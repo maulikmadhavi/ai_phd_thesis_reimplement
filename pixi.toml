@@ -8,6 +8,7 @@ python = "3.11.*"
 numpy = "*"
 scipy = "*"
 pysoundfile = "*"
+pyarrow = "*"
 pytest = "*"
 
 [activation.env]
@@ -24,5 +25,19 @@ matplotlib = "*"
 demo-stage1 = "python demo/stage1_audio_demo.py"
 demo-stage2 = "python demo/stage2_features_demo.py"
 
+# Forced alignment of TIMIT words (GPU model). Torch stays out of core/demo.
+[feature.align.system-requirements]
+cuda = "12"
+
+[feature.align.dependencies]
+pytorch-gpu = "*"
+transformers = "*"
+huggingface_hub = "*"
+safetensors = "*"
+
+[feature.align.tasks]
+align-timit = "python -m qbestd.alignment.run --split all --device cuda"
+
 [environments]
 demo = ["demo"]
+align = ["align"]
