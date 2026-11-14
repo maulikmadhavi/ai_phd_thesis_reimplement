@@ -1,0 +1,11 @@
+.pixi/
+.claude/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+*.wav
+*.flac
+data/
+outputs/
+paths.local.toml

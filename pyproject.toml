@@ -1,0 +1,12 @@
+[project]
+name = "qbestd"
+version = "0.1.0"
+description = "Query-by-example spoken term detection thesis reimplementation"
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -10,6 +10,9 @@ scipy = "*"
 pysoundfile = "*"
 pytest = "*"
 
+[activation.env]
+PYTHONPATH = "src"
+
 [tasks]
 test = "pytest -q"
 
