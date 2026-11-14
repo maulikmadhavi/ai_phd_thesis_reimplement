@@ -20,5 +20,8 @@ test = "pytest -q"
 gradio = "*"
 matplotlib = "*"
 
+[feature.demo.tasks]
+demo-stage1 = "python demo/stage1_audio_demo.py"
+
 [environments]
 demo = ["demo"]
