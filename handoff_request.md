@@ -1,16 +1,20 @@
 # Handoff Request: Reviewer → Codex
 
-- **Cycle:** 2
+- **Cycle:** 2 + 2b
 - **From:** Claude Code Reviewer
 - **To:** Codex. Write only `handoff_response.md` (replacing the cycle 1 response) and commit
   it. Do not touch any other file.
-- **Plan under review:** `docs/plan.md` at `11862f2`: Stage 1 fix-ups F1–F7 and Stage 2
-  (acoustic features) T2.1–T2.11
-- **Status:** COMPLETE. All 18 tasks are committed and reviewed (head `a0c46c4`).
-- **D1 (user decision, resolved 2026-11-14):** no LDC `.WRD` files. The user only needs word
-  segments to cut out the spoken queries, so query boundaries will come from
-  **automatic alignment on the HF copy**. Results are labelled approximate against the
-  thesis. See Q14 for how to do the alignment.
+- **Plans under review:**
+  - `docs/plan.md` at `11862f2`: Stage 1 fix-ups F1–F7 and Stage 2 (acoustic features)
+    T2.1–T2.11. Sections 1–4 below, Q1–Q13.
+  - `docs/plan.md` at `9498174`, §9: cycle 2b, TIMIT word alignment A1–A5. **Section 4**
+    below, Q14–Q20.
+- **Status:** COMPLETE. Cycle 2 (18 tasks, head `a0c46c4`) and cycle 2b (5 tasks, head
+  `4d6f1af`) are committed and reviewed.
+- **D1 (user decision, resolved 2026-11-14):** no LDC `.WRD` files. Query boundaries come from
+  automatic forced alignment on the HF copy. The user picked the aligner
+  `Scicom-intl/Where-Words-Begin-and-End-Whisper-Large-V3`, which replaces the Reviewer's
+  earlier MFA proposal. Results are labelled approximate against the thesis.
 
 ## 1. Commits to review
 
@@ -121,33 +125,98 @@ is under 400 lines, and this handoff covers D1 and the parity gaps. **Met.**
 
 **Open questions carried forward**
 
-12. Plan §4 #14: did the thesis downsample TIMIT to 8 kHz? Data is confirmed 16 kHz on row 0.
+12. Plan §4 #14: did the thesis downsample TIMIT to 8 kHz? Data is confirmed 16 kHz on all 6300 rows (cycle 2b).
     MATLAB defaults to 16 kHz with fH 4000 for MFCC-TMP but fH `fs/2` for MFCC. Which
     `(sample_rate, high_hz)` pair should each extractor default to?
 13. Missing `Fx_melfiltbank.m`: is there any other source (thesis appendix, rastamat
     `fft2melmx`, an old copy) that pins down the triangle normalisation (unit peak versus unit
     area) and edge placement?
 
-**D1 follow-up: word alignment for query extraction**
+## 4. Cycle 2b: TIMIT word alignment (A1–A5)
 
-14. Every row has its transcript (`sentence`), so the Reviewer suggests **forced alignment**
-    of that known text rather than free ASR. Free ASR word timestamps (e.g. Whisper) are
-    looser and can mis-recognise the keyword. Our candidate approach:
-    - Use Montreal Forced Aligner (conda-forge, English ARPAbet model; word and phone
-      TextGrids) in a separate pixi feature/env `align`, so the core env stays lean.
-    - Run it once offline over the train split (queries) and test split (ground truth).
-    - Commit only a small text manifest (`split, row_index, word, start_s, end_s`). Never
-      commit audio.
-    - Cut the Q-20/Q-84 queries from the manifest with a small padding (e.g. 20 ms).
+### Commits to review
 
-    Alternatives: torchaudio MMS forced aligner (adds torch), WhisperX (adds torch and
-    Whisper, looser timing). Do you agree with MFA? Which approach best balances accuracy
-    against requirements.md's "be conservative with dependencies"? How should we sanity-check
-    the boundaries, given the HF rows have no IDs to match against official TIMIT? Note that
-    the phone boundaries could also serve Stage 6 STM checks.
+| Commit | Task | Files | Reviewer verdict |
+|---|---|---|---|
+| `7fd4848` exec: add align pixi environment | A1 | `pixi.toml`, `pixi.lock` | OK; torch only in `align`, `pyarrow` in core |
+| `bb7ba6c` exec: add hugging face timit loader | A2 | `data/timit_hf.py`, tests | OK; takes an extra `split` argument (plan deviation 2) |
+| `a957ba6` exec: add whisper word aligner wrapper | A3 | `alignment/word_aligner.py`, `alignment/manifest.py`, tests | OK; see Q14, Q15 |
+| `7054dc0` exec: align timit words and record notes | A4 | `alignment/run.py`, `alignment/sanity.py`, `docs/alignment_notes.md`, `.gitignore`, tests | OK; see Q16–Q18 |
+| `4d6f1af` exec: record d1 resolution in data notes | A5 | `docs/data_notes.md` | OK |
 
-## 4. Response format requested
+Diff range: `git diff 9498174 4d6f1af -- . ':!pixi.lock'`
+
+Cycle 2b definition of done (plan §9): A1–A5 are on `main`; core tests are green with no torch
+and no network; manifests exist locally with hashes and checks recorded. **Met.**
+
+### Reviewer checks done
+
+- `pixi run test` (core env): **233 passed, 1 skipped** (the real-model smoke test, gated by
+  `QBESTD_RUN_ALIGNER=1`).
+- **Remote code check.** I read the cached `align.py` at the pinned revision. Its SHA-256
+  `8f7a3590…0ee0` matches the pin. It does no file, network or subprocess I/O and doesn't use
+  `trust_remote_code`. `from_pretrained` only gets `*.json` and `*.safetensors` (no pickle
+  weights, per `allow_patterns`). `load_align_module` refuses on a hash mismatch and never
+  touches `sys.path`.
+- **Nothing derived is committed.** Manifests, weights, parquet, `outputs/` and the spot-check
+  WAVs are all git-ignored (`.gitignore:10 outputs/`, `*.wav`). The CC BY-NC 4.0 licence is
+  recorded in both docs.
+- The Executor reports the full run with 6300/6300 rows aligned and 0 failed. All rows are
+  16 kHz, because the loader raises otherwise. Median word duration is 0.285 s, and 15 rule
+  violations (all < 20 ms) fall in 9 rows. All of this is documented with row indices in
+  `docs/alignment_notes.md`. I didn't re-run the 8-minute alignment, but `outputs/alignment/`
+  holds the summary, sanity report and manifests.
+- Every module is under 400 lines (largest: `sanity.py`, 172).
+- **Plan deviations:**
+  1. `.gitignore` `data/` became `/data/`, so it no longer ignores `src/qbestd/data`. Correct.
+  2. `iter_timit_rows` takes a `split` argument.
+  3. `check_segments(expected_words=)` is extended.
+  4. `align_rows_detailed` / `RowResult` were added.
+  5. `sanity.py`, `--limit` and the rows TSV are extras.
+
+  All are reasonable and covered by tests.
+
+**For the user (not Codex):** the 10 spot-check WAVs in `outputs/alignment/spot_check/` have
+not been listened to yet.
+
+### Questions for Codex (cycle 2b)
+
+14. **Vacuous rules in `check_segments`.** `align.py` (lines 146–151) already clamps each
+    start to at least the previous start, and each end to at least start + 0.01 s. So the
+    "decreasing starts" and "end ≤ start" rules can never fire on real output, and a collapsed
+    run of words is caught only when it falls under 20 ms. Should `check_segments` add a rule
+    for **consecutive words sharing the same start** (the collapse signature in rows 908, 3213,
+    3505 and test 1151), so Stage 7 can drop those rows cleanly rather than relying on a
+    duration threshold?
+15. **`normalize_transcript` units.** The aligner is given our tokens as a word list, so
+    `align.py`'s own `words_of` (NFC normalisation, markup removal, dropping tokens without a
+    letter or digit) is bypassed. Our tokens keep hyphenated compounds as one word and inner
+    apostrophes. Is there a TIMIT transcript form that splits into a unit the model handles
+    badly, for example a hyphenated compound, or a digit if any appear? Should we NFC-normalise
+    too?
+16. **Overlapping boundaries.** 12,732 of 38,197 adjacent train pairs overlap, by up to
+    0.23 s. For cutting queries, should Stage 7:
+    - use `[start − pad, end + pad]` as is,
+    - clip each word to the midpoint of any overlap with its neighbours, or
+    - drop keywords overlapping a neighbour by more than X ms?
+17. **Accuracy claim and speaker leakage.** The model was trained on TIMIT *training*
+    speakers' human boundaries, and this HF copy's split was redrawn. So many HF "test" rows
+    may come from speakers the aligner saw in training. That doesn't affect QbE scoring
+    (alignment only cuts queries and labels), but should `alignment_notes.md` say the card's
+    10.7 ms figure isn't transferable to this split?
+18. **Sanity-check strength.** The energy check (word mean > the utterance's 10th-percentile
+    frame energy) passed 20/20 but is a low bar. Is there a cheap, stronger automatic check
+    without reference `.WRD` files? For example, re-align a time-shifted or concatenated copy
+    and check that the boundaries shift accordingly, or cross-check against a second aligner on
+    a sample of 50 rows.
+19. **Reproducibility.** The aligner runs in bf16 on GPU, so a re-run may change the last digit
+    of some times and therefore the manifest SHA-256s. Is recording the hashes still useful, or
+    should we record a tolerance-based fingerprint, such as summary statistics per split?
+20. Any other correctness, PEP 8, security or test-coverage issues in A1–A5? In particular:
+    `pytorch-gpu = "*"` with `cuda = "12"`, and pinning only by `pixi.lock`.
+
+## 5. Response format requested
 
 Write `handoff_response.md` with one section per question number. Mark each as
 **agree / change requested / unknown**. For a requested change, give the file and the
-concrete change. Commit it as `handoff_resp: cycle 2 review`.
+concrete change. Commit it as `handoff_resp: cycle 2 and 2b review`.
