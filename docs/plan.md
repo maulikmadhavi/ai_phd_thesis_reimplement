@@ -105,7 +105,7 @@ matches (see §4, D1).
 | 14 | TIMIT at 8 kHz or 16 kHz? | **Unknown.** Evidence: MATLAB MFCC-TMP defaults to fs = 16000 with fH = 4000, which points to 16 kHz audio with a 4 kHz mel ceiling. Keep `sample_rate` and `high_hz` as *separate* settings. Default `high_hz = 4000` and leave the sample rate unverified. |
 | 15 | Q-84 list | **Unknown.** Derive it deterministically in Stage 7 from the official split and normalized transcripts, compare the count to 84, and commit the list as an artifact. |
 | 16 | Phone segmentation for Stage 6 | **Resolved:** STM (`stm_computation.m`, Matching.tex lines 287–339). |
-| D1 | **User decision:** is a licensed LDC TIMIT copy with `.WRD` files available? | **Open.** Without it, Q-20/Q-84 query audio has to be cut by forced alignment on the HF copy. That is an approximate experiment and must be labelled as such. Stage 2 does not depend on this; Stage 7 does. |
+| D1 | **User decision:** is a licensed LDC TIMIT copy with `.WRD` files available? | **Resolved 2026-11-14:** no LDC copy. The user chose the forced aligner [`Scicom-intl/Where-Words-Begin-and-End-Whisper-Large-V3`](https://huggingface.co/Scicom-intl/Where-Words-Begin-and-End-Whisper-Large-V3) to produce the word boundaries on the HF copy. This replaces the Reviewer's MFA proposal in `handoff_request.md` Q14. Results are labelled approximate against the thesis. Tasks are in §9. |
 
 Codex decisions adopted:
 - Keep `win-64` only.
@@ -341,3 +341,145 @@ Arrays are `(n_frames, n_dims)` throughout, and all logs use an explicit floor (
 - F1–F7 and T2.1–T2.11 are on `main`, and `pixi run test` is green.
 - Every module is under 400 lines.
 - The Reviewer has written `handoff_request.md` for cycle 2, including the D1 status and any parity gaps.
+
+---
+
+## 9. Cycle 2b: TIMIT word alignment (user decision D1)
+
+The user picked the aligner, so these tasks do not depend on Codex's cycle 2 answers and can
+start now. Any sanity-check advice Codex gives under Q14 is folded in at cycle 3. Every
+module stays under 400 lines, and every function gets tests.
+
+**About the aligner (read from the model card and `align.py` on 2026-11-14):**
+- It is Whisper large-v3 with merged LoRA weights. It is given the audio plus the known
+  words, decodes once with the transcript teacher-forced, and returns
+  `[{"word", "start", "end"}]` in seconds.
+- Input is 16 kHz mono float32, at most 30 s. TIMIT utterances are about 3 s.
+- The card reports a mean word-boundary error of 10.7 ms on the TIMIT test set (MFA 3.4:
+  19.1 ms). The model was trained on human boundaries from the TIMIT *training* speakers,
+  so it follows TIMIT's labelling conventions closely.
+- **Licence: CC BY-NC 4.0** (non-commercial). This repo is personal research, which is fine.
+  Record the licence in the docs, and never commit or redistribute the weights.
+- **Pin both revisions:**
+  - model `618763b1ed3ae17cb9a2062d6d4d0de436828c7a`
+  - dataset `Siyong/speech_timit` `ef7bffd88de7065b8b1c2fdc76e8364921c30e58`
+- `align.py` (153 lines) has been reviewed by the Orchestrator. It only runs the model (no file
+  or network I/O). At the pinned revision its SHA-256 is
+  `8f7a3590aa3a83dbc9cc33db3d6051b1c9b94f1212c353655c96fc841c910ee0`.
+  - Load it with `importlib.util.spec_from_file_location` from the pinned snapshot, and only
+    after checking that hash. On a mismatch, raise.
+  - Do **not** put the snapshot directory on `sys.path`.
+- The weights are 3.1 GB and the parquet files about 1.2 GB. Both go to the Hugging Face
+  cache, outside the repo. Never into the repo.
+- Hardware: an RTX 5070 with 12 GB (Blackwell, sm_120), which needs a CUDA 12.8+ PyTorch
+  build. Use bf16 on the GPU. Fallback is float32 on CPU: slow (hours) but correct.
+
+### A1: `align` pixi environment
+- **Files:** `pixi.toml`
+- **Core env:** add `pyarrow`, because Stage 7 also has to read the parquet files.
+- **New feature `align`**, with environment `align = ["align"]`:
+  - `pytorch-gpu` from conda-forge, or `pytorch` with a CUDA build that supports sm_120
+  - `transformers`
+  - `huggingface_hub`
+  - `safetensors`
+- Keep torch out of the core and demo envs.
+- **Check:** `pixi run -e align python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_arch_list())"`
+  shows `True` and `sm_120`. If no conda-forge build works, record that and use CPU. Do not
+  add pip or PyPI index hacks without flagging them in the review.
+- **Commit:** `exec: add align pixi environment`
+
+### A2: HF TIMIT loader
+- **Files:** `src/qbestd/data/__init__.py`, `src/qbestd/data/timit_hf.py`, tests
+- **Do:**
+  - `TIMIT_HF_REPO` and `TIMIT_HF_REVISION` (the pinned sha).
+  - `download_timit_parquet(split) -> list[Path]` using `huggingface_hub.hf_hub_download`
+    at the pinned revision. Import it lazily: core-env tests must not need the network.
+  - `iter_timit_rows(parquet_paths) -> Iterator[TimitRow]`, where `TimitRow` holds
+    `split, row_index, sentence, audio (float32), sample_rate`. Use pyarrow and read in
+    batches, not all at once.
+  - Raise if `sample_rate != 16000`. This settles the open sample-rate question for every
+    row, not just row 0.
+  - `normalize_transcript(sentence) -> list[str]`: lowercase, split on whitespace, strip
+    punctuation from the ends of each word, keep inner apostrophes (`don't`), drop empty
+    tokens. Stage 7 must use this **same** function for keyword matching.
+- **Tests:** a tiny parquet written to `tmp_path` with pyarrow (two rows, synthetic audio);
+  a rate-mismatch row raises; normalisation cases (punctuation, apostrophe, repeated spaces).
+- **Commit:** `exec: add hugging face timit loader`
+
+### A3: Aligner wrapper and manifest
+- **Files:** `src/qbestd/alignment/__init__.py`, `src/qbestd/alignment/word_aligner.py`,
+  `src/qbestd/alignment/manifest.py`, tests
+- **`word_aligner.py`:**
+  - `load_whisper_aligner(device, revision) -> aligner`:
+    `snapshot_download` at the pinned revision, then the SHA-256 check on `align.py`, then
+    the importlib load, then `ForcedAligner(path, device, dtype)`. Import torch lazily
+    inside the function.
+  - `align_rows(rows, aligner, batch_size) -> Iterator[WordSegment]`:
+    - pass `normalize_transcript(...)` as a **word list** (not a string), so the
+      manifest words are exactly our tokens;
+    - call `align_batch`;
+    - an item the aligner returns as an `Exception` is logged and recorded as failed,
+      not raised.
+- **`manifest.py`:**
+  - `WordSegment(split, row_index, word_index, word, start_s, end_s)`.
+  - `write_manifest` / `read_manifest`: TSV with a header line, plus a `# model=<sha>
+    dataset=<sha>` comment line at the top.
+  - `check_segments(segments, duration_s) -> list[str]`, which reports any of:
+    - start < 0
+    - end > duration
+    - end ≤ start
+    - non-monotonic starts
+    - word duration < 20 ms or > 2 s
+    - word count ≠ transcript token count
+- **Tests:**
+  - use a **fake aligner** object with an `align_batch` method; never download the model in
+    tests;
+  - TSV round-trip;
+  - each `check_segments` rule;
+  - an `align.py` hash mismatch raises, using a temporary file plus a monkeypatched
+    snapshot path.
+  - An optional smoke test against the real model is skipped unless `QBESTD_RUN_ALIGNER=1`.
+- **Commit:** `exec: add whisper word aligner wrapper`
+
+### A4: Run the alignment over both splits
+- **Files:** `src/qbestd/alignment/run.py` (CLI: `python -m qbestd.alignment.run --split
+  train|test|all --device cuda --batch-size 16 --out outputs/alignment/`); pixi task
+  `align-timit` in the `align` feature; tests for argument parsing and the summary function.
+- **Outputs:** git-ignored, under `outputs/alignment/`:
+  - `timit_hf_words_{train,test}.tsv`
+  - `failures.tsv`
+  - `summary.json` (row and word counts, failures, check violations, word-duration
+    percentiles, runtime)
+- **Do not commit the manifests.** They are derived from LDC-licensed TIMIT text through a
+  CC BY-NC model, and they are reproducible from the two pinned revisions.
+- **Run it**, then write `docs/alignment_notes.md`:
+  - model, licence and revisions;
+  - the SHA-256 of each manifest;
+  - the counts from `summary.json`;
+  - every rule violation, with its row index;
+  - the confirmed sample rate.
+- **Sanity checks, recorded in that doc:**
+  1. Every row is aligned (or listed as failed); zero `check_segments` violations, or
+     every one explained.
+  2. Word-duration median falls in 0.15–0.5 s.
+  3. The SA sentence "she had your dark suit in greasy wash water all year" appears many
+     times. Compare the start of `dark` across those rows: report the spread of the
+     *relative* position (start / duration) and flag outliers beyond 3 IQR.
+  4. For 20 random words, the mean frame energy inside the segment exceeds the
+     utterance's lowest-energy 10% of frames (reuse `qbestd.audio.energy`).
+  5. Write 10 cut segments (20 ms padding) to `outputs/alignment/spot_check/` as WAVs
+     (git-ignored) for the user to listen to. Say so in the handoff.
+- **Commit:** `exec: align timit words and record notes`
+
+### A5: Data notes update
+- **Files:** `docs/data_notes.md`
+- **Do:**
+  - Replace "Pending user decision D1" with the resolution: aligner, licence, link to
+    `docs/alignment_notes.md`, and "approximate against thesis" wording.
+  - Update the sample-rate row with the all-rows check from A2/A4.
+- **Commit:** `exec: record d1 resolution in data notes`
+
+**Cycle 2b definition of done:**
+- A1–A5 are on `main`, and `pixi run test` is green in the core env (no torch, no network).
+- Manifests exist locally, with their hashes and checks recorded.
+- Query cutting itself (Q-20/Q-84 lists, padding) stays in Stage 7. A4 only produces boundaries.
