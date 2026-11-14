@@ -21,14 +21,15 @@
 | `6be2695` exec: add analysis windows | T1.5 | `src/qbestd/audio/windowing.py`, tests | OK; default flagged unverified |
 | `66d0dd6` exec: add power spectrum | T1.6 | `src/qbestd/audio/spectrum.py`, tests | OK; see Q7 |
 | `5e49710` exec: add short-time and teager energy | T1.7 | `src/qbestd/audio/energy.py`, tests | OK; see Q8 |
+| `06979f8` exec: add dataset path configuration | T1.8 | `src/qbestd/config.py`, `tests/test_config.py` | OK; see Q9 |
 
-Diff range: `git diff e42ce14 5e49710 -- . ':!pixi.lock'`
+Diff range: `git diff e42ce14 06979f8 -- . ':!pixi.lock'`
 
-**Not yet committed:** T1.8 config, T1.9 pipeline, T1.10 Gradio demo, T1.11 TIMIT notes.
+**Not yet committed:** T1.9 pipeline, T1.10 Gradio demo, T1.11 TIMIT notes.
 
 ## 2. Reviewer checks done
 
-- `pixi run test`: **38 passed** (0.89 s) at `5e49710`.
+- `pixi run test`: **49 passed** (1.01 s) at `06979f8`.
 - Every module is under 400 lines. The largest source file is 40 lines, the largest test 49.
 - Each task matches its plan spec: function names, signatures, conventions (HTK framing with
   no padding, symmetric `N-1` windows) and the required tests.
@@ -68,19 +69,29 @@ Diff range: `git diff e42ce14 5e49710 -- . ':!pixi.lock'`
    `frame_teager_energy` applies TEO inside each frame, so the 2 edge samples per frame are
    replicated rather than taken from neighbouring frames. Is per-frame TEO acceptable, or
    should TEO run on the whole signal before framing (closer to MFCC-TMP's subband TEO)?
-9. Any other correctness, PEP 8 or test-coverage issues in the listed commits?
+9. `config.DatasetPaths`:
+   - The defaults are machine-specific absolute Windows paths. The plan asked for this, but
+     they are now committed to a public repo. Keep them, or move them to an example
+     `paths.local.toml.example`?
+   - `paths.local.toml` is resolved relative to the current working directory, not the
+     repo root.
+   - `require("typo")` raises `AttributeError` instead of a clear error.
+   - An empty env var falls through to the file/default because of `or`.
+
+   Which of these should change?
+10. Any other correctness, PEP 8 or test-coverage issues in the listed commits?
 
 **Plan §4 open questions** (please check against the MATLAB feature-extraction repo
 `github.com/maulikmadhavi/research_myMATLAB_codes/tree/master/Analysis/Feature_Extraction`
 and the thesis, and cite file names and line numbers):
 
-10. Pre-emphasis coefficient, window type, FFT size, cepstral liftering (22?), and c0 versus
+11. Pre-emphasis coefficient, window type, FFT size, cepstral liftering (22?), and c0 versus
     log-energy in the original MFCC code.
-11. Was TIMIT downsampled to 8 kHz before feature extraction? The thesis puts mel filters over
+12. Was TIMIT downsampled to 8 kHz before feature extraction? The thesis puts mel filters over
     0–4000 Hz, but TIMIT is 16 kHz.
-12. How is the Q-84 query list derived (7–20 test occurrences, ≥ 6 letters)? Was there a fixed
+13. How is the Q-84 query list derived (7–20 test occurrences, ≥ 6 letters)? Was there a fixed
     list in the original work?
-13. Which phone-segmentation method was used for feature reduction (stage 6)?
+14. Which phone-segmentation method was used for feature reduction (stage 6)?
 
 ## 4. Response format requested
 
