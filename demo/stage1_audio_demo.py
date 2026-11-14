@@ -46,15 +46,15 @@ def plot_spectrogram(frames, config, sample_rate, shift_ms):
 
 
 def plot_energy_curves(frames, shift_ms):
-    figure = Figure(figsize=(8, 2.5))
-    axes = figure.subplots()
+    figure = Figure(figsize=(8, 4))
+    energy_axes, teager_axes = figure.subplots(2, 1, sharex=True)
     times = np.arange(len(frames)) * shift_ms / 1000.0
-    axes.plot(times, log_energy(frames), label="log short-time energy")
-    teager = frame_teager_energy(frames)
-    axes.plot(times, np.log(np.maximum(np.abs(teager), LOG_POWER_FLOOR)),
-              label="log |mean TEO|")
-    axes.set(xlabel="time (s)", title="Energy per frame")
-    axes.legend()
+    energy_axes.plot(times, log_energy(frames))
+    energy_axes.set(ylabel="log energy", title="Short-time energy per frame")
+    teager_axes.plot(times, frame_teager_energy(frames))
+    teager_axes.axhline(0.0, color="gray", linewidth=0.5)
+    teager_axes.set(xlabel="time (s)", ylabel="mean TEO (signed)",
+                    title="Teager energy per frame (can be negative)")
     figure.tight_layout()
     return figure
 
