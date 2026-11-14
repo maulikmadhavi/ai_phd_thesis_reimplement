@@ -1,9 +1,11 @@
 # Data notes: TIMIT on Hugging Face (`Siyong/speech_timit`)
 
-Inspected read-only on 2026-11-14 through the public HF API, the repo's
+First inspected read-only on 2026-11-14 through the public HF API, the repo's
 `dataset_infos.json` (revision `ef7bffd`, last modified 2022-07-13) and one
-row from the dataset-viewer rows API. No parquet file was downloaded and the
-`datasets` package was not added.
+row from the dataset-viewer rows API. Since then the parquet files were read
+at the pinned revision `ef7bffd88de7065b8b1c2fdc76e8364921c30e58`, through
+pyarrow and `huggingface_hub` (the `datasets` package is not used); they live
+in the Hugging Face cache, not in the repository.
 
 ## Format
 
@@ -12,12 +14,13 @@ row from the dataset-viewer rows API. No parquet file was downloaded and the
 | Files | `data/train-00000-of-00002.parquet`, `data/train-00001-of-00002.parquet`, `data/test-00000-of-00001.parquet` |
 | Columns | `audio`: struct of `array` (float32 sequence) and `sampling_rate` (int64); `sentence`: string |
 | Splits | train = 5040 utterances, test = 1260 utterances |
-| Sample rate | **Observed 16 kHz** on train row 0 (`audio.sampling_rate = 16000`, 38,605 samples = 2.41 s, sentence "combine all the ingredients in a large bowl"). Read from the `sampling_rate` field of the rows API JSON, which returns the array inline, so no WAV header was involved. Only row 0 was checked; the size estimate (about 49.2k float32 samples per utterance, 3.1 s mean at 16 kHz) is consistent with the rest of train being 16 kHz but does not prove it. |
+| Sample rate | **16 kHz on every row.** `iter_timit_rows` (`qbestd.data.timit_hf`) raises on any other rate, and the alignment run read all 6300 rows (5040 train, 1260 test) without raising (see `docs/alignment_notes.md`). Row 0 of train was earlier seen as 38,605 samples = 2.41 s. |
 | README / license | The repo has no README and an empty license field. TIMIT itself is LDC93S1 (licensed). |
 
 ## What is missing
 
-- **No word or phone alignments.** Only the sentence text is present.
+- **No word or phone alignments in the dataset.** Only the sentence text is
+  present. Word boundaries now come from forced alignment (see D1 below).
 - **No identifiers.** There is no speaker, dialect, sentence ID or file name.
   The `/sa/` sentences therefore cannot be excluded by name. Only the two fixed
   SA texts can be matched by string:
@@ -52,22 +55,39 @@ speaker IDs to check. Consequences:
      would be matched to the HF rows by sentence text plus a waveform check,
      because the HF rows have no IDs.
   2. Forced alignment of the known text, which adds a dependency and
-     alignment noise.
+     alignment noise. **Chosen** (see D1 below).
 - **Q-84 keyword list:** derivable from `sentence` using the thesis rule (at
   least 6 letters, 7 to 20 test occurrences), but with this split's counts.
   Verify the rule text in the thesis before implementing.
 
-## Suggested decision for the Orchestrator
+## Suggested decision for the Orchestrator (superseded)
 
-Prefer option 1 (original TIMIT with `.WRD`/`.PHN`) if the user holds a copy.
-Otherwise a reproduction on this HF copy will differ from the thesis in the
-split, the keyword counts and the segment boundaries, so absolute p@N and MAP
-values are not directly comparable to the thesis tables.
+This section recommended the original TIMIT with `.WRD`/`.PHN` files if the
+user had a copy. The user chose forced alignment instead (D1 below). A
+reproduction on this HF copy still differs from the thesis in the split, the
+keyword counts and the segment boundaries, so absolute p@N and MAP values are
+not directly comparable to the thesis tables.
 
-## Pending user decision D1
+## Resolved decision D1
 
-**Is a licensed LDC TIMIT copy with `.WRD`/`.PHN` files available?** (plan.md
-section 4, D1.) Status: open, waiting for the user. Without it, Q-20 and Q-84
-query audio would have to be cut by forced alignment on the HF copy, and that
-experiment must be labelled approximate. Stages 2 to 6 do not depend on the
-answer; Stage 7 does.
+**Resolution (2026-11-14, the user):** no licensed LDC TIMIT copy is used. Word
+boundaries for Q-20 and Q-84 query cutting come from the forced aligner
+`Scicom-intl/Where-Words-Begin-and-End-Whisper-Large-V3` (licence **CC BY-NC
+4.0**, non-commercial, personal research only), run on both splits of this HF
+copy. It replaces the MFA idea in the handoff request, Q14.
+
+- Model revision `618763b1ed3ae17cb9a2062d6d4d0de436828c7a`; dataset revision
+  `ef7bffd88de7065b8b1c2fdc76e8364921c30e58`. Both are pinned in code.
+- Result: 6300 of 6300 rows aligned (54,198 words), 15 words under 20 ms in
+  9 rows, all listed in `docs/alignment_notes.md` together with the sanity
+  checks and 10 spot-check WAVs for the user to listen to.
+- **Wording to use in any results table: "approximate against the thesis".**
+  The boundaries are model output (the card reports 10.7 ms mean error on the
+  official TIMIT test set; we did not measure it), the split is redrawn, and
+  there are no speaker or sentence IDs.
+- Manifests are written to `outputs/alignment/` and are git-ignored, because
+  they derive from LDC text through a CC BY-NC model. Reproduce with
+  `pixi run -e align align-timit`.
+- Stage 7 must use `normalize_transcript` from `qbestd.data.timit_hf` for
+  keyword matching, so words match the manifest tokens exactly.
+- Stages 2 to 6 are unaffected.
