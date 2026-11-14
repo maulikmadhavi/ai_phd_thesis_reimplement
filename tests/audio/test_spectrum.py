@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from qbestd.audio.spectrum import (
+    complex_spectrum,
     fft_bin_frequencies,
     magnitude_spectrum,
     next_power_of_two,
@@ -64,3 +65,16 @@ def test_invalid_n_fft_raises(bad_n_fft):
 
 def test_n_fft_equal_to_frame_length_is_allowed():
     assert power_spectrum(np.zeros((2, 200)), n_fft=200).shape == (2, 101)
+
+
+def test_complex_spectrum_is_two_sided_and_consistent():
+    frames = np.random.default_rng(2).normal(size=(3, 200))
+    full = complex_spectrum(frames)
+    assert full.shape == (3, 256)
+    assert np.allclose(np.abs(full[:, :129]), magnitude_spectrum(frames))
+    assert np.allclose(full[:, 1:128], np.conj(full[:, :128:-1]))
+
+
+def test_complex_spectrum_validates_n_fft():
+    with pytest.raises(ValueError):
+        complex_spectrum(np.zeros((1, 200)), n_fft=100)

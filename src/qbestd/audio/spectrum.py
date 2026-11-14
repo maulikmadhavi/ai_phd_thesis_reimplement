@@ -10,6 +10,20 @@ def next_power_of_two(n):
     return 1 << (int(n) - 1).bit_length()
 
 
+def _resolve_n_fft(frames, n_fft):
+    """Validate ``n_fft`` (None -> next power of two) for ``frames``."""
+    if n_fft is None:
+        n_fft = next_power_of_two(frames.shape[-1])
+    if not float(n_fft).is_integer() or n_fft <= 0:
+        raise ValueError(f"n_fft must be a positive integer, got {n_fft!r}")
+    n_fft = int(n_fft)
+    if n_fft < frames.shape[-1]:
+        raise ValueError(
+            f"n_fft={n_fft} is shorter than the frame length "
+            f"{frames.shape[-1]}")
+    return n_fft
+
+
 def magnitude_spectrum(frames, n_fft=None):
     """One-sided FFT magnitude, shape (n_frames, n_fft // 2 + 1).
 
@@ -23,16 +37,19 @@ def magnitude_spectrum(frames, n_fft=None):
             the frame length (which would silently truncate the frame).
     """
     frames = np.asarray(frames, dtype="float64")
-    if n_fft is None:
-        n_fft = next_power_of_two(frames.shape[-1])
-    if not float(n_fft).is_integer() or n_fft <= 0:
-        raise ValueError(f"n_fft must be a positive integer, got {n_fft!r}")
-    n_fft = int(n_fft)
-    if n_fft < frames.shape[-1]:
-        raise ValueError(
-            f"n_fft={n_fft} is shorter than the frame length "
-            f"{frames.shape[-1]}")
+    n_fft = _resolve_n_fft(frames, n_fft)
     return np.abs(np.fft.rfft(frames, n=n_fft, axis=-1))
+
+
+def complex_spectrum(frames, n_fft=None):
+    """Two-sided complex FFT, shape (n_frames, n_fft), unnormalized.
+
+    Same validation as ``magnitude_spectrum``. Used by MFCC-TMP, which needs
+    the phase (MATLAB ``myspectrogram`` third output).
+    """
+    frames = np.asarray(frames, dtype="float64")
+    n_fft = _resolve_n_fft(frames, n_fft)
+    return np.fft.fft(frames, n=n_fft, axis=-1)
 
 
 def power_spectrum(frames, n_fft=None):
