@@ -1,134 +1,133 @@
 # Handoff Request: Reviewer → Codex
 
-- **Cycle:** 1
+- **Cycle:** 2
 - **From:** Claude Code Reviewer
-- **To:** Codex. Write only `handoff_response.md` and commit it. Do not touch any other file.
-- **Plan under review:** `docs/plan.md` (commit `e42ce14`), Stage 0 + Stage 1
-- **Status:** COMPLETE. All of Stage 0 and Stage 1 (T0.1–T1.11) are committed and reviewed.
+- **To:** Codex. Write only `handoff_response.md` (replacing the cycle 1 response) and commit
+  it. Do not touch any other file.
+- **Plan under review:** `docs/plan.md` at `11862f2`: Stage 1 fix-ups F1–F7 and Stage 2
+  (acoustic features) T2.1–T2.11
+- **Status:** COMPLETE. All 18 tasks are committed and reviewed (head `a0c46c4`).
+- **D1 (user decision, still open):** is a licensed LDC TIMIT copy with `.WRD`/`.PHN`
+  available? Stage 2 doesn't depend on it; Stage 7 does.
 
 ## 1. Commits to review
 
-| Commit | Plan task | Files | Reviewer verdict |
+| Commit | Task | Files | Reviewer verdict |
 |---|---|---|---|
-| `e0436aa` setup pixi environment | T0.1 | `pixi.toml`, `pixi.lock` | OK; see Q1, Q2 |
-| `16f5a77` exec: add package skeleton and gitignore | T0.2 | `.gitignore`, `pyproject.toml`, `src/qbestd/__init__.py`, `demo/.gitkeep` | OK; see Q3 |
-| `c37f599` exec: add concise readme | T0.3 | `README.md` (35 lines) | OK |
-| `75af7d9` exec: add wav load and save | T1.1 | `src/qbestd/audio/io.py`, `tests/audio/test_io.py` | OK |
-| `391e945` exec: add resampling utilities | T1.2 | `src/qbestd/audio/resample.py`, tests | OK; see Q5 |
-| `1401394` exec: add pre-emphasis and dc removal | T1.3 | `src/qbestd/audio/preprocess.py`, tests | OK; default flagged unverified |
-| `6e38c39` exec: add signal framing | T1.4 | `src/qbestd/audio/framing.py`, tests | OK; see Q6 |
-| `6be2695` exec: add analysis windows | T1.5 | `src/qbestd/audio/windowing.py`, tests | OK; default flagged unverified |
-| `66d0dd6` exec: add power spectrum | T1.6 | `src/qbestd/audio/spectrum.py`, tests | OK; see Q7 |
-| `5e49710` exec: add short-time and teager energy | T1.7 | `src/qbestd/audio/energy.py`, tests | OK; see Q8 |
-| `06979f8` exec: add dataset path configuration | T1.8 | `src/qbestd/config.py`, `tests/test_config.py` | OK; see Q9 |
-| `1f1fe64` exec: add audio front-end pipeline | T1.9 | `src/qbestd/audio/pipeline.py`, tests | OK; see Q10 |
-| `95cb709` exec: add stage 1 gradio demo | T1.10 | `demo/stage1_audio_demo.py` (108 lines), `pixi.toml` | OK; see Q11 |
-| `b24097d` exec: document timit dataset format | T1.11 | `docs/data_notes.md` | OK; answers the input side of open question 2; see Q17 |
+| `609baf2` exec: validate pcm range in save_audio | F1 | `audio/io.py`, tests | OK |
+| `b734af3` exec: validate rates and anti-alias time scaling | F2 | `audio/resample.py`, tests | OK; see Q1 |
+| `78d4ea2` exec: validate framing parameters | F3 | `audio/framing.py`, tests | OK |
+| `21027a8` exec: reject short or invalid fft lengths | F4 | `audio/spectrum.py`, tests | OK |
+| `2855038` exec: remove absolute defaults from dataset config | F5 | `config.py`, `paths.local.toml.example`, tests | OK; adds a check beyond the plan (see Q2) |
+| `315a732` exec: plot signed teager energy in demo | F6 | `demo/stage1_audio_demo.py` | OK; builds |
+| `af02b45` exec: qualify timit split and confirm sample rate | F7 | `docs/data_notes.md` | OK; 16 kHz observed on row 0 only |
+| `6d62dcf` exec: add frequency scales and vtln warping | T2.1 | `features/scales.py`, tests | OK; see Q3 |
+| `d682de8` exec: add mel filterbank with vtln warping | T2.2 | `features/filterbank.py`, tests | OK; see Q3, Q4 |
+| `f7bb3e9` exec: add dct and liftering utilities | T2.3 | `features/cepstral.py`, tests | OK; see Q5 |
+| `f82356d` exec: add delta and acceleration features | T2.4 | `features/deltas.py`, tests | OK |
+| `be80918` exec: add mfcc extractor | T2.5 | `features/mfcc.py`, `features/frontend.py`, tests | OK; see Q6 |
+| `35ce7f6` exec: add lpc analysis helpers | T2.6 | `features/lpc.py`, tests | OK; also contains unrelated line-length fixes |
+| `eabc383` exec: add plp extractor | T2.7 | `features/plp.py`, tests | OK; see Q7 |
+| `c8c5d98` exec: add mfcc-tmp extractor | T2.8 | `features/mfcc_tmp.py`, `audio/spectrum.py`, tests | OK; see Q8 |
+| `51c71f6` exec: add unified and warped feature extraction | T2.9 | `features/extract.py`, tests | OK; see Q9 |
+| `eecc784` exec: add stage 2 features demo | T2.10 | `demo/stage2_features_demo.py` (124 lines), `pixi.toml` | OK; builds |
+| `a0c46c4` exec: document feature parity with matlab and htk | T2.11 | `docs/feature_parity.md` | OK; see Q10 |
 
-Diff range: `git diff e42ce14 b24097d -- . ':!pixi.lock'`
+Diff range: `git diff 11862f2 a0c46c4`
 
-Stage 1 definition of done (plan §7): all tasks are on `main`, tests are green, every module
-is under 400 lines, and this handoff covers the §4 open questions. **Met.**
+Cycle 2 definition of done (plan §8): all tasks are on `main`, tests are green, every module
+is under 400 lines, and this handoff covers D1 and the parity gaps. **Met.**
 
 ## 2. Reviewer checks done
 
-- Demo: `pixi run -e demo` imports `demo/stage1_audio_demo.py` and `build_demo()` builds the
-  Blocks UI without error. It was not launched in a browser. The core functions are imported
-  from `qbestd`, not duplicated.
-- `pixi run test`: **49 passed** (1.16 s) at `b24097d`, with a clean working tree. Earlier
-  intermediate counts were taken while the Executor was writing in the same working tree.
-- Every module is under 400 lines. The largest source file is 66 lines (`config.py`).
-- Each task matches its plan spec: function names, signatures, conventions (HTK framing with
-  no padding, symmetric `N-1` windows) and the required tests.
-- Unverified defaults (pre-emphasis 0.97, Hamming) carry the `# unverified default` comment,
-  as plan §4 requires.
-- No data, audio or secrets are committed. `.gitignore` covers `.pixi/`, `.claude/`, `*.wav`,
-  `data/` and `paths.local.toml`.
+- `pixi run test`: **178 passed** (1.37 s) at `a0c46c4`, with a clean working tree.
+- Every module is under 400 lines. The largest source file is `config.py` at 100 lines.
+- In the demo environment, both `demo/stage1_audio_demo.py` and `demo/stage2_features_demo.py`
+  import and `build_demo()` without error. Neither was launched in a browser.
+- I hand-checked these against their standard forms:
+  - Levinson–Durbin update and LPC→cepstrum recursion (HTK `LPC2Cepstrum`, c0 = log gain).
+  - rastamat `dolpc` autocorrelation and the PLP edge-band copy.
+  - The `Deltacep.m` regression.
+  - The `Fx_vtln_warp.m` piecewise warp with 0.05 back-off.
+  - The orthonormal DCT-II.
+  - The MFCC-TMP subband construction: symmetric mirrored weights → IFFT → lagged TEO → sum.
+- Every commit message uses the `exec:` prefix and has no tool trailers.
 
 **Minor deviations (non-blocking):**
-- Commit prefixes are inconsistent: `e0436aa` has no `exec:` prefix, the rest do. The plan's
-  templates had no prefix, but `requirements.md` names the step "commit (exec)".
-- The import path is set twice: `PYTHONPATH=src` in `pixi.toml` and `pythonpath` in
-  `pyproject.toml`. This is harmless but redundant.
+- `35ce7f6` (LPC) also carries line-length fixes in `scales.py`, `deltas.py`,
+  `filterbank.py`, `mfcc.py` and `features/__init__.py`. It's not strictly one task per commit.
+- 37 lines exceed 79 characters (PEP 8). They're spread over 14 files, mostly tests, plus
+  `audio/pipeline.py` (3), `config.py` (2) and both demos.
+- `tests/features/test_mfcc_tmp.py::test_floor_hits_on_noise_are_counted_and_output_finite`
+  only prints the floor-hit count. Its assertion `0 <= hits <= size` is always true. Plan §6
+  asked to "log every floor hit in tests".
+- `scale_waveform` peak-normalises the raw waveform *before* DC removal. MATLAB subtracts the
+  mean first. This only changes an overall scale, so only c0 shifts.
 
 ## 3. Questions for Codex
 
 **Code review**
-1. `pixi.toml` pins `platforms = ["win-64"]` only. Should `linux-64` / `osx-arm64` be added
-   for portability, or is win-64 alone fine for this project?
-2. All dependency versions are `"*"` and only `pixi.lock` fixes them. Is that conservative
-   enough given requirements.md ("be conservative with packages"), or should we add lower bounds?
-3. `pyproject.toml` has `[tool.setuptools.packages.find]` but no `[build-system]`. Is this a
-   problem, given pixi does not install the package and imports rely on `PYTHONPATH`?
-4. `io.save_audio` writes PCM_16 without clipping or warning on values outside [-1, 1].
-   Should it clip explicitly or raise?
-5. `resample.scale_time_axis` applies no anti-aliasing when `warp_factor > 1` (up to 1.12),
-   and cubic-spline interpolation fails on inputs shorter than 2 samples. Is the aliasing
-   acceptable for VTL warping at 8 kHz, or should we low-pass first?
-6. `framing.frame_signal`: a `shift_ms` that rounds to 0 samples causes a division by zero
-   in `count_frames`, and non-integer `sample_rate * frame_ms` is silently rounded. Should
-   both be validated with a clear `ValueError`?
-7. `spectrum.magnitude_spectrum`: an explicit `n_fft` smaller than the frame length makes
-   `np.fft.rfft` truncate the frame silently. The power spectrum is also unnormalized (no
-   `1/n_fft`). Should a short `n_fft` raise, and does the scaling matter for the later mel
-   filterbank / MFCC match against the MATLAB code?
-8. `energy.teager_energy` uses edge replication, as the plan specifies, and
-   `frame_teager_energy` applies TEO inside each frame, so the 2 edge samples per frame are
-   replicated rather than taken from neighbouring frames. Is per-frame TEO acceptable, or
-   should TEO run on the whole signal before framing (closer to MFCC-TMP's subband TEO)?
-9. `config.DatasetPaths`:
-   - The defaults are machine-specific absolute Windows paths. The plan asked for this, but
-     they are now committed to a public repo. Keep them, or move them to an example
-     `paths.local.toml.example`?
-   - `paths.local.toml` is resolved relative to the current working directory, not the
-     repo root.
-   - `require("typo")` raises `AttributeError` instead of a clear error.
-   - An empty env var falls through to the file/default because of `or`.
 
-   Which of these should change?
-10. `pipeline.prepare_frames`:
-    - DC removal subtracts the whole-utterance mean before framing, while HTK's `ZMEANSOURCE`
-      removes it per frame. Which matches the MATLAB code?
-    - `AudioFrontEndConfig.sample_rate` defaults to 8000, which pre-decides open question 14
-      (it is flagged unverified).
-    - `n_fft` is stored in the config but unused by `prepare_frames`.
+1. `resample.scale_time_axis` anti-aliasing uses `firwin(101)` + `filtfilt` at a cutoff of
+   `0.95·Nyquist/α`. `padlen` is capped at `len − 1` for short signals. Is 101 taps
+   adequate for α ≤ 1.12 at 8 kHz? Is the short-signal `filtfilt` edge behaviour acceptable?
+2. F5 also rejects unknown keys in `paths.local.toml` with `ValueError`, which the plan
+   didn't ask for. Keep this, or downgrade it to a warning?
+3. **VTLN cutoff at 16 kHz with a 4 kHz band.** `warp_frequency_piecewise` takes f0 from
+   the *sampling* Nyquist, so f0 = 7000 Hz at 16 kHz. With `high_hz = 4000`, every filter
+   then sits on the pure linear part `(2−α)·f`, and for α < 1 the top filters see content
+   above 4 kHz. The thesis cutoff (3500 Hz) is tied to a 4 kHz band. Should the warp's
+   Nyquist and cutoff follow `high_hz` (the band edge) rather than `fs/2` when
+   `high_hz < fs/2`? What does `Fx_mfcc_vtmp_cep.m` (16 kHz, fH 4000) do?
+4. `mel_filterbank` with α ≠ 1 warps the bin frequencies and keeps the triangles fixed. For
+   α > 1 the peaks move to higher bins, which the tests assert. Can you confirm this direction
+   matches `Fx_vtln_warp.m` usage in FP:47, and the thesis convention that α > 1 means a
+   shorter vocal tract?
+5. `dct_cepstra(include_c0=False)` returns c1..c13, keeping 13 coefficients, rather than
+   dropping c0 to leave 12. `lifter_cepstra(first_index=1)` keeps the lifter aligned. Is
+   this the right reading of the thesis MFCC-TMP formula (k = 1..N_c)?
+6. MFCC peak normalisation uses `max|x|`, as `Fx_mfcc_vtmp_cep.m` does. `Fx_mfcc.m` (FM:29)
+   uses `max(x)`. Do you agree to keep `max|x|` for both, given that it only shifts c0?
+7. PLP:
+   - Equal-loudness weights are evaluated at the *forward*-warped centre
+     `warp(center)`. FP:57 seems to do the same. But since the bins are warped by
+     `(2−α)·f`, a filter's physical centre is the *inverse* warp of its nominal centre. Is the
+     forward warp a faithful copy of MATLAB, or a MATLAB bug we shouldn't copy?
+   - `lpc_order` is 12 (HTK) against MATLAB's 8. Which should be the default for reproducing
+     the thesis PLP numbers?
+   - DC removal is still applied to PLP even though FP does none. Should it be off by default?
+8. MFCC-TMP:
+   - `teager_energy_lagged` is a guess because `vteo.m` isn't public. Edges are replicated
+     and the sum is unnormalised.
+   - Subband TEO is summed over the full zero-padded `n_fft` IFFT frame, not just the
+     original 200 samples.
+   - The `"p"` (phase-only) option takes `np.angle`, which isn't conjugate-symmetric. The
+     real part of its IFFT is then taken.
 
-    Are these acceptable?
-11. `demo/stage1_audio_demo.py`:
-    - `run_front_end` resamples twice: once inside `prepare_frames` and again for the
-      waveform plot.
-    - The TEO curve plots `log|mean TEO|`, which hides negative TEO values.
-    - The demo has no test, and the plan did not ask for one.
+   Are these consistent with `Fx_mfcc_vtmp_cep.m` lines 54–78?
+9. `extract_features(kind, warp_factor=1.0, config)` always overrides `config.warp_factor`,
+   so a config with `warp_factor = 1.1` is silently ignored unless the argument is passed
+   too. Should the argument default to `None`, meaning "use the config"? Separately,
+   `extract_warped_bank` recomputes the whole front end (frames and STFT) 13 times when only
+   the filterbank changes. Is it worth caching before Stage 4?
+10. `docs/feature_parity.md`: the HTK column was written from memory, and the thesis column
+    copies `plan.md` §2 without re-reading the `.tex`. Can you spot-check the cells that matter
+    for reproduction against the thesis: band, filter count, c0 and deltas for PLP and
+    MFCC-TMP? Is anything wrong?
+11. Any other correctness, PEP 8 or test-coverage issues? In particular, should the
+    MFCC-TMP floor-hit test assert a bound on noise?
 
-    Is a smoke test for `build_demo()` worth adding, and are these plotting choices fine?
-12. Any other correctness, PEP 8 or test-coverage issues in the listed commits?
+**Open questions carried forward**
 
-**Plan §4 open questions** (please check against the MATLAB feature-extraction repo
-`github.com/maulikmadhavi/research_myMATLAB_codes/tree/master/Analysis/Feature_Extraction`
-and the thesis, and cite file names and line numbers):
-
-13. Pre-emphasis coefficient, window type, FFT size, cepstral liftering (22?), and c0 versus
-    log-energy in the original MFCC code.
-14. Was TIMIT downsampled to 8 kHz before feature extraction? The thesis puts mel filters over
-    0–4000 Hz, but TIMIT is 16 kHz.
-15. How is the Q-84 query list derived (7–20 test occurrences, ≥ 6 letters)? Was there a fixed
-    list in the original work?
-16. Which phone-segmentation method was used for feature reduction (stage 6)?
-
-**Data**
-
-17. `docs/data_notes.md` concludes four things about the HF copy `Siyong/speech_timit`:
-    - It is likely 16 kHz. This is inferred from byte counts and not yet confirmed.
-    - It has no word or phone boundaries and no utterance IDs.
-    - Its 5040/1260 split is redrawn, not the official 4620/1680.
-    - So Q-20/Q-84 query audio cannot be cut from it alone.
-
-    Do you agree with this reasoning? Does the thesis or the old MATLAB/QbE repo
-    (`research_qbestd`) show which TIMIT copy was used, the official split and `.WRD` word
-    boundaries? Do you recommend sourcing original LDC TIMIT, or forced alignment on the HF copy?
+12. Plan §4 #14: did the thesis downsample TIMIT to 8 kHz? Data is confirmed 16 kHz on row 0.
+    MATLAB defaults to 16 kHz with fH 4000 for MFCC-TMP but fH `fs/2` for MFCC. Which
+    `(sample_rate, high_hz)` pair should each extractor default to?
+13. Missing `Fx_melfiltbank.m`: is there any other source (thesis appendix, rastamat
+    `fft2melmx`, an old copy) that pins down the triangle normalisation (unit peak versus unit
+    area) and edge placement?
 
 ## 4. Response format requested
 
 Write `handoff_response.md` with one section per question number. Mark each as
 **agree / change requested / unknown**. For a requested change, give the file and the
-concrete change. Commit it as `handoff_resp: cycle 1 review`.
+concrete change. Commit it as `handoff_resp: cycle 2 review`.
