@@ -7,8 +7,10 @@
 - **Plan under review:** `docs/plan.md` at `11862f2`: Stage 1 fix-ups F1–F7 and Stage 2
   (acoustic features) T2.1–T2.11
 - **Status:** COMPLETE. All 18 tasks are committed and reviewed (head `a0c46c4`).
-- **D1 (user decision, still open):** is a licensed LDC TIMIT copy with `.WRD`/`.PHN`
-  available? Stage 2 doesn't depend on it; Stage 7 does.
+- **D1 (user decision, resolved 2026-11-14):** no LDC `.WRD` files. The user only needs word
+  segments to cut out the spoken queries, so query boundaries will come from
+  **automatic alignment on the HF copy**. Results are labelled approximate against the
+  thesis. See Q14 for how to do the alignment.
 
 ## 1. Commits to review
 
@@ -125,6 +127,24 @@ is under 400 lines, and this handoff covers D1 and the parity gaps. **Met.**
 13. Missing `Fx_melfiltbank.m`: is there any other source (thesis appendix, rastamat
     `fft2melmx`, an old copy) that pins down the triangle normalisation (unit peak versus unit
     area) and edge placement?
+
+**D1 follow-up: word alignment for query extraction**
+
+14. Every row has its transcript (`sentence`), so the Reviewer suggests **forced alignment**
+    of that known text rather than free ASR. Free ASR word timestamps (e.g. Whisper) are
+    looser and can mis-recognise the keyword. Our candidate approach:
+    - Use Montreal Forced Aligner (conda-forge, English ARPAbet model; word and phone
+      TextGrids) in a separate pixi feature/env `align`, so the core env stays lean.
+    - Run it once offline over the train split (queries) and test split (ground truth).
+    - Commit only a small text manifest (`split, row_index, word, start_s, end_s`). Never
+      commit audio.
+    - Cut the Q-20/Q-84 queries from the manifest with a small padding (e.g. 20 ms).
+
+    Alternatives: torchaudio MMS forced aligner (adds torch), WhisperX (adds torch and
+    Whisper, looser timing). Do you agree with MFA? Which approach best balances accuracy
+    against requirements.md's "be conservative with dependencies"? How should we sanity-check
+    the boundaries, given the HF rows have no IDs to match against official TIMIT? Note that
+    the phone boundaries could also serve Stage 6 STM checks.
 
 ## 4. Response format requested
 
