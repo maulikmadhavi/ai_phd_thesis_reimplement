@@ -1,0 +1,21 @@
+[workspace]
+name = "qbestd"
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[dependencies]
+python = "3.11.*"
+numpy = "*"
+scipy = "*"
+pysoundfile = "*"
+pytest = "*"
+
+[tasks]
+test = "pytest -q"
+
+[feature.demo.dependencies]
+gradio = "*"
+matplotlib = "*"
+
+[environments]
+demo = ["demo"]
