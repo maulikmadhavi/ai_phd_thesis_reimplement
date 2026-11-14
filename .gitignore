@@ -6,6 +6,6 @@ __pycache__/
 *.egg-info/
 *.wav
 *.flac
-data/
+/data/
 outputs/
 paths.local.toml
