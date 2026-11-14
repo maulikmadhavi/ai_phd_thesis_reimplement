@@ -49,3 +49,18 @@ def test_bin_frequencies_span_zero_to_nyquist():
     assert frequencies[0] == 0
     assert frequencies[-1] == 4000
     assert len(frequencies) == 129
+
+
+def test_n_fft_shorter_than_frame_raises():
+    with pytest.raises(ValueError, match="shorter than the frame"):
+        power_spectrum(np.zeros((2, 200)), n_fft=128)
+
+
+@pytest.mark.parametrize("bad_n_fft", [255.5, 0, -256])
+def test_invalid_n_fft_raises(bad_n_fft):
+    with pytest.raises(ValueError):
+        power_spectrum(np.zeros((2, 200)), n_fft=bad_n_fft)
+
+
+def test_n_fft_equal_to_frame_length_is_allowed():
+    assert power_spectrum(np.zeros((2, 200)), n_fft=200).shape == (2, 101)

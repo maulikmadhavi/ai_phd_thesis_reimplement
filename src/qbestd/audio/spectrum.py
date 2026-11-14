@@ -15,11 +15,23 @@ def magnitude_spectrum(frames, n_fft=None):
 
     ``n_fft=None`` uses the next power of two >= frame length
     (unverified default, not yet checked against the MATLAB code).
-    Frames are zero-padded up to ``n_fft``.
+    Frames are zero-padded up to ``n_fft``. The FFT is deliberately left
+    unnormalized (no 1/n_fft), matching MATLAB ``Fx_mfcc.m``.
+
+    Raises:
+        ValueError: if n_fft is not a positive integer or is shorter than
+            the frame length (which would silently truncate the frame).
     """
     frames = np.asarray(frames, dtype="float64")
     if n_fft is None:
         n_fft = next_power_of_two(frames.shape[-1])
+    if not float(n_fft).is_integer() or n_fft <= 0:
+        raise ValueError(f"n_fft must be a positive integer, got {n_fft!r}")
+    n_fft = int(n_fft)
+    if n_fft < frames.shape[-1]:
+        raise ValueError(
+            f"n_fft={n_fft} is shorter than the frame length "
+            f"{frames.shape[-1]}")
     return np.abs(np.fft.rfft(frames, n=n_fft, axis=-1))
 
 
