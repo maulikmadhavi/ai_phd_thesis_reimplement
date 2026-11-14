@@ -1,8 +1,9 @@
 # Data notes: TIMIT on Hugging Face (`Siyong/speech_timit`)
 
-Inspected read-only on 2026-11-14 through the public HF API and the repo's
-`dataset_infos.json` (revision `ef7bffd`, last modified 2022-07-13). No data was
-downloaded and the `datasets` package was not added.
+Inspected read-only on 2026-11-14 through the public HF API, the repo's
+`dataset_infos.json` (revision `ef7bffd`, last modified 2022-07-13) and one
+row from the dataset-viewer rows API. No parquet file was downloaded and the
+`datasets` package was not added.
 
 ## Format
 
@@ -11,7 +12,7 @@ downloaded and the `datasets` package was not added.
 | Files | `data/train-00000-of-00002.parquet`, `data/train-00001-of-00002.parquet`, `data/test-00000-of-00001.parquet` |
 | Columns | `audio`: struct of `array` (float32 sequence) and `sampling_rate` (int64); `sentence`: string |
 | Splits | train = 5040 utterances, test = 1260 utterances |
-| Sample rate | Not stated in the metadata. **Inferred 16 kHz**: the train split is 992,565,400 bytes for 5040 utterances, i.e. about 49.2k float32 samples (3.1 s) per utterance at 16 kHz. At 8 kHz that would be about 6.2 s, which is too long for TIMIT. Confirm by reading `sampling_rate` from the first parquet row group. |
+| Sample rate | **Observed 16 kHz** on train row 0 (`audio.sampling_rate = 16000`, 38,605 samples = 2.41 s, sentence "combine all the ingredients in a large bowl"). Read from the `sampling_rate` field of the rows API JSON, which returns the array inline, so no WAV header was involved. Only row 0 was checked; the size estimate (about 49.2k float32 samples per utterance, 3.1 s mean at 16 kHz) is consistent with the rest of train being 16 kHz but does not prove it. |
 | README / license | The repo has no README and an empty license field. TIMIT itself is LDC93S1 (licensed). |
 
 ## What is missing
@@ -26,12 +27,13 @@ downloaded and the `datasets` package was not added.
 ## Split differs from official TIMIT
 
 Official TIMIT has 4620 train and 1680 test utterances, which makes 6300.
-This dataset also has 6300 (5040 + 1260), but in an 80/20 ratio. The split was
-redrawn, probably at random and probably without regard to speakers.
-Consequences:
-- "Queries from train, documents from test" can still be followed, but speakers
-  likely overlap, which makes the task easier than in the thesis.
-- Keyword occurrence counts in the test split will not match the thesis tables
+This dataset also has 6300 (5040 + 1260), but in an 80/20 ratio, so the split
+was redrawn. How it was drawn is undocumented: the repo has no README, so
+nothing says whether it is random or speaker-disjoint, and the rows carry no
+speaker IDs to check. Consequences:
+- "Queries from train, documents from test" can still be followed, but whether
+  speakers overlap is unknown.
+- Keyword occurrence counts in the test split need not match the thesis tables
   (for example the Q-84 rule of 7 to 20 test occurrences).
 
 ## Implications for the plan
@@ -39,7 +41,8 @@ Consequences:
 - **Open question 2 (sample rate), input side:** TIMIT audio is 16 kHz, so the
   8 kHz that the thesis's 0 to 4000 Hz mel filters imply needs downsampling.
   `AudioFrontEndConfig.sample_rate` already defaults to 8000 and is marked
-  unverified. Whether the thesis downsampled is still open.
+  unverified. Whether the thesis downsampled is still open (plan.md section 4,
+  question 14).
 - **Document-level ground truth (p@N, MAP): derivable.** Whether a test
   utterance contains a keyword can be decided by word matching on `sentence`.
 - **Q-20 and Q-84 query audio: not derivable from this dataset alone.** Query
@@ -60,3 +63,11 @@ Prefer option 1 (original TIMIT with `.WRD`/`.PHN`) if the user holds a copy.
 Otherwise a reproduction on this HF copy will differ from the thesis in the
 split, the keyword counts and the segment boundaries, so absolute p@N and MAP
 values are not directly comparable to the thesis tables.
+
+## Pending user decision D1
+
+**Is a licensed LDC TIMIT copy with `.WRD`/`.PHN` files available?** (plan.md
+section 4, D1.) Status: open, waiting for the user. Without it, Q-20 and Q-84
+query audio would have to be cut by forced alignment on the HF copy, and that
+experiment must be labelled approximate. Stages 2 to 6 do not depend on the
+answer; Stage 7 does.
