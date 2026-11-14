@@ -22,8 +22,9 @@ def compute_deltas(features, window=2):
     padded = np.pad(features, ((window, window), (0, 0)), mode="edge")
     numerator = np.zeros_like(features)
     for offset in range(1, window + 1):
-        numerator += offset * (padded[window + offset:window + offset + n_frames]
-                               - padded[window - offset:window - offset + n_frames])
+        ahead = padded[window + offset:window + offset + n_frames]
+        behind = padded[window - offset:window - offset + n_frames]
+        numerator += offset * (ahead - behind)
     return numerator / (2.0 * sum(k * k for k in range(1, window + 1)))
 
 

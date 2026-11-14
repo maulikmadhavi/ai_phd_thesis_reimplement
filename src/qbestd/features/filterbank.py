@@ -3,7 +3,11 @@
 import numpy as np
 
 from qbestd.audio.spectrum import fft_bin_frequencies
-from qbestd.features.scales import hz_to_mel, mel_to_hz, warp_frequency_piecewise
+from qbestd.features.scales import (
+    hz_to_mel,
+    mel_to_hz,
+    warp_frequency_piecewise,
+)
 
 
 def mel_filter_edges_hz(n_filters, low_hz, high_hz):

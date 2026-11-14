@@ -1,1 +1,1 @@
-"""Acoustic feature extraction: mel/Bark scales, filterbanks, MFCC, PLP, MFCC-TMP."""
+"""Acoustic features: scales, filterbanks, MFCC, PLP, MFCC-TMP."""

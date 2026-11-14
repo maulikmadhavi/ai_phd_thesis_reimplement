@@ -11,7 +11,8 @@ CUTOFF_BACKOFF_STEP = 0.05
 
 def hz_to_mel(frequency_hz):
     """HTK mel scale: 2595 * log10(1 + f / 700)."""
-    return 2595.0 * np.log10(1.0 + np.asarray(frequency_hz, dtype="float64") / 700.0)
+    frequency_hz = np.asarray(frequency_hz, dtype="float64")
+    return 2595.0 * np.log10(1.0 + frequency_hz / 700.0)
 
 
 def mel_to_hz(mel):
@@ -45,7 +46,8 @@ def vtln_cutoff_frequency(warp_factor, sample_rate,
     while slope * ratio * nyquist >= nyquist:
         ratio -= CUTOFF_BACKOFF_STEP
         if ratio <= 0:
-            raise ValueError(f"No valid VTLN cutoff for warp_factor={warp_factor}")
+            raise ValueError(
+                f"No valid VTLN cutoff for warp_factor={warp_factor}")
     return ratio * nyquist
 
 

@@ -24,7 +24,8 @@ class MfccConfig(AudioFrontEndConfig):
     n_ceps: int = 13
     include_c0: bool = True
     lifter_length: int = 0  # Fx_mfcc.m applies none; HTK default would be 22
-    spectrum_type: str = "magnitude"  # unverified default: MATLAB log((M|X|)^2)
+    # unverified default: MATLAB computes log((M * |X|)^2)
+    spectrum_type: str = "magnitude"
     normalize_peak: bool = True  # MATLAB x / max|x|
     pcm_scale: float = PCM_SCALE
     deltas: bool = True
