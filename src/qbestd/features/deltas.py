@@ -17,6 +17,8 @@ def compute_deltas(features, window=2):
     if int(window) != window or window < 1:
         raise ValueError("window must be a positive integer")
     n_frames = features.shape[0]
+    if n_frames == 0:
+        return features.copy()
     padded = np.pad(features, ((window, window), (0, 0)), mode="edge")
     numerator = np.zeros_like(features)
     for offset in range(1, window + 1):
