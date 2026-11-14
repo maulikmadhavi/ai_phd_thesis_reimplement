@@ -19,15 +19,16 @@
 | `1401394` exec: add pre-emphasis and dc removal | T1.3 | `src/qbestd/audio/preprocess.py`, tests | OK; default flagged unverified |
 | `6e38c39` exec: add signal framing | T1.4 | `src/qbestd/audio/framing.py`, tests | OK; see Q6 |
 | `6be2695` exec: add analysis windows | T1.5 | `src/qbestd/audio/windowing.py`, tests | OK; default flagged unverified |
+| `66d0dd6` exec: add power spectrum | T1.6 | `src/qbestd/audio/spectrum.py`, tests | OK; see Q7 |
+| `5e49710` exec: add short-time and teager energy | T1.7 | `src/qbestd/audio/energy.py`, tests | OK; see Q8 |
 
-Diff range: `git diff e42ce14 6be2695 -- . ':!pixi.lock'`
+Diff range: `git diff e42ce14 5e49710 -- . ':!pixi.lock'`
 
-**Not yet committed:** T1.6 power spectrum, T1.7 energy/TEO, T1.8 config, T1.9 pipeline,
-T1.10 Gradio demo, T1.11 TIMIT notes.
+**Not yet committed:** T1.8 config, T1.9 pipeline, T1.10 Gradio demo, T1.11 TIMIT notes.
 
 ## 2. Reviewer checks done
 
-- `pixi run test`: **25 passed** (0.95 s) at `6be2695`.
+- `pixi run test`: **38 passed** (0.89 s) at `5e49710`.
 - Every module is under 400 lines. The largest source file is 40 lines, the largest test 49.
 - Each task matches its plan spec: function names, signatures, conventions (HTK framing with
   no padding, symmetric `N-1` windows) and the required tests.
@@ -59,19 +60,27 @@ T1.10 Gradio demo, T1.11 TIMIT notes.
 6. `framing.frame_signal`: a `shift_ms` that rounds to 0 samples causes a division by zero
    in `count_frames`, and non-integer `sample_rate * frame_ms` is silently rounded. Should
    both be validated with a clear `ValueError`?
-7. Any other correctness, PEP 8 or test-coverage issues in the listed commits?
+7. `spectrum.magnitude_spectrum`: an explicit `n_fft` smaller than the frame length makes
+   `np.fft.rfft` truncate the frame silently. The power spectrum is also unnormalized (no
+   `1/n_fft`). Should a short `n_fft` raise, and does the scaling matter for the later mel
+   filterbank / MFCC match against the MATLAB code?
+8. `energy.teager_energy` uses edge replication, as the plan specifies, and
+   `frame_teager_energy` applies TEO inside each frame, so the 2 edge samples per frame are
+   replicated rather than taken from neighbouring frames. Is per-frame TEO acceptable, or
+   should TEO run on the whole signal before framing (closer to MFCC-TMP's subband TEO)?
+9. Any other correctness, PEP 8 or test-coverage issues in the listed commits?
 
 **Plan §4 open questions** (please check against the MATLAB feature-extraction repo
 `github.com/maulikmadhavi/research_myMATLAB_codes/tree/master/Analysis/Feature_Extraction`
 and the thesis, and cite file names and line numbers):
 
-8. Pre-emphasis coefficient, window type, FFT size, cepstral liftering (22?), and c0 versus
-   log-energy in the original MFCC code.
-9. Was TIMIT downsampled to 8 kHz before feature extraction? The thesis puts mel filters over
-   0–4000 Hz, but TIMIT is 16 kHz.
-10. How is the Q-84 query list derived (7–20 test occurrences, ≥ 6 letters)? Was there a fixed
+10. Pre-emphasis coefficient, window type, FFT size, cepstral liftering (22?), and c0 versus
+    log-energy in the original MFCC code.
+11. Was TIMIT downsampled to 8 kHz before feature extraction? The thesis puts mel filters over
+    0–4000 Hz, but TIMIT is 16 kHz.
+12. How is the Q-84 query list derived (7–20 test occurrences, ≥ 6 letters)? Was there a fixed
     list in the original work?
-11. Which phone-segmentation method was used for feature reduction (stage 6)?
+13. Which phone-segmentation method was used for feature reduction (stage 6)?
 
 ## 4. Response format requested
 
