@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from qbestd.audio.framing import count_frames, frame_signal
 
@@ -25,3 +26,27 @@ def test_count_frames_boundaries():
     assert count_frames(200, 200, 80) == 1
     assert count_frames(279, 200, 80) == 1
     assert count_frames(280, 200, 80) == 2
+
+
+def test_zero_shift_raises():
+    with pytest.raises(ValueError):
+        frame_signal(np.zeros(8000), 8000, shift_ms=0.0)
+
+
+def test_shift_rounding_to_zero_samples_raises():
+    with pytest.raises(ValueError, match="rounds to 0"):
+        frame_signal(np.zeros(8000), 8000, shift_ms=0.01)
+
+
+@pytest.mark.parametrize("sample_rate, frame_ms", [(-8000, 25.0), (0, 25.0),
+                                                   (8000, -25.0)])
+def test_nonpositive_parameters_raise(sample_rate, frame_ms):
+    with pytest.raises(ValueError):
+        frame_signal(np.zeros(8000), sample_rate, frame_ms=frame_ms)
+
+
+def test_count_frames_rejects_nonpositive_lengths():
+    with pytest.raises(ValueError):
+        count_frames(1000, 0, 80)
+    with pytest.raises(ValueError):
+        count_frames(1000, 200, 0)
