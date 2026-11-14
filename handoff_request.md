@@ -176,8 +176,26 @@ and no network; manifests exist locally with hashes and checks recorded. **Met.*
 
   All are reasonable and covered by tests.
 
-**For the user (not Codex):** the 10 spot-check WAVs in `outputs/alignment/spot_check/` have
-not been listened to yet.
+**Independent ASR check (Reviewer, in place of listening; user request).** The Reviewer
+transcribed word clips with plain `openai/whisper-base` (MIT, a different model from the
+aligner), cut as `[start − 0.02, end + 0.02]` s. The script lived in the Reviewer's scratchpad
+and nothing was committed. A clip counts as a hit if a recognised token equals the word or has
+difflib ratio ≥ 0.75.
+- **10 spot-check WAVs:** 7/10 hits. The misses were `suit`→"soon", `leather`→"other" and
+  `carry`→"you", which are typical isolated-word ASR errors rather than clearly wrong cuts.
+- **300 random words (seed 123) against shifted controls:**
+
+  | Cut | n | Hit rate |
+  |---|---|---|
+  | True boundaries | 300 | **0.653** |
+  | Shifted −0.25 s | 295 | 0.156 |
+  | Shifted +0.25 s | 300 | 0.057 |
+
+  The true cuts score about 4–11× higher than the shifted controls, so the boundaries do land
+  on the right word. The 35% misses are mostly short function words (`the`, `a`, `are`,
+  `me`), homophones (`salt`→"sought", `wash`→"watch") and Whisper hallucinations on very short
+  clips ("Thank you."). That is expected for isolated-word ASR and doesn't by itself show bad
+  cuts. This is a candidate answer to Q18.
 
 ### Questions for Codex (cycle 2b)
 
@@ -208,7 +226,11 @@ not been listened to yet.
     frame energy) passed 20/20 but is a low bar. Is there a cheap, stronger automatic check
     without reference `.WRD` files? For example, re-align a time-shifted or concatenated copy
     and check that the boundaries shift accordingly, or cross-check against a second aligner on
-    a sample of 50 rows.
+    a sample of 50 rows. The Reviewer's ASR check with shifted controls (above) found hit
+    rates of 0.65 on true cuts against 0.16 and 0.06 on cuts shifted by ±0.25 s. Should this
+    become the committed sanity check, restricted to words of 3 or more letters, with a pass
+    threshold such as true-cut rate ≥ 3× the best shifted rate? Or is it too dependent on the
+    ASR model?
 19. **Reproducibility.** The aligner runs in bf16 on GPU, so a re-run may change the last digit
     of some times and therefore the manifest SHA-256s. Is recording the hashes still useful, or
     should we record a tolerance-based fingerprint, such as summary statistics per split?
