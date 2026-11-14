@@ -23,13 +23,17 @@
 | `5e49710` exec: add short-time and teager energy | T1.7 | `src/qbestd/audio/energy.py`, tests | OK; see Q8 |
 | `06979f8` exec: add dataset path configuration | T1.8 | `src/qbestd/config.py`, `tests/test_config.py` | OK; see Q9 |
 | `1f1fe64` exec: add audio front-end pipeline | T1.9 | `src/qbestd/audio/pipeline.py`, tests | OK; see Q10 |
+| `95cb709` exec: add stage 1 gradio demo | T1.10 | `demo/stage1_audio_demo.py` (108 lines), `pixi.toml` | OK; see Q11 |
 
-Diff range: `git diff e42ce14 1f1fe64 -- . ':!pixi.lock'`
+Diff range: `git diff e42ce14 95cb709 -- . ':!pixi.lock'`
 
-**Not yet committed:** T1.10 Gradio demo, T1.11 TIMIT notes.
+**Not yet committed:** T1.11 TIMIT notes.
 
 ## 2. Reviewer checks done
 
+- Demo: `pixi run -e demo` imports `demo/stage1_audio_demo.py` and `build_demo()` builds the
+  Blocks UI without error. It was not launched in a browser. The core functions are imported
+  from `qbestd`, not duplicated.
 - `pixi run test`: **49 passed** at `1f1fe64`. The Reviewer and Executor share one working
   tree, so this count is for the working tree at review time, not a clean checkout of each
   commit.
@@ -85,24 +89,31 @@ Diff range: `git diff e42ce14 1f1fe64 -- . ':!pixi.lock'`
 10. `pipeline.prepare_frames`:
     - DC removal subtracts the whole-utterance mean before framing, while HTK's `ZMEANSOURCE`
       removes it per frame. Which matches the MATLAB code?
-    - `AudioFrontEndConfig.sample_rate` defaults to 8000, which pre-decides open question 13
+    - `AudioFrontEndConfig.sample_rate` defaults to 8000, which pre-decides open question 14
       (it is flagged unverified).
     - `n_fft` is stored in the config but unused by `prepare_frames`.
 
     Are these acceptable?
-11. Any other correctness, PEP 8 or test-coverage issues in the listed commits?
+11. `demo/stage1_audio_demo.py`:
+    - `run_front_end` resamples twice: once inside `prepare_frames` and again for the
+      waveform plot.
+    - The TEO curve plots `log|mean TEO|`, which hides negative TEO values.
+    - The demo has no test, and the plan did not ask for one.
+
+    Is a smoke test for `build_demo()` worth adding, and are these plotting choices fine?
+12. Any other correctness, PEP 8 or test-coverage issues in the listed commits?
 
 **Plan §4 open questions** (please check against the MATLAB feature-extraction repo
 `github.com/maulikmadhavi/research_myMATLAB_codes/tree/master/Analysis/Feature_Extraction`
 and the thesis, and cite file names and line numbers):
 
-12. Pre-emphasis coefficient, window type, FFT size, cepstral liftering (22?), and c0 versus
+13. Pre-emphasis coefficient, window type, FFT size, cepstral liftering (22?), and c0 versus
     log-energy in the original MFCC code.
-13. Was TIMIT downsampled to 8 kHz before feature extraction? The thesis puts mel filters over
+14. Was TIMIT downsampled to 8 kHz before feature extraction? The thesis puts mel filters over
     0–4000 Hz, but TIMIT is 16 kHz.
-14. How is the Q-84 query list derived (7–20 test occurrences, ≥ 6 letters)? Was there a fixed
+15. How is the Q-84 query list derived (7–20 test occurrences, ≥ 6 letters)? Was there a fixed
     list in the original work?
-15. Which phone-segmentation method was used for feature reduction (stage 6)?
+16. Which phone-segmentation method was used for feature reduction (stage 6)?
 
 ## 4. Response format requested
 
