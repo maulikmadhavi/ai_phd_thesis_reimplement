@@ -22,6 +22,7 @@ matplotlib = "*"
 
 [feature.demo.tasks]
 demo-stage1 = "python demo/stage1_audio_demo.py"
+demo-stage2 = "python demo/stage2_features_demo.py"
 
 [environments]
 demo = ["demo"]
