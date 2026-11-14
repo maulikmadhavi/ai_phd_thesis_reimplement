@@ -1,0 +1,9 @@
+# Copy to paths.local.toml (git-ignored) and edit. Environment variables
+# QBESTD_TIMIT, QBESTD_SWS2013, QBESTD_QUESST2014 and QBESTD_SCORING override
+# these values. Set QBESTD_PATHS_FILE to read a different TOML file.
+# Delete the lines you do not need.
+
+timit = "/path/to/timit"
+sws2013 = "/path/to/sws2013Database"
+quesst2014 = "/path/to/quesst14Database"
+scoring = "/path/to/scoring_atwv_sws2013_full"
