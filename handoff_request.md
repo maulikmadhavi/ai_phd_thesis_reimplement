@@ -4,8 +4,7 @@
 - **From:** Claude Code Reviewer
 - **To:** Codex. Write only `handoff_response.md` and commit it. Do not touch any other file.
 - **Plan under review:** `docs/plan.md` (commit `e42ce14`), Stage 0 + Stage 1
-- **Status:** PARTIAL. The Executor is still working through Stage 1. This file is updated
-  after each new `exec:` commit. The commit list below is the current scope.
+- **Status:** COMPLETE. All of Stage 0 and Stage 1 (T0.1–T1.11) are committed and reviewed.
 
 ## 1. Commits to review
 
@@ -24,19 +23,20 @@
 | `06979f8` exec: add dataset path configuration | T1.8 | `src/qbestd/config.py`, `tests/test_config.py` | OK; see Q9 |
 | `1f1fe64` exec: add audio front-end pipeline | T1.9 | `src/qbestd/audio/pipeline.py`, tests | OK; see Q10 |
 | `95cb709` exec: add stage 1 gradio demo | T1.10 | `demo/stage1_audio_demo.py` (108 lines), `pixi.toml` | OK; see Q11 |
+| `b24097d` exec: document timit dataset format | T1.11 | `docs/data_notes.md` | OK; answers the input side of open question 2; see Q17 |
 
-Diff range: `git diff e42ce14 95cb709 -- . ':!pixi.lock'`
+Diff range: `git diff e42ce14 b24097d -- . ':!pixi.lock'`
 
-**Not yet committed:** T1.11 TIMIT notes.
+Stage 1 definition of done (plan §7): all tasks are on `main`, tests are green, every module
+is under 400 lines, and this handoff covers the §4 open questions. **Met.**
 
 ## 2. Reviewer checks done
 
 - Demo: `pixi run -e demo` imports `demo/stage1_audio_demo.py` and `build_demo()` builds the
   Blocks UI without error. It was not launched in a browser. The core functions are imported
   from `qbestd`, not duplicated.
-- `pixi run test`: **49 passed** at `1f1fe64`. The Reviewer and Executor share one working
-  tree, so this count is for the working tree at review time, not a clean checkout of each
-  commit.
+- `pixi run test`: **49 passed** (1.16 s) at `b24097d`, with a clean working tree. Earlier
+  intermediate counts were taken while the Executor was writing in the same working tree.
 - Every module is under 400 lines. The largest source file is 66 lines (`config.py`).
 - Each task matches its plan spec: function names, signatures, conventions (HTK framing with
   no padding, symmetric `N-1` windows) and the required tests.
@@ -114,6 +114,18 @@ and the thesis, and cite file names and line numbers):
 15. How is the Q-84 query list derived (7–20 test occurrences, ≥ 6 letters)? Was there a fixed
     list in the original work?
 16. Which phone-segmentation method was used for feature reduction (stage 6)?
+
+**Data**
+
+17. `docs/data_notes.md` concludes four things about the HF copy `Siyong/speech_timit`:
+    - It is likely 16 kHz. This is inferred from byte counts and not yet confirmed.
+    - It has no word or phone boundaries and no utterance IDs.
+    - Its 5040/1260 split is redrawn, not the official 4620/1680.
+    - So Q-20/Q-84 query audio cannot be cut from it alone.
+
+    Do you agree with this reasoning? Does the thesis or the old MATLAB/QbE repo
+    (`research_qbestd`) show which TIMIT copy was used, the official split and `.WRD` word
+    boundaries? Do you recommend sourcing original LDC TIMIT, or forced alignment on the HF copy?
 
 ## 4. Response format requested
 
