@@ -134,6 +134,26 @@ caches and both models were rebuilt. New feature fingerprint
 `split_id` `hf-ef7bffd88de7-nonsa`; parameter hashes **unchanged**
 (GMM-64 `80a5b016...`, GMM-128 `c0e38a61...`), so no row or feature changed.
 
+## PLP on `textdisjoint_q20_v2` (cycle 6, P1)
+
+PLP, profile `timit_matlab` (16 kHz, 8 kHz band), 39 dimensions, diagonal
+GMMs with the same recipe as the MFCC models (LBG, 10 EM iterations, seed 0),
+trained on the train side of `textdisjoint_q20_v2` (`split_id` `textdisjoint_q20_v2-0e913c50aae7`).
+Feature fingerprint `81ab5664f83b4a1bfe75630ae4ec2da6b5d068cd7753ff3d09440ac7d927fa77`.
+
+| Model | Parameter SHA-256 | Training rows | Training frames | Mean log-likelihood per frame, start -> end |
+|---|---|---|---|---|
+| GMM-64 | `76308673789e6332...` | 3696 | 1119053 | 25.324 -> 27.681 |
+| GMM-128 | `832fbb03a3929b08...` | 3696 | 1119053 | 26.500 -> 28.793 |
+
+The EM log-likelihood per frame **rises monotonically** at every iteration
+for both sizes (11 values: the LBG start and 10 iterations):
+
+- GMM-64: 25.324, 26.263, 26.792, 27.117, 27.306, 27.425, 27.511, 27.574, 27.619, 27.654, 27.681
+- GMM-128: 26.500, 27.538, 28.051, 28.328, 28.474, 28.564, 28.634, 28.688, 28.729, 28.764, 28.793
+
+Retrieval numbers are in `docs/results_timit_q20_features.md`.
+
 ## What this does not show
 
 - No comparison with the thesis figure and no held-out likelihood.
