@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -40,9 +42,14 @@ def test_unknown_name_or_kind_raises(name, kind):
         get_profile(name, kind)
 
 
+NOT_DEFINED = {("timit_matlab_levelflip", "mfcc_tmp")}
+
+
 @pytest.mark.parametrize("name", PROFILE_NAMES)
 @pytest.mark.parametrize("kind", KINDS)
 def test_every_profile_extracts_finite_features(name, kind):
+    if (name, kind) in NOT_DEFINED:
+        pytest.skip("profile is not defined for this kind")
     noise = 0.1 * np.random.default_rng(0).normal(size=16000)
     features = extract_features(noise, 16000, kind,
                                 config=get_profile(name, kind))
@@ -59,3 +66,34 @@ def test_no_dc_removal_changes_plp_output_for_offset_signal():
     without = extract_features(signal, 16000, "plp",
                                config=get_profile("timit_matlab", "plp"))
     assert not np.allclose(with_dc, without)
+
+
+def test_levelflip_swaps_only_peak_normalisation():
+    base_mfcc = get_profile("timit_matlab", "mfcc")
+    flip_mfcc = get_profile("timit_matlab_levelflip", "mfcc")
+    assert (base_mfcc.normalize_peak, flip_mfcc.normalize_peak) == (True,
+                                                                   False)
+    assert replace(flip_mfcc, normalize_peak=True) == base_mfcc
+    base_plp = get_profile("timit_matlab", "plp")
+    flip_plp = get_profile("timit_matlab_levelflip", "plp")
+    assert (base_plp.normalize_peak, flip_plp.normalize_peak) == (False,
+                                                                 True)
+    assert replace(flip_plp, normalize_peak=False) == base_plp
+
+
+def test_levelflip_raises_for_mfcc_tmp():
+    with pytest.raises(ValueError, match="mfcc and plp only"):
+        get_profile("timit_matlab_levelflip", "mfcc_tmp")
+
+
+def test_levelflip_changes_only_the_level_dependent_dimensions_of_mfcc():
+    noise = 0.05 * np.random.default_rng(2).normal(size=16000)
+    base = extract_features(noise, 16000, "mfcc",
+                            config=get_profile("timit_matlab", "mfcc"))
+    flip = extract_features(noise, 16000, "mfcc",
+                            config=get_profile("timit_matlab_levelflip",
+                                               "mfcc"))
+    assert base.shape == flip.shape
+    # a gain moves c0 only: the static c1..c12 are unchanged to rounding
+    assert np.allclose(base[:, 1:13], flip[:, 1:13], atol=1e-6)
+    assert not np.allclose(base[:, 0], flip[:, 0])
