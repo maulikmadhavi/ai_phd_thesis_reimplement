@@ -127,6 +127,13 @@ fingerprint `2c337a2602c49699416c0d75b1dc722c09e0f160047b074b9185fcc7f1f65df2`,
 **unchanged** (GMM-64 `80a5b016...`, GMM-128 `c0e38a61...`), so the front
 end did not move.
 
+**Cycle 6 retrain (C3).** After the row-selection identity (`timit_hf.py`
+digest, `SA_TOKENS`, `ROW_SELECTION_VERSION`) joined the fingerprint, both HF
+caches and both models were rebuilt. New feature fingerprint
+`200751d44f47885af13b43dd16c2fed8a9361923d33620a8e47f36d9e8172c36`,
+`split_id` `hf-ef7bffd88de7-nonsa`; parameter hashes **unchanged**
+(GMM-64 `80a5b016...`, GMM-128 `c0e38a61...`), so no row or feature changed.
+
 ## What this does not show
 
 - No comparison with the thesis figure and no held-out likelihood.
