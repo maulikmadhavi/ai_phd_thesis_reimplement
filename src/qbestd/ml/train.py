@@ -139,7 +139,8 @@ def train_from_features(features, meta, args):
     npz_path = Path(args.out) / f"{name}.npz"
     npz_path.parent.mkdir(parents=True, exist_ok=True)
     info = {"kind": args.kind, "profile": args.profile,
-            "split_id": args.split_id, "dims": int(features.shape[1]), "n_iter": args.n_iter,
+            "split_id": args.split_id, "dims": int(features.shape[1]),
+            "n_iter": args.n_iter,
             "components": args.components, "epsilon": args.epsilon,
             "var_floor_ratio": args.var_floor_ratio, "seed": args.seed,
             "training_rows": meta["n_rows"],

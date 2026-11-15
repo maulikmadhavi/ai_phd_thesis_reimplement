@@ -13,9 +13,10 @@ trained on the same split (``split_id`` is checked).
 
 Steps: (1) load or build the feature caches (SA excluded, fingerprint
 checked) and select the test-side documents; (2) cut each query clip from its
-audio and extract its features; (3) posteriorgrams of queries and documents; (4) for every query
-and document: symmetric-KL matrix, LC2 accumulation and the utterance
-distance; (5) rank documents, then p@N and AP per query instance.
+audio and extract its features; (3) posteriorgrams of queries and
+documents; (4) for every query and document: symmetric-KL matrix, LC2
+accumulation and the utterance distance; (5) rank documents, then p@N
+and AP per query instance.
 
 Assumptions (unverified, see ``docs/results_timit_q20.md``): every instance
 is its own query; relevance is an exact token match; query features are
@@ -72,8 +73,8 @@ from qbestd.search.distance import symmetric_kl_matrix
 from qbestd.search.score import rank_documents
 from qbestd.search.subdtw import best_utterance_distance, subdtw_lc2
 
-PER_QUERY_HEADER = ("keyword", "hf_split", "row_index", "word_index", "n_relevant",
-                    "p_at_n", "ap", "nonmatches")
+PER_QUERY_HEADER = ("keyword", "hf_split", "row_index", "word_index",
+                    "n_relevant", "p_at_n", "ap", "nonmatches")
 
 
 def parse_args(argv=None):

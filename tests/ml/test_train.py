@@ -181,4 +181,5 @@ def test_split_id_option_is_stored_in_the_model(tmp_path):
 
 
 def test_hf_split_id_uses_twelve_hex_of_the_revision():
-    assert hf_split_id("0123456789abcdef" * 2 + "01234567") ==         "hf-0123456789ab-nonsa"
+    revision = "0123456789abcdef" * 2 + "01234567"
+    assert hf_split_id(revision) == "hf-0123456789ab-nonsa"
