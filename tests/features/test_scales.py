@@ -73,3 +73,26 @@ def test_warp_mel_scale_matches_formula_and_identity():
         2595 * np.log10(1 + 1000 / (700 * 1.1)))
     with pytest.raises(ValueError):
         warp_mel_scale(100.0, 0.0)
+
+
+def test_upper_anchor_gives_3500_hz_cutoff_for_4khz_band():
+    assert vtln_cutoff_frequency(0.88, 16000, upper_hz=4000.0) \
+        == pytest.approx(3500.0)
+    assert vtln_cutoff_frequency(0.88, 16000) == pytest.approx(7000.0)
+
+
+@pytest.mark.parametrize("warp_factor", VTLN_WARP_FACTORS)
+def test_upper_anchor_maps_to_itself_and_is_monotonic(warp_factor):
+    frequencies = np.linspace(0, 8000, 1601)
+    warped = warp_frequency_piecewise(frequencies, warp_factor, 16000,
+                                      upper_hz=4000.0)
+    assert np.all(np.diff(warped) > 0)
+    index = int(np.argmin(np.abs(frequencies - 4000.0)))
+    assert warped[index] == pytest.approx(4000.0)
+
+
+def test_default_anchor_is_nyquist():
+    frequencies = np.linspace(0, 8000, 101)
+    assert np.array_equal(
+        warp_frequency_piecewise(frequencies, 0.92, 16000),
+        warp_frequency_piecewise(frequencies, 0.92, 16000, upper_hz=8000.0))

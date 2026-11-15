@@ -31,40 +31,48 @@ def bark_to_hz(bark):
 
 
 def vtln_cutoff_frequency(warp_factor, sample_rate,
-                          cutoff_ratio=DEFAULT_CUTOFF_RATIO):
+                          cutoff_ratio=DEFAULT_CUTOFF_RATIO, upper_hz=None):
     """Frequency f0 where the VTLN warp switches from the first to second line.
 
-    f0 = cutoff_ratio * Nyquist. As in ``Fx_vtln_warp.m``, the ratio is lowered
-    in steps of 0.05 until the first line maps f0 strictly below Nyquist.
+    f0 = cutoff_ratio * upper, where ``upper`` is the anchor frequency that
+    the warp maps to itself: ``upper_hz``, or Nyquist when None. As in
+    ``Fx_vtln_warp.m``, the ratio is lowered in steps of 0.05 until the
+    first line maps f0 strictly below ``upper``.
 
     Raises:
         ValueError: if no positive cutoff ratio satisfies the condition.
     """
-    nyquist = sample_rate / 2.0
+    upper = sample_rate / 2.0 if upper_hz is None else float(upper_hz)
     slope = 2.0 - warp_factor
     ratio = cutoff_ratio
-    while slope * ratio * nyquist >= nyquist:
+    while slope * ratio * upper >= upper:
         ratio -= CUTOFF_BACKOFF_STEP
         if ratio <= 0:
             raise ValueError(
                 f"No valid VTLN cutoff for warp_factor={warp_factor}")
-    return ratio * nyquist
+    return ratio * upper
 
 
 def warp_frequency_piecewise(freqs_hz, warp_factor, sample_rate,
-                             cutoff_ratio=DEFAULT_CUTOFF_RATIO):
-    """Piecewise-linear VTLN warp, exactly as ``Fx_vtln_warp.m``.
+                             cutoff_ratio=DEFAULT_CUTOFF_RATIO,
+                             upper_hz=None):
+    """Piecewise-linear VTLN warp, as ``Fx_vtln_warp.m`` with a movable anchor.
 
     f' = (2 - alpha) * f                          for f <= f0
     f' = (2 - alpha) * f0 + m2 * (f - f0)         for f >  f0
-    where m2 = (Nyquist - (2 - alpha) f0) / (Nyquist - f0), so that Nyquist
-    maps to Nyquist. alpha > 1 therefore lowers frequencies below f0.
+    where m2 = (upper - (2 - alpha) f0) / (upper - f0), so that ``upper``
+    maps to itself. ``upper_hz`` defaults to Nyquist (the MATLAB script);
+    pass the band edge (``high_hz``) for a band-limited filterbank, which
+    gives f0 = 3500 Hz for a 4 kHz band (thesis ``Warped_Feature.tex``).
+    alpha > 1 lowers frequencies below f0. Frequencies above ``upper`` are
+    continued on the second line.
     """
     freqs_hz = np.asarray(freqs_hz, dtype="float64")
-    nyquist = sample_rate / 2.0
+    upper = sample_rate / 2.0 if upper_hz is None else float(upper_hz)
     slope = 2.0 - warp_factor
-    cutoff = vtln_cutoff_frequency(warp_factor, sample_rate, cutoff_ratio)
-    upper_slope = (nyquist - slope * cutoff) / (nyquist - cutoff)
+    cutoff = vtln_cutoff_frequency(warp_factor, sample_rate, cutoff_ratio,
+                                   upper)
+    upper_slope = (upper - slope * cutoff) / (upper - cutoff)
     return np.where(freqs_hz <= cutoff, slope * freqs_hz,
                     slope * cutoff + upper_slope * (freqs_hz - cutoff))
 

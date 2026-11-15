@@ -70,3 +70,38 @@ def test_high_hz_above_nyquist_raises():
 def test_invalid_arguments_raise(kwargs):
     with pytest.raises(ValueError):
         mel_filterbank(**kwargs)
+
+
+@pytest.mark.parametrize("warp_factor", [0.88, 1.12])
+def test_band_limited_support_stays_below_high_hz_when_warped(warp_factor):
+    bank = mel_filterbank(26, 512, 16000, 0.0, 4000.0, warp_factor)
+    frequencies = fft_bin_frequencies(512, 16000)
+    assert np.all(bank[:, frequencies > 4000.0] == 0)
+    assert bank[:, frequencies <= 4000.0].sum() > 0
+
+
+def test_band_limited_warp_differs_from_nyquist_anchored_warp():
+    # With the old fs/2 anchor the last filters reach beyond 4 kHz for 1.12
+    # or stop short of it for 0.88; the band-edge anchor keeps them at 4 kHz.
+    bank = mel_filterbank(26, 512, 16000, 0.0, 4000.0, 0.88)
+    frequencies = fft_bin_frequencies(512, 16000)
+    assert frequencies[np.flatnonzero(bank[-1])[-1]] >= 3900.0
+
+
+def test_alpha_one_band_limited_is_unchanged():
+    assert np.array_equal(
+        mel_filterbank(26, 512, 16000, 0.0, 4000.0, 1.0),
+        mel_filterbank(26, 512, 16000, 0.0, 4000.0))
+
+
+def test_full_band_warp_is_nyquist_anchored():
+    from qbestd.features.filterbank import mel_filter_edges_hz
+    from qbestd.features.scales import warp_frequency_piecewise
+    bank = mel_filterbank(26, 512, 16000, 0.0, 8000.0, 0.92)
+    warped = warp_frequency_piecewise(fft_bin_frequencies(512, 16000), 0.92,
+                                      16000, upper_hz=8000.0)
+    edges = mel_filter_edges_hz(26, 0.0, 8000.0)
+    low, mid, high = edges[:-2, None], edges[1:-1, None], edges[2:, None]
+    expected = np.maximum(0.0, np.minimum((warped - low) / (mid - low),
+                                          (high - warped) / (high - mid)))
+    assert np.allclose(bank, expected)

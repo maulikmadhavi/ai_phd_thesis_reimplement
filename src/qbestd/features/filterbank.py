@@ -29,7 +29,11 @@ def mel_filterbank(n_filters=26, n_fft=256, sample_rate=8000, low_hz=0.0,
     ``low_hz`` and ``high_hz`` (HTK mel scale). When ``warp_factor`` is not 1
     the FFT bin frequencies are first warped by
     ``warp_frequency_piecewise`` and the unchanged triangles are then
-    evaluated at the warped frequencies (as in ``Fx_PLPCC_htk.m``). For
+    evaluated at the warped frequencies (as in ``Fx_PLPCC_htk.m``). The warp
+    is anchored at the band edge: ``upper_hz = high_hz`` when
+    ``high_hz < Nyquist``, else Nyquist, so a 4 kHz band gets a 3500 Hz
+    cutoff (thesis-based; ``Fx_melfiltbank.m`` is missing, so MATLAB parity
+    is not proven). Filter support never exceeds ``high_hz``. For
     warp_factor > 1 a bin at f is seen at (2 - alpha) * f < f, so every
     filter peak moves to a higher FFT bin; for warp_factor < 1 it moves lower.
 
@@ -45,7 +49,9 @@ def mel_filterbank(n_filters=26, n_fft=256, sample_rate=8000, low_hz=0.0,
             f"high_hz={high_hz} exceeds Nyquist {sample_rate / 2}")
     bin_hz = fft_bin_frequencies(n_fft, sample_rate)
     if warp_factor != 1.0:
-        bin_hz = warp_frequency_piecewise(bin_hz, warp_factor, sample_rate)
+        bin_hz = warp_frequency_piecewise(
+            bin_hz, warp_factor, sample_rate,
+            upper_hz=min(high_hz, sample_rate / 2.0))
     edges = mel_filter_edges_hz(n_filters, low_hz, high_hz)
     lower, center, upper = edges[:-2, None], edges[1:-1, None], edges[2:, None]
     rising = (bin_hz[None, :] - lower) / (center - lower)
