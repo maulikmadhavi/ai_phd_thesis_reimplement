@@ -54,19 +54,20 @@ README.md [Shorter and concise overview of the project]
 - you can create multiple branches if needed for different features or experiments. But make sure maintain the main branch stable and up-to-date.
 - Use target repository for all code push. [No need to pull from target repository]
 - Push immediately after every git commit, on whichever branch or tag it was made. No need to ask before pushing.
-- Agentic handoff: 
-    - prepare handoff_request.md fromm claude code to codex agent
-    - prepare handoff_response.md from codex agent to claude code
-    - The handoff protocol role:
-        - Claude code: 
-            1. Orchestrator: Responsible for initial task understanding and making execution plan. Check for handoff_response.md from other agents and adjust the execution plan accordingly. [Opus - high] 
-            2. Executor: Responsible for implementing the task as per the execution plan. [Sonnet - high]
-            3. Reviewer: Check the implemented code for correctness and adherence to the execution plan. commit the results and provide handoff_request.md [Opus - medium] 
-        - Codex agent:
-            1. Just write single handoff_response.md based on the received handoff_request.md. Codex must not create or modify any other file.
-            Commit the handoff_response.md to the repository. [codex - GPT 6 - sol - medium]
-
-    - handoff exectution: Claud code Orchestrator [commit (plan)] -> Claude Code Executor [commit (exec) ] -> Claude Code Reviewer [commit (handoff)] -> Codex [commit (handoff_resp)] -> Claud code Orchestrator [commit (plan)]  .... 
-    - Every step in the cycle ends with its own git commit.
-    - The user starts every session manually, including the single Codex agent. Claude Code never launches Codex: after the Reviewer's handoff commit it stops and waits for the user.
-    - All session should have appropriate title/session_name for better tracking and management.
+- Agentic handoff (from cycle 6 on, all four roles are Claude Code sessions; Codex is retired):
+    - `handoff_request.md`: Reviewer -> Handoff_feedback. `handoff_response.md`: Handoff_feedback -> Orchestrator.
+    - Roles (one local Claude Code session each; the session name is its address):
+        1. Orchestrator [Opus - high]: understands the task and owns `docs/plan.md`. On a handoff_resp commit, reads `handoff_response.md`, updates the plan, commits `plan: ...`.
+        2. Executor [Sonnet - high]: implements the plan task by task, one `exec: ...` commit per task. Stops and reports at every STOP gate in the plan.
+        3. Reviewer [Opus - medium]: checks the exec commits for correctness and plan adherence, re-runs the tests, writes `handoff_request.md`, commits `handoff: ...`.
+        4. Handoff_feedback [Opus - medium]: independent reviewer that replaces Codex. Writes only `handoff_response.md` from `handoff_request.md`, the repo and the thesis sources, and commits `handoff_resp: ...`. It must not create or modify any other file, and must not take plan decisions in place of the Orchestrator.
+    - Cycle: Orchestrator [plan] -> Executor [exec ...] -> Reviewer [handoff] -> Handoff_feedback [handoff_resp] -> Orchestrator [plan] ...
+    - Every step ends with its own git commit and an immediate push. Git is the source of truth; messages only point to commits.
+    - Notification: after its final commit and push, each role sends the next role a SendMessage with the commit hash and a one-line summary, then stops. No manual relay by the user.
+        - Orchestrator -> Executor, Executor -> Reviewer, Reviewer -> Handoff_feedback, Handoff_feedback -> Orchestrator.
+        - Fallback: the Orchestrator keeps a background git watcher for `handoff_resp` commits newer than its last plan commit, in case a message is lost.
+    - The user still starts every session manually and can stop the loop at any time. The loop pauses for the user (the role reports instead of handing on) when:
+        - a STOP gate in the plan fires, tests fail, or a regression check fails;
+        - Handoff_feedback marks an item **user decision** (data access, licence, scope, compute cost);
+        - a session needs a permission it does not have. A role never asks another session to do something its own permissions blocked.
+    - All sessions should have an appropriate title/session_name for better tracking and management.

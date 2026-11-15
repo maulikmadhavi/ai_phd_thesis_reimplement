@@ -7,6 +7,8 @@
 - **This cycle:** provenance fixes and a corrected text-disjoint split `textdisjoint_q20_v2`
   that keeps SX transcript variants together (part A, §8), then PLP and MFCC-TMP on v2
   (part B, §9)
+- **Review agent:** from the cycle 6 review on, `handoff_response.md` comes from the
+  Claude Code session Handoff_feedback, not Codex (protocol in `requirements.md`)
 - **Source of truth:** thesis `D:\Storage\career_phd_daiict_work\Thesis` (`Chapters/*.tex`,
   `Backmatter/*.tex`) and the MATLAB feature repo
   `github.com/maulikmadhavi/research_myMATLAB_codes/tree/master/Analysis/Feature_Extraction`
