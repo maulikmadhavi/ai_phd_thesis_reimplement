@@ -55,6 +55,14 @@ FEATURE_SOURCE_FILES = (
     "features/plp.py",
     "features/scales.py",
 )
+# The module that decides which rows are read and how they are decoded
+# (row iteration, sample-rate check, ``normalize_transcript``). Not this
+# file: hashing it would invalidate every cache on any edit to the
+# fingerprint code itself.
+ROW_SOURCE_FILES = ("data/timit_hf.py",)
+# Version of the row-selection loop inside ``build_feature_cache`` (SA skip,
+# row order, offsets, short-row skip). Bump it whenever that logic changes.
+ROW_SELECTION_VERSION = 1
 
 
 class CacheMismatchError(ValueError):
@@ -79,16 +87,25 @@ def feature_source_digest(root=None, files=FEATURE_SOURCE_FILES):
     return digest.hexdigest()
 
 
+def row_source_digest(root=None):
+    """Like :func:`feature_source_digest`, over ``ROW_SOURCE_FILES``."""
+    return feature_source_digest(root, ROW_SOURCE_FILES)
+
+
 def feature_fingerprint(kind, profile, exclude_sa=True,
                         dataset_revision=TIMIT_HF_REVISION):
     """SHA-256 over everything that decides what the cached features are:
     the profile config values, feature kind, dataset revision, SA exclusion,
-    the feature source digest and ``FEATURE_CACHE_VERSION`` (the cache
-    format version)."""
+    the feature source digest, the row source digest (``timit_hf.py``), the
+    ``SA_TOKENS`` text list, ``ROW_SELECTION_VERSION`` and
+    ``FEATURE_CACHE_VERSION`` (the cache format version)."""
     payload = {"config": asdict(get_profile(profile, kind)), "kind": kind,
                "dataset_revision": dataset_revision,
                "exclude_sa": bool(exclude_sa),
                "source_digest": feature_source_digest(),
+               "row_source_digest": row_source_digest(),
+               "sa_tokens": [list(tokens) for tokens in SA_TOKENS],
+               "row_selection_version": ROW_SELECTION_VERSION,
                "version": FEATURE_CACHE_VERSION}
     text = json.dumps(payload, sort_keys=True)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()

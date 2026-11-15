@@ -1,4 +1,5 @@
 import ast
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -9,6 +10,8 @@ import pytest
 from qbestd.data.feature_cache import (
     FEATURE_CACHE_VERSION,
     FEATURE_SOURCE_FILES,
+    ROW_SELECTION_VERSION,
+    ROW_SOURCE_FILES,
     SA_SENTENCES,
     CacheMismatchError,
     build_feature_cache,
@@ -17,6 +20,7 @@ from qbestd.data.feature_cache import (
     feature_source_digest,
     is_sa_sentence,
     load_feature_cache,
+    row_source_digest,
     utterance_slice,
 )
 from qbestd.data.timit_hf import normalize_transcript
@@ -158,29 +162,38 @@ def test_cache_without_fingerprint_is_rejected(tmp_path):
 PACKAGE = Path(__file__).resolve().parents[2] / "src" / "qbestd"
 
 
-def transitive_feature_imports(start="features/extract.py"):
-    """Files under ``audio/`` and ``features/`` reached from ``start`` by
-    ``qbestd`` imports, found by parsing the source (``__init__`` skipped)."""
+def import_targets(node, name):
+    """Dotted module names an import node may refer to. ``name`` is the
+    importing file relative to the package (``features/extract.py``)."""
+    if isinstance(node, ast.Import):
+        return [a.name for a in node.names]
+    if not isinstance(node, ast.ImportFrom):
+        return []
+    base = node.module.split(".") if node.module else []
+    if node.level:
+        package = ["qbestd"] + name.split("/")[:-1]
+        base = package[:len(package) - (node.level - 1)] + base
+    return [".".join(base)] + [".".join(base + [a.name]) for a in node.names]
+
+
+def transitive_feature_imports(root=PACKAGE, start="features/extract.py"):
+    """Files under ``audio/`` and ``features/`` of the package at ``root``
+    reached from ``start`` by ``qbestd`` imports, absolute or relative,
+    found by parsing the source (``__init__`` skipped). It misses dynamic
+    imports and code outside those two packages."""
     seen, todo = set(), [start]
     while todo:
         name = todo.pop()
         if name in seen:
             continue
         seen.add(name)
-        for node in ast.walk(ast.parse((PACKAGE / name).read_text("utf-8"))):
-            if isinstance(node, ast.ImportFrom) and node.module:
-                modules = [node.module]
-                modules += [f"{node.module}.{a.name}" for a in node.names]
-            elif isinstance(node, ast.Import):
-                modules = [a.name for a in node.names]
-            else:
-                continue
-            for module in modules:
+        for node in ast.walk(ast.parse((root / name).read_text("utf-8"))):
+            for module in import_targets(node, name):
                 parts = module.split(".")
                 if parts[0] == "qbestd" and parts[1:2] and parts[1] in (
                         "audio", "features") and len(parts) > 2:
                     candidate = "/".join(parts[1:3]) + ".py"
-                    if (PACKAGE / candidate).exists():
+                    if (root / candidate).exists():
                         todo.append(candidate)
     return seen
 
@@ -188,6 +201,26 @@ def transitive_feature_imports(start="features/extract.py"):
 def test_source_files_are_the_transitive_feature_imports():
     assert set(FEATURE_SOURCE_FILES) == transitive_feature_imports()
     assert list(FEATURE_SOURCE_FILES) == sorted(FEATURE_SOURCE_FILES)
+
+
+@pytest.mark.parametrize("import_line", [
+    "from qbestd.features.newhelper import value",
+    "from .newhelper import value",
+    "from . import newhelper",
+    "import qbestd.features.newhelper",
+])
+def test_closure_finds_a_new_helper_imported_by_extract(tmp_path,
+                                                        import_line):
+    root = tmp_path / "qbestd"
+    for package in ("audio", "features"):
+        shutil.copytree(PACKAGE / package, root / package,
+                        ignore=shutil.ignore_patterns("__pycache__"))
+    (root / "features" / "newhelper.py").write_text("value = 1\n", "utf-8")
+    extract = root / "features" / "extract.py"
+    extract.write_text(import_line + "\n" + extract.read_text("utf-8"),
+                       "utf-8")
+    missing = transitive_feature_imports(root) - set(FEATURE_SOURCE_FILES)
+    assert missing == {"features/newhelper.py"}
 
 
 def copy_sources(target):
@@ -217,5 +250,44 @@ def test_digest_ignores_crlf_line_endings(tmp_path):
 def test_fingerprint_changes_with_the_source_digest(monkeypatch):
     base = feature_fingerprint("mfcc", "timit_matlab", True)
     monkeypatch.setattr("qbestd.data.feature_cache.feature_source_digest",
-                        lambda: "another digest")
+                        lambda *args: "another digest")
+    assert feature_fingerprint("mfcc", "timit_matlab", True) != base
+
+
+def test_row_source_digest_covers_timit_hf_and_ignores_crlf(tmp_path):
+    assert ROW_SOURCE_FILES == ("data/timit_hf.py",)
+    target = tmp_path / "data" / "timit_hf.py"
+    target.parent.mkdir()
+    original = (PACKAGE / "data" / "timit_hf.py").read_bytes()
+    lf = original.replace(b"\r\n", b"\n")
+    target.write_bytes(lf)
+    assert row_source_digest(tmp_path) == row_source_digest()
+    target.write_bytes(lf.replace(b"\n", b"\r\n"))
+    assert row_source_digest(tmp_path) == row_source_digest()
+    target.write_bytes(lf + b"# edit\n")
+    assert row_source_digest(tmp_path) != row_source_digest()
+
+
+def test_fingerprint_changes_with_the_timit_hf_bytes(tmp_path, monkeypatch):
+    base = feature_fingerprint("mfcc", "timit_matlab", True)
+    target = tmp_path / "data" / "timit_hf.py"
+    target.parent.mkdir()
+    target.write_bytes((PACKAGE / "data" / "timit_hf.py").read_bytes()
+                       + b"# edit\n")
+    monkeypatch.setattr("qbestd.data.feature_cache.row_source_digest",
+                        lambda: row_source_digest(tmp_path))
+    assert feature_fingerprint("mfcc", "timit_matlab", True) != base
+
+
+def test_fingerprint_changes_with_the_sa_tokens(monkeypatch):
+    base = feature_fingerprint("mfcc", "timit_matlab", True)
+    monkeypatch.setattr("qbestd.data.feature_cache.SA_TOKENS",
+                        (("other", "text"),))
+    assert feature_fingerprint("mfcc", "timit_matlab", True) != base
+
+
+def test_fingerprint_changes_with_the_row_selection_version(monkeypatch):
+    base = feature_fingerprint("mfcc", "timit_matlab", True)
+    monkeypatch.setattr("qbestd.data.feature_cache.ROW_SELECTION_VERSION",
+                        ROW_SELECTION_VERSION + 1)
     assert feature_fingerprint("mfcc", "timit_matlab", True) != base
