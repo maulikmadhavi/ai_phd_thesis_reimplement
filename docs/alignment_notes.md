@@ -175,14 +175,16 @@ Test: `don't` 137, `it's` 12, `we'll` 8, `didn't` 7, `you're` 4, `i'd` 4, `nevad
   reference words we do not have. Do not quote it as the accuracy of these
   boundaries; the only independent evidence we have is the sanity checks and
   the ASR audit below.
-- **Speaker overlap is unverified.** The Hugging Face rows carry no speaker
-  or sentence IDs and the split is a redrawn 80/20 (see `docs/data_notes.md`),
-  so we cannot tell whether speakers (or the sentences read by them) appear in
-  both the train and the test set. Overlap would make both the alignment
-  quality and later QbE scores look better than a speaker-disjoint setup
-  would. The aligner itself was also trained on human boundaries from the
-  official TIMIT *training* speakers, and some of those speakers may sit in
-  our test split; this is unverified too.
+- **The split is not strictly speaker-independent.** The Hugging Face rows
+  carry no speaker IDs, but the SA1 and SA2 counts differ within each split
+  (train 488 / 501, test 142 / 129; 630 each in total), whereas a
+  speaker-disjoint split would make them equal. So at least 13 speakers' SA
+  utterances cross it (see `docs/data_notes.md`). The counts do not prove a
+  random split and give only that lower bound. Overlap can make later QbE
+  scores look better than a speaker-disjoint setup would; label results
+  *speaker overlap present; approximate versus the thesis*. Whether the
+  aligner's own training speakers (official TIMIT training speakers) sit in
+  our test split is **unverified**.
 
 ## Environment record
 

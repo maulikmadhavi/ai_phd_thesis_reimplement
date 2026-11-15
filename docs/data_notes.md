@@ -34,8 +34,15 @@ This dataset also has 6300 (5040 + 1260), but in an 80/20 ratio, so the split
 was redrawn. How it was drawn is undocumented: the repo has no README, so
 nothing says whether it is random or speaker-disjoint, and the rows carry no
 speaker IDs to check. Consequences:
-- "Queries from train, documents from test" can still be followed, but whether
-  speakers overlap is unknown.
+- "Queries from train, documents from test" can still be followed, but the
+  split is **not strictly speaker-independent**. Every TIMIT speaker reads
+  both SA sentences, so a speaker-disjoint split would give equal SA1 and SA2
+  counts in each split. The counts differ (train 488 / 501, test 142 / 129;
+  630 each in total), so at least 13 speakers' SA utterances cross the split.
+  The counts do not prove a random split, and say nothing about how many
+  speakers overlap beyond that lower bound.
+- Label for every result obtained on this split: *speaker overlap present;
+  approximate versus the thesis*.
 - Keyword occurrence counts in the test split need not match the thesis tables
   (for example the Q-84 rule of 7 to 20 test occurrences).
 
