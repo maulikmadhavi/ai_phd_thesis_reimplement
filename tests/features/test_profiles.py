@@ -26,17 +26,6 @@ def test_timit_matlab_plp_follows_matlab_script():
     assert config.pcm_scale == 32768.0
 
 
-def test_htk_like_plp_has_order_12_and_dc_removal():
-    config = get_profile("htk_like", "plp")
-    assert config.lpc_order == 12
-    assert config.remove_dc is True
-
-
-def test_htk_like_mfcc_matches_timit_matlab_mfcc():
-    assert get_profile("htk_like", "mfcc") == get_profile("timit_matlab",
-                                                          "mfcc")
-
-
 def test_generic_defaults_are_unchanged():
     assert MfccConfig().sample_rate == 8000
     assert PlpConfig().lpc_order == 12
@@ -45,7 +34,7 @@ def test_generic_defaults_are_unchanged():
 
 
 @pytest.mark.parametrize("name, kind", [
-    ("nope", "mfcc"), ("htk_like", "fbank"), ("timit_matlab", "")])
+    ("nope", "mfcc"), ("timit_matlab", "fbank"), ("timit_matlab", "")])
 def test_unknown_name_or_kind_raises(name, kind):
     with pytest.raises(ValueError):
         get_profile(name, kind)
@@ -65,7 +54,8 @@ def test_every_profile_extracts_finite_features(name, kind):
 def test_no_dc_removal_changes_plp_output_for_offset_signal():
     signal = 0.1 * np.random.default_rng(1).normal(size=16000) + 0.05
     with_dc = extract_features(signal, 16000, "plp",
-                               config=get_profile("htk_like", "plp"))
+                               config=PlpConfig(sample_rate=16000, lpc_order=8,
+                                                remove_dc=True))
     without = extract_features(signal, 16000, "plp",
                                config=get_profile("timit_matlab", "plp"))
     assert not np.allclose(with_dc, without)

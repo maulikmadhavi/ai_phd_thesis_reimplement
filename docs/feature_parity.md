@@ -45,7 +45,7 @@ Sources and how much to trust them:
 | `Fx_mfcc_lift.m` lifter | n/a | n/a | n/a | n/a | n/a | `Nlift = -20` (FL:24), i.e. HTK sine, L = 20; also fH 8000 (FL:27) |
 | Deltas | regression, window 2, edge frames replicated; delta and acceleration give 39 dims | n/a | n/a | n/a | DELTAWINDOW 2, ACCWINDOW 2 | MFCC-TMP: 13 + delta + delta-delta (198); MFCC and PLP **not stated** |
 | Delta formula | `sum k (x[t+k]-x[t-k]) / (2 sum k^2)` | `Deltacep(x,N)` (DC:49-53), N is a parameter, edge copy (DC:28-38) | same | same | same | same |
-| LPC order | generic default 12 (unverified); `timit_matlab` PLP 8, `htk_like` PLP 12 | n/a | n/a | 8 (FP:35) | LPCORDER 12 | not stated |
+| LPC order | generic default 12 (unverified); `timit_matlab` PLP 8 | n/a | n/a | 8 (FP:35) | LPCORDER 12 | not stated |
 | Equal loudness | `f^4/(f^2+1.6e5)^2 * (f^2+1.44e6)/(f^2+9.61e6)` at the warped filter centre | n/a | n/a | same formula, centre `fhz(i)` (FP:57-62) | same | not stated (PLP cites Hermansky 1990 only, 194) |
 | Compression | power 0.33 | n/a | n/a | `.^0.33` (FP:93) | 0.33 | n/a |
 | Edge bands | first and last copied from neighbours | n/a | n/a | `z([2,2:(nfilt-1),nfilt-1],:)` (FP:95) | same idea | n/a |
@@ -62,7 +62,6 @@ is thesis-verified.
 | Profile | MFCC / MFCC-TMP | PLP |
 |---|---|---|
 | `timit_matlab` | 16 kHz, 0-4000 Hz | 16 kHz, 0-8000 Hz, LPC order 8, no DC removal, no pre-emphasis, no peak normalisation, x 32768 (FP:30-39, 69) |
-| `htk_like` | same as `timit_matlab` | LPC order 12, DC removal on (HTK values from memory, unverified) |
 
 The generic config defaults (8 kHz, order 12) are unchanged.
 

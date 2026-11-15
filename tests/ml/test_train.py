@@ -31,10 +31,10 @@ def test_defaults():
 
 
 def test_options():
-    args = parse_args(["--kind", "plp", "--profile", "htk_like",
+    args = parse_args(["--kind", "plp", "--profile", "timit_matlab",
                        "--components", "128", "--out", "m",
                        "--rebuild-cache"])
-    assert (args.kind, args.profile, args.components) == ("plp", "htk_like",
+    assert (args.kind, args.profile, args.components) == ("plp", "timit_matlab",
                                                           128)
     assert args.rebuild_cache is True
 

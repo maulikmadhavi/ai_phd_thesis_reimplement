@@ -2,9 +2,8 @@
 
 **No profile is thesis-verified.** They are reading aids that group the
 settings of the MATLAB scripts (``Fx_mfcc.m`` FM, ``Fx_mfcc_vtmp_cep.m`` FT,
-``Fx_PLPCC_htk.m`` FP in ``research_myMATLAB_codes``) or the HTK defaults.
-The generic config defaults (8 kHz, unverified) are not changed by this
-module.
+``Fx_PLPCC_htk.m`` FP in ``research_myMATLAB_codes``). The generic config
+defaults (8 kHz, unverified) are not changed by this module.
 """
 
 from qbestd.features.mfcc import MfccConfig
@@ -12,7 +11,7 @@ from qbestd.features.mfcc_tmp import MfccTmpConfig
 from qbestd.features.plp import PlpConfig
 
 TIMIT_SAMPLE_RATE = 16000
-PROFILE_NAMES = ("timit_matlab", "htk_like")
+PROFILE_NAMES = ("timit_matlab",)
 KINDS = ("mfcc", "plp", "mfcc_tmp")
 
 
@@ -32,18 +31,7 @@ def _timit_matlab(kind):
                      remove_dc=False)
 
 
-def _htk_like(kind):
-    """As ``timit_matlab`` but PLP follows HTK: LPC order 12, DC removed.
-
-    The HTK values are recalled from the HTK Book, not checked here.
-    """
-    if kind == "plp":
-        return PlpConfig(sample_rate=TIMIT_SAMPLE_RATE, lpc_order=12,
-                         remove_dc=True)
-    return _timit_matlab(kind)
-
-
-_BUILDERS = {"timit_matlab": _timit_matlab, "htk_like": _htk_like}
+_BUILDERS = {"timit_matlab": _timit_matlab}
 
 
 def get_profile(name, kind):
