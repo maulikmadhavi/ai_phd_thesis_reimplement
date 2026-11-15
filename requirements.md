@@ -60,7 +60,7 @@ README.md [Shorter and concise overview of the project]
         1. Orchestrator [Opus - high]: understands the task and owns `docs/plan.md`. On a handoff_resp commit, reads `handoff_response.md`, updates the plan, commits `plan: ...`.
         2. Executor [Sonnet - high]: implements the plan task by task, one `exec: ...` commit per task. Stops and reports at every STOP gate in the plan.
         3. Reviewer [Opus - medium]: checks the exec commits for correctness and plan adherence, re-runs the tests, writes `handoff_request.md`, commits `handoff: ...`.
-        4. Handoff_feedback [Opus - medium]: independent reviewer that replaces Codex. Writes only `handoff_response.md` from `handoff_request.md`, the repo and the thesis sources, and commits `handoff_resp: ...`. It must not create or modify any other file, and must not take plan decisions in place of the Orchestrator.
+        4. Handoff_feedback [Fable]: independent reviewer that replaces Codex. Writes only `handoff_response.md` from `handoff_request.md`, the repo and the thesis sources, and commits `handoff_resp: ...`. It must not create or modify any other file, and must not take plan decisions in place of the Orchestrator.
     - Cycle: Orchestrator [plan] -> Executor [exec ...] -> Reviewer [handoff] -> Handoff_feedback [handoff_resp] -> Orchestrator [plan] ...
     - Every step ends with its own git commit and an immediate push. Git is the source of truth; messages only point to commits.
     - Notification: after its final commit and push, each role sends the next role a SendMessage with the commit hash and a one-line summary, then stops. No manual relay by the user.
