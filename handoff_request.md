@@ -1,244 +1,172 @@
 # Handoff Request: Reviewer → Codex
 
-- **Cycle:** 2 + 2b
+- **Cycle:** 3
 - **From:** Claude Code Reviewer
-- **To:** Codex. Write only `handoff_response.md` (replacing the cycle 1 response) and commit
+- **To:** Codex. Write only `handoff_response.md` (replacing the cycle 2 response) and commit
   it. Do not touch any other file.
-- **Plans under review:**
-  - `docs/plan.md` at `11862f2`: Stage 1 fix-ups F1–F7 and Stage 2 (acoustic features)
-    T2.1–T2.11. Sections 1–4 below, Q1–Q13.
-  - `docs/plan.md` at `9498174`, §9: cycle 2b, TIMIT word alignment A1–A5. **Section 4**
-    below, Q14–Q20.
-- **Status:** COMPLETE. Cycle 2 (18 tasks, head `a0c46c4`) and cycle 2b (5 tasks, head
-  `4d6f1af`) are committed and reviewed.
-- **D1 (user decision, resolved 2026-11-14):** no LDC `.WRD` files. Query boundaries come from
-  automatic forced alignment on the HF copy. The user picked the aligner
-  `Scicom-intl/Where-Words-Begin-and-End-Whisper-Large-V3`, which replaces the Reviewer's
-  earlier MFA proposal. Results are labelled approximate against the thesis.
+- **Plan under review:** `docs/plan.md` at `926821b`:
+  - §8 Part A, fix-ups C1–C9 from your `bc8279a` response;
+  - §9 Part B, Stage 3 (LBG codebook, diagonal GMM, posteriorgram) T3.1–T3.6.
+- **Status:** COMPLETE. 15 commits, `799b826..c992e9d`.
 
 ## 1. Commits to review
 
 | Commit | Task | Files | Reviewer verdict |
 |---|---|---|---|
-| `609baf2` exec: validate pcm range in save_audio | F1 | `audio/io.py`, tests | OK |
-| `b734af3` exec: validate rates and anti-alias time scaling | F2 | `audio/resample.py`, tests | OK; see Q1 |
-| `78d4ea2` exec: validate framing parameters | F3 | `audio/framing.py`, tests | OK |
-| `21027a8` exec: reject short or invalid fft lengths | F4 | `audio/spectrum.py`, tests | OK |
-| `2855038` exec: remove absolute defaults from dataset config | F5 | `config.py`, `paths.local.toml.example`, tests | OK; adds a check beyond the plan (see Q2) |
-| `315a732` exec: plot signed teager energy in demo | F6 | `demo/stage1_audio_demo.py` | OK; builds |
-| `af02b45` exec: qualify timit split and confirm sample rate | F7 | `docs/data_notes.md` | OK; 16 kHz observed on row 0 only |
-| `6d62dcf` exec: add frequency scales and vtln warping | T2.1 | `features/scales.py`, tests | OK; see Q3 |
-| `d682de8` exec: add mel filterbank with vtln warping | T2.2 | `features/filterbank.py`, tests | OK; see Q3, Q4 |
-| `f7bb3e9` exec: add dct and liftering utilities | T2.3 | `features/cepstral.py`, tests | OK; see Q5 |
-| `f82356d` exec: add delta and acceleration features | T2.4 | `features/deltas.py`, tests | OK |
-| `be80918` exec: add mfcc extractor | T2.5 | `features/mfcc.py`, `features/frontend.py`, tests | OK; see Q6 |
-| `35ce7f6` exec: add lpc analysis helpers | T2.6 | `features/lpc.py`, tests | OK; also contains unrelated line-length fixes |
-| `eabc383` exec: add plp extractor | T2.7 | `features/plp.py`, tests | OK; see Q7 |
-| `c8c5d98` exec: add mfcc-tmp extractor | T2.8 | `features/mfcc_tmp.py`, `audio/spectrum.py`, tests | OK; see Q8 |
-| `51c71f6` exec: add unified and warped feature extraction | T2.9 | `features/extract.py`, tests | OK; see Q9 |
-| `eecc784` exec: add stage 2 features demo | T2.10 | `demo/stage2_features_demo.py` (124 lines), `pixi.toml` | OK; builds |
-| `a0c46c4` exec: document feature parity with matlab and htk | T2.11 | `docs/feature_parity.md` | OK; see Q10 |
-
-Diff range: `git diff 11862f2 a0c46c4`
-
-Cycle 2 definition of done (plan §8): all tasks are on `main`, tests are green, every module
-is under 400 lines, and this handoff covers D1 and the parity gaps. **Met.**
+| `799b826` exec: anchor vtln warp at feature band edge | C1 | `features/scales.py`, `features/filterbank.py`, tests | OK; see Q1 |
+| `8b0a34f` exec: add named feature profiles | C2 | `features/profiles.py`, `audio/pipeline.py` (`remove_dc`), `config.py`, tests | OK; see Q2 |
+| `86027c8` exec: let config warp factor apply by default | C3 | `features/extract.py`, tests | OK |
+| `7634e38` exec: correct thesis claims in feature parity doc | C4 | `docs/feature_parity.md` | OK; see Q3 |
+| `5f822f3` exec: tighten floor hit test and wrap long lines | C5 | `test_mfcc_tmp.py`, 14 files | OK |
+| `6999dc6` exec: flag collapsed runs and non-finite times | C6 | `alignment/manifest.py`, `alignment/recheck.py` (new), tests, notes | OK |
+| `99fd644` exec: check aligner returns one outcome per row | C7 | `alignment/word_aligner.py`, tests | OK |
+| `b6cb46b` exec: nfc normalise transcripts and audit tokens | C8 | `data/timit_hf.py`, tests, notes | OK |
+| `cd77fa7` exec: add asr alignment audit and caveats | C9 | `alignment/asr_audit.py` (new), tests, notes | OK |
+| `54c960a` exec: add lbg vector quantiser | T3.1 | `ml/vq.py`, tests | OK; see Q4 |
+| `47b7361` exec: add diagonal gmm trained by em | T3.2 | `ml/gmm.py`, tests | OK; see Q5 |
+| `689cd83` exec: add gaussian posteriorgram | T3.3 | `ml/posteriorgram.py`, tests | OK |
+| `f06af20` exec: add timit feature cache | T3.4 | `data/feature_cache.py`, tests | OK; see Q6 |
+| `028c58f` exec: train baseline mfcc gmm and record notes | T3.5 | `ml/train.py`, `pixi.toml`, `docs/gmm_notes.md`, tests | OK; see Q7, Q8 |
+| `c992e9d` exec: add stage 3 gmm demo | T3.6 | `demo/stage3_gmm_demo.py`, `pixi.toml` | OK (smoke-tested, not opened in a browser) |
 
 ## 2. Reviewer checks done
 
-- `pixi run test`: **178 passed** (1.37 s) at `a0c46c4`, with a clean working tree.
-- Every module is under 400 lines. The largest source file is `config.py` at 100 lines.
-- In the demo environment, both `demo/stage1_audio_demo.py` and `demo/stage2_features_demo.py`
-  import and `build_demo()` without error. Neither was launched in a browser.
-- I hand-checked these against their standard forms:
-  - Levinson–Durbin update and LPC→cepstrum recursion (HTK `LPC2Cepstrum`, c0 = log gain).
-  - rastamat `dolpc` autocorrelation and the PLP edge-band copy.
-  - The `Deltacep.m` regression.
-  - The `Fx_vtln_warp.m` piecewise warp with 0.05 back-off.
-  - The orthonormal DCT-II.
-  - The MFCC-TMP subband construction: symmetric mirrored weights → IFFT → lagged TEO → sum.
-- Every commit message uses the `exec:` prefix and has no tool trailers.
+- **Tests:** `pixi run test` gives 366 passed and 1 skipped (the real-model aligner test).
+  The Reviewer re-ran this.
+- **Limits:** the largest file is `ml/gmm.py` at 235 lines, and no line in `src`, `demo` or
+  `tests` is over 79 characters.
+- **Nothing derived committed:** features, models, manifests and audio all stay under
+  git-ignored `outputs/`. There are no trailers on the commits.
+- **C8 audit (as the plan required):** **no tokens changed.**
+  - Only apostrophe tokens exist: 119 distinct in train and 64 in test.
+  - There are no hyphens and no non-ASCII characters.
+  - Re-normalising all 6300 rows reproduces the manifest tokens exactly, so no re-alignment
+    was needed and the manifest hashes still hold.
+- **C6 re-check (no re-alignment):** `collapsed_run` fires in train rows 908, 2090, 3213 and
+  3505 and in test row 1151. Row 2090 is newly named as collapsed, but it was already in the
+  under-20 ms list. There are 0 non-finite times, and the older rules give the same counts as
+  before (11 and 4).
+- **C9 ASR audit:** `openai/whisper-base` at pinned revision `e37978b9…`, 300 words of at
+  least 3 letters, seed 0, 20 ms padding.
 
-**Minor deviations (non-blocking):**
-- `35ce7f6` (LPC) also carries line-length fixes in `scales.py`, `deltas.py`,
-  `filterbank.py`, `mfcc.py` and `features/__init__.py`. It's not strictly one task per commit.
-- 37 lines exceed 79 characters (PEP 8). They're spread over 14 files, mostly tests, plus
-  `audio/pipeline.py` (3), `config.py` (2) and both demos.
-- `tests/features/test_mfcc_tmp.py::test_floor_hits_on_noise_are_counted_and_output_finite`
-  only prints the floor-hit count. Its assertion `0 <= hits <= size` is always true. Plan §6
-  asked to "log every floor hit in tests".
-- `scale_waveform` peak-normalises the raw waveform *before* DC removal. MATLAB subtracts the
-  mean first. This only changes an overall scale, so only c0 shifts.
+  | Cut | Hit rate |
+  |---|---|
+  | True cut | **0.713** |
+  | Shifted −0.25 s | 0.127 |
+  | Shifted +0.25 s | 0.063 |
+
+  - The Executor samples only words whose shifted cuts stay inside the audio.
+  - This agrees with the Reviewer's earlier unpinned check (0.653 / 0.156 / 0.057, all
+    lengths, seed 123).
+  - It is recorded as a diagnostic, not a gate.
+- **T3.5 results** (`docs/gmm_notes.md`):
+  - 4051 rows and 1,232,912 frames of 39-dimensional MFCC.
+  - Mean frame log-likelihood rises monotonically in both models:
+
+    | Model | Before EM | After 10 iterations | Last-step gain |
+    |---|---|---|---|
+    | GMM-64 | −34.003 | −31.986 | 0.025 |
+    | GMM-128 | −33.383 | −31.151 | 0.025 |
+
+  - 0 variances hit the floor, the smallest weights are 0.0088 and 0.0042, and the weights
+    are fairly even.
+- **Code read:** the Reviewer read `vq.py`, `gmm.py`, `posteriorgram.py`, `feature_cache.py`,
+  `train.py`, `profiles.py`, the C1/C6/C8 diffs and the demo's model selection.
+  - The EM uses log-sum-exp throughout, accumulates statistics in chunks and floors the
+    variances.
+  - `load_gmm` and `load_feature_cache` use `allow_pickle=False`.
+  - The demo filters models by `kind` and `profile` and checks the dimension.
+
+### Reviewer finding: the HF split is per utterance, not per speaker
+
+Counting SA sentences in the alignment rows TSVs:
+
+| Split | Rows | "dark suit" (SA1) | "oily rag" (SA2) |
+|---|---|---|---|
+| train | 5040 | 488 | 501 |
+| test | 1260 | 142 | 129 |
+| total | 6300 | **630** | **630** |
+
+Every one of TIMIT's 630 speakers reads both SA sentences. A speaker-based split would put
+both of a speaker's SA rows on the same side, so the SA1 and SA2 counts would match within
+each split. They don't (488 vs 501, 142 vs 129). So the HF copy was split **at random per
+utterance**, and most speakers almost certainly appear in **both** splits. This moves the
+C9 caveat "speaker overlap is unverified" to "speaker overlap is near-certain". It matters
+for Stage 7 (Q9, Q10).
+
+### Minor notes (no change required unless Codex disagrees)
+
+- **`kmeans_refine` stop rule:** it stops whenever distortion fails to drop by `tol`,
+  including when it *rises* after an empty-cluster re-seed. A re-seed can therefore end that
+  level's refinement early. This didn't happen in the logged runs: every level ran 4–17
+  iterations.
+- **One-pass variance:** `em_step` and `cluster_statistics` compute variance as
+  E[x²] − E[x]², in float64. Cancellation is possible for c0 with large means, but the floor
+  never engaged, so it is harmless here.
+- **`train.py` docstring:** it says "core environment", but the CLI needs `huggingface_hub`,
+  which only the align environment has (Q7).
+- **Demo slider:** the component slider steps by 1 but is rounded down to a power of two, so
+  a value of 48 trains 32. The note tells the user this.
 
 ## 3. Questions for Codex
 
-**Code review**
+1. **C1 anchor reading.** `Warped_Feature.tex` line 30 says "sampling frequencies of 4000 Hz
+   and 8000 Hz". The Executor read this as the **band edge**, which gives a 3500 Hz cutoff
+   for the 4 kHz MFCC band. Do you agree, or does the thesis mean the 8 kHz / 16 kHz
+   sampling rate (cutoff 0.875·fs/2)?
+2. **C2 `htk_like` profile.** It differs from `timit_matlab` only for PLP; MFCC and MFCC-TMP
+   are identical. Is that worth keeping as a named profile, or should it be dropped until
+   the HTK values are actually checked?
+3. **C4 parity doc.** Can you spot-check `docs/feature_parity.md` against `ExpSetup.tex`
+   lines 191–223, especially the per-feature thesis column and the cells marked
+   "unverified"?
+4. **T3.1 LBG.** Is splitting at μ ± 0.2·σ with each cluster's own per-dimension std the
+   right reading of `Algorithm_LC.tex` Fig. VQ? Should the k-means stop rule treat a
+   distortion *increase* after a re-seed as "continue" rather than "converged" (minor note
+   above)?
+5. **T3.2 GMM.**
+   - Is an E[x²] − E[x]² variance in float64 acceptable, or should it be centred (two-pass,
+     or shifted by the global mean)?
+   - Dead components (soft count ≤ 1e-8) keep their old means and variances with weight
+     1e-12. Should they be re-seeded instead?
+6. **T3.4 cache.** The cache file is keyed only by (split, kind, profile). It doesn't record
+   or check the code version or `exclude_sa`, so a stale cache is silently reused after a
+   feature change unless `--rebuild-cache` is passed. Should the metadata carry a config hash
+   that is checked on load?
+7. **`huggingface_hub` in core.** `train-gmm` needs `huggingface_hub` to download the
+   parquet. Should it go in the core environment (small, pure Python), or should training
+   stay in the align environment? The Reviewer leans towards core, because Stage 7 and the
+   search also need the data.
+8. **Model hashes.** The `.npz` file SHA-256 is not reproducible (zip timestamps), so
+   `gmm_notes.md` records a parameter SHA-256 too. Is that enough? Or should `save_gmm`
+   write deterministic files, for example a fixed zip date or a plain `.npy` per array?
+9. **Speaker overlap (new finding above).** The HF train/test split is per utterance, so
+   queries (from train), GMM training data and search documents (test) share speakers.
+   - Should Stage 7 re-split by speaker? The HF rows may lack speaker IDs; can they be
+     recovered, for example from the dataset's original file names?
+   - Or should we keep the HF split and label every result "speaker-overlapped,
+     approximate"?
+   - The thesis used the official speaker-independent split (3696 train / 1344 test
+     utterances).
+10. **SA rows in the search set.** The HF test split contains 271 SA rows (142 + 129). The
+    official 1344-utterance test set has none. Should Stage 7 drop SA rows from the search
+    documents too? If they stay, any query word from the SA texts gets about 130 near-copies.
+11. **Plan Q17: variance floor and k-means stop rule.** Is there MATLAB or HTK evidence
+    (`HCompV` / `HERest -v`, or the old `research_qbestd` repo) for what the thesis used?
+12. **Plan Q18: SAD.** The thesis's SAD used BUT phone posteriors (`ExpSetup.tex` 242–243),
+    which we don't have. GMM training currently uses every frame, silence included.
+    - Should training and search drop leading and trailing silence?
+    - If so, should they use energy-based SAD, or trim to the aligner's first word start and
+      last word end (cheap, and available for every row)?
+13. **Plan Q19: 39 or 13 dimensions.** Should the GMM train on static + Δ + ΔΔ (39
+    dimensions, current) or on the 13 statics? The MFCC statics include c0. Should c0 be
+    dropped for posteriorgram training?
+14. **Convergence.** After 10 EM iterations the last step still adds about 1.2% of the total
+    gain. The thesis fixes 10 iterations, so we keep 10. Agree?
+15. Any other correctness, PEP 8, security or test-coverage issues in C1–C9 or T3.1–T3.6?
 
-1. `resample.scale_time_axis` anti-aliasing uses `firwin(101)` + `filtfilt` at a cutoff of
-   `0.95·Nyquist/α`. `padlen` is capped at `len − 1` for short signals. Is 101 taps
-   adequate for α ≤ 1.12 at 8 kHz? Is the short-signal `filtfilt` edge behaviour acceptable?
-2. F5 also rejects unknown keys in `paths.local.toml` with `ValueError`, which the plan
-   didn't ask for. Keep this, or downgrade it to a warning?
-3. **VTLN cutoff at 16 kHz with a 4 kHz band.** `warp_frequency_piecewise` takes f0 from
-   the *sampling* Nyquist, so f0 = 7000 Hz at 16 kHz. With `high_hz = 4000`, every filter
-   then sits on the pure linear part `(2−α)·f`, and for α < 1 the top filters see content
-   above 4 kHz. The thesis cutoff (3500 Hz) is tied to a 4 kHz band. Should the warp's
-   Nyquist and cutoff follow `high_hz` (the band edge) rather than `fs/2` when
-   `high_hz < fs/2`? What does `Fx_mfcc_vtmp_cep.m` (16 kHz, fH 4000) do?
-4. `mel_filterbank` with α ≠ 1 warps the bin frequencies and keeps the triangles fixed. For
-   α > 1 the peaks move to higher bins, which the tests assert. Can you confirm this direction
-   matches `Fx_vtln_warp.m` usage in FP:47, and the thesis convention that α > 1 means a
-   shorter vocal tract?
-5. `dct_cepstra(include_c0=False)` returns c1..c13, keeping 13 coefficients, rather than
-   dropping c0 to leave 12. `lifter_cepstra(first_index=1)` keeps the lifter aligned. Is
-   this the right reading of the thesis MFCC-TMP formula (k = 1..N_c)?
-6. MFCC peak normalisation uses `max|x|`, as `Fx_mfcc_vtmp_cep.m` does. `Fx_mfcc.m` (FM:29)
-   uses `max(x)`. Do you agree to keep `max|x|` for both, given that it only shifts c0?
-7. PLP:
-   - Equal-loudness weights are evaluated at the *forward*-warped centre
-     `warp(center)`. FP:57 seems to do the same. But since the bins are warped by
-     `(2−α)·f`, a filter's physical centre is the *inverse* warp of its nominal centre. Is the
-     forward warp a faithful copy of MATLAB, or a MATLAB bug we shouldn't copy?
-   - `lpc_order` is 12 (HTK) against MATLAB's 8. Which should be the default for reproducing
-     the thesis PLP numbers?
-   - DC removal is still applied to PLP even though FP does none. Should it be off by default?
-8. MFCC-TMP:
-   - `teager_energy_lagged` is a guess because `vteo.m` isn't public. Edges are replicated
-     and the sum is unnormalised.
-   - Subband TEO is summed over the full zero-padded `n_fft` IFFT frame, not just the
-     original 200 samples.
-   - The `"p"` (phase-only) option takes `np.angle`, which isn't conjugate-symmetric. The
-     real part of its IFFT is then taken.
-
-   Are these consistent with `Fx_mfcc_vtmp_cep.m` lines 54–78?
-9. `extract_features(kind, warp_factor=1.0, config)` always overrides `config.warp_factor`,
-   so a config with `warp_factor = 1.1` is silently ignored unless the argument is passed
-   too. Should the argument default to `None`, meaning "use the config"? Separately,
-   `extract_warped_bank` recomputes the whole front end (frames and STFT) 13 times when only
-   the filterbank changes. Is it worth caching before Stage 4?
-10. `docs/feature_parity.md`: the HTK column was written from memory, and the thesis column
-    copies `plan.md` §2 without re-reading the `.tex`. Can you spot-check the cells that matter
-    for reproduction against the thesis: band, filter count, c0 and deltas for PLP and
-    MFCC-TMP? Is anything wrong?
-11. Any other correctness, PEP 8 or test-coverage issues? In particular, should the
-    MFCC-TMP floor-hit test assert a bound on noise?
-
-**Open questions carried forward**
-
-12. Plan §4 #14: did the thesis downsample TIMIT to 8 kHz? Data is confirmed 16 kHz on all 6300 rows (cycle 2b).
-    MATLAB defaults to 16 kHz with fH 4000 for MFCC-TMP but fH `fs/2` for MFCC. Which
-    `(sample_rate, high_hz)` pair should each extractor default to?
-13. Missing `Fx_melfiltbank.m`: is there any other source (thesis appendix, rastamat
-    `fft2melmx`, an old copy) that pins down the triangle normalisation (unit peak versus unit
-    area) and edge placement?
-
-## 4. Cycle 2b: TIMIT word alignment (A1–A5)
-
-### Commits to review
-
-| Commit | Task | Files | Reviewer verdict |
-|---|---|---|---|
-| `7fd4848` exec: add align pixi environment | A1 | `pixi.toml`, `pixi.lock` | OK; torch only in `align`, `pyarrow` in core |
-| `bb7ba6c` exec: add hugging face timit loader | A2 | `data/timit_hf.py`, tests | OK; takes an extra `split` argument (plan deviation 2) |
-| `a957ba6` exec: add whisper word aligner wrapper | A3 | `alignment/word_aligner.py`, `alignment/manifest.py`, tests | OK; see Q14, Q15 |
-| `7054dc0` exec: align timit words and record notes | A4 | `alignment/run.py`, `alignment/sanity.py`, `docs/alignment_notes.md`, `.gitignore`, tests | OK; see Q16–Q18 |
-| `4d6f1af` exec: record d1 resolution in data notes | A5 | `docs/data_notes.md` | OK |
-
-Diff range: `git diff 9498174 4d6f1af -- . ':!pixi.lock'`
-
-Cycle 2b definition of done (plan §9): A1–A5 are on `main`; core tests are green with no torch
-and no network; manifests exist locally with hashes and checks recorded. **Met.**
-
-### Reviewer checks done
-
-- `pixi run test` (core env): **233 passed, 1 skipped** (the real-model smoke test, gated by
-  `QBESTD_RUN_ALIGNER=1`).
-- **Remote code check.** I read the cached `align.py` at the pinned revision. Its SHA-256
-  `8f7a3590…0ee0` matches the pin. It does no file, network or subprocess I/O and doesn't use
-  `trust_remote_code`. `from_pretrained` only gets `*.json` and `*.safetensors` (no pickle
-  weights, per `allow_patterns`). `load_align_module` refuses on a hash mismatch and never
-  touches `sys.path`.
-- **Nothing derived is committed.** Manifests, weights, parquet, `outputs/` and the spot-check
-  WAVs are all git-ignored (`.gitignore:10 outputs/`, `*.wav`). The CC BY-NC 4.0 licence is
-  recorded in both docs.
-- The Executor reports the full run with 6300/6300 rows aligned and 0 failed. All rows are
-  16 kHz, because the loader raises otherwise. Median word duration is 0.285 s, and 15 rule
-  violations (all < 20 ms) fall in 9 rows. All of this is documented with row indices in
-  `docs/alignment_notes.md`. I didn't re-run the 8-minute alignment, but `outputs/alignment/`
-  holds the summary, sanity report and manifests.
-- Every module is under 400 lines (largest: `sanity.py`, 172).
-- **Plan deviations:**
-  1. `.gitignore` `data/` became `/data/`, so it no longer ignores `src/qbestd/data`. Correct.
-  2. `iter_timit_rows` takes a `split` argument.
-  3. `check_segments(expected_words=)` is extended.
-  4. `align_rows_detailed` / `RowResult` were added.
-  5. `sanity.py`, `--limit` and the rows TSV are extras.
-
-  All are reasonable and covered by tests.
-
-**Independent ASR check (Reviewer, in place of listening; user request).** The Reviewer
-transcribed word clips with plain `openai/whisper-base` (MIT, a different model from the
-aligner), cut as `[start − 0.02, end + 0.02]` s. The script lived in the Reviewer's scratchpad
-and nothing was committed. A clip counts as a hit if a recognised token equals the word or has
-difflib ratio ≥ 0.75.
-- **10 spot-check WAVs:** 7/10 hits. The misses were `suit`→"soon", `leather`→"other" and
-  `carry`→"you", which are typical isolated-word ASR errors rather than clearly wrong cuts.
-- **300 random words (seed 123) against shifted controls:**
-
-  | Cut | n | Hit rate |
-  |---|---|---|
-  | True boundaries | 300 | **0.653** |
-  | Shifted −0.25 s | 295 | 0.156 |
-  | Shifted +0.25 s | 300 | 0.057 |
-
-  The true cuts score about 4–11× higher than the shifted controls, so the boundaries do land
-  on the right word. The 35% misses are mostly short function words (`the`, `a`, `are`,
-  `me`), homophones (`salt`→"sought", `wash`→"watch") and Whisper hallucinations on very short
-  clips ("Thank you."). That is expected for isolated-word ASR and doesn't by itself show bad
-  cuts. This is a candidate answer to Q18.
-
-### Questions for Codex (cycle 2b)
-
-14. **Vacuous rules in `check_segments`.** `align.py` (lines 146–151) already clamps each
-    start to at least the previous start, and each end to at least start + 0.01 s. So the
-    "decreasing starts" and "end ≤ start" rules can never fire on real output, and a collapsed
-    run of words is caught only when it falls under 20 ms. Should `check_segments` add a rule
-    for **consecutive words sharing the same start** (the collapse signature in rows 908, 3213,
-    3505 and test 1151), so Stage 7 can drop those rows cleanly rather than relying on a
-    duration threshold?
-15. **`normalize_transcript` units.** The aligner is given our tokens as a word list, so
-    `align.py`'s own `words_of` (NFC normalisation, markup removal, dropping tokens without a
-    letter or digit) is bypassed. Our tokens keep hyphenated compounds as one word and inner
-    apostrophes. Is there a TIMIT transcript form that splits into a unit the model handles
-    badly, for example a hyphenated compound, or a digit if any appear? Should we NFC-normalise
-    too?
-16. **Overlapping boundaries.** 12,732 of 38,197 adjacent train pairs overlap, by up to
-    0.23 s. For cutting queries, should Stage 7:
-    - use `[start − pad, end + pad]` as is,
-    - clip each word to the midpoint of any overlap with its neighbours, or
-    - drop keywords overlapping a neighbour by more than X ms?
-17. **Accuracy claim and speaker leakage.** The model was trained on TIMIT *training*
-    speakers' human boundaries, and this HF copy's split was redrawn. So many HF "test" rows
-    may come from speakers the aligner saw in training. That doesn't affect QbE scoring
-    (alignment only cuts queries and labels), but should `alignment_notes.md` say the card's
-    10.7 ms figure isn't transferable to this split?
-18. **Sanity-check strength.** The energy check (word mean > the utterance's 10th-percentile
-    frame energy) passed 20/20 but is a low bar. Is there a cheap, stronger automatic check
-    without reference `.WRD` files? For example, re-align a time-shifted or concatenated copy
-    and check that the boundaries shift accordingly, or cross-check against a second aligner on
-    a sample of 50 rows. The Reviewer's ASR check with shifted controls (above) found hit
-    rates of 0.65 on true cuts against 0.16 and 0.06 on cuts shifted by ±0.25 s. Should this
-    become the committed sanity check, restricted to words of 3 or more letters, with a pass
-    threshold such as true-cut rate ≥ 3× the best shifted rate? Or is it too dependent on the
-    ASR model?
-19. **Reproducibility.** The aligner runs in bf16 on GPU, so a re-run may change the last digit
-    of some times and therefore the manifest SHA-256s. Is recording the hashes still useful, or
-    should we record a tolerance-based fingerprint, such as summary statistics per split?
-20. Any other correctness, PEP 8, security or test-coverage issues in A1–A5? In particular:
-    `pytorch-gpu = "*"` with `cuda = "12"`, and pinning only by `pixi.lock`.
-
-## 5. Response format requested
+## 4. Response format requested
 
 Write `handoff_response.md` with one section per question number. Mark each as
 **agree / change requested / unknown**. For a requested change, give the file and the
-concrete change. Commit it as `handoff_resp: cycle 2 and 2b review`.
+concrete change. Commit it as `handoff_resp: cycle 3 review`.
