@@ -42,9 +42,9 @@ Sources and how much to trust them:
 | Cepstra | 13 including c0 | rows `1:Nc` of DCT (FM:39, 50-51) | rows `1:Nc` (FT:78) | `lpc2cep(.., Nc)`, Nc 13 (FP:42, 103) | NUMCEPS 12 plus optional C0 | MFCC 13 (191); MFCC-TMP 13, k = 1..13 (198, 223); PLP **not stated**; c0 policy not stated |
 | DCT | orthonormal type 2 (`scipy.fft.dct`, `norm="ortho"`) | `Fx_dctmat(Nc,p,2)` (FM:39), unitary | `dct(eye(p))` (FT:50), orthonormal | none (LPC cepstrum) | type 2 with sqrt(2/N) | MFCC "Type III of DCT" (191); MFCC-TMP formula `sum_j S_ij cos(k(j-0.5)pi/N_F)` (221). Naming/convention **not checked** against our orthonormal DCT-II |
 | Lifter | MFCC 0, MFCC-TMP 0, PLP 22 (HTK sine, `1 + L/2 sin(pi n/L)`) | none | none | `lifter(cepstra, Nlift)` (FP:109); `Nlift` has **no default** (FP:42 stops at Nc) | CEPLIFTER 22 | not stated |
-| `Fx_mfcc_lift.m` lifter | n/a | n/a | n/a | n/a | n/a | `Nlift = -20` (FL:24), i.e. HTK sine, L = 20; also fH 8000 (FL:27) |
+| `Fx_mfcc_lift.m` lifter (a separate MATLAB script, not a thesis statement) | n/a | `Nlift = -20` (FL:24), i.e. HTK sine, L = 20; also fH 8000 (FL:27) | n/a | n/a | n/a | **not stated**: the thesis gives no lifter |
 | Deltas | regression, window 2, edge frames replicated; delta and acceleration give 39 dims | n/a | n/a | n/a | DELTAWINDOW 2, ACCWINDOW 2 | MFCC-TMP: 13 + delta + delta-delta (198); MFCC and PLP **not stated** |
-| Delta formula | `sum k (x[t+k]-x[t-k]) / (2 sum k^2)` | `Deltacep(x,N)` (DC:49-53), N is a parameter, edge copy (DC:28-38) | same | same | same | same |
+| Delta formula | `sum k (x[t+k]-x[t-k]) / (2 sum k^2)` | `Deltacep(x,N)` (DC:49-53), N is a parameter, edge copy (DC:28-38) | same | same | same | **not stated** |
 | LPC order | generic default 12 (unverified); `timit_matlab` PLP 8 | n/a | n/a | 8 (FP:35) | LPCORDER 12 | not stated |
 | Equal loudness | `f^4/(f^2+1.6e5)^2 * (f^2+1.44e6)/(f^2+9.61e6)` at the warped filter centre | n/a | n/a | same formula, centre `fhz(i)` (FP:57-62) | same | not stated (PLP cites Hermansky 1990 only, 194) |
 | Compression | power 0.33 | n/a | n/a | `.^0.33` (FP:93) | 0.33 | n/a |
