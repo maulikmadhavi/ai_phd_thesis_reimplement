@@ -355,12 +355,17 @@ change becomes a new name (`..._v2`) with a written reason.
   1. **Universe:** every non-SA row of both HF splits, keyed by the original
      `(hf_split, row_index)`. Group by `" ".join(normalize_transcript(sentence))`. The group
      hash is `sha256("qbestd-textsplit-v1\n" + text)`. No RNG anywhere.
-  2. **Keyword constraints**, keywords in `Q20_KEYWORDS` table order. For keyword k, let
-     `G_k` be the groups whose tokens contain k. Groups fixed by an earlier keyword keep
-     their side. Enumerate every assignment of the free groups (at most 2⁸). Its cost is
+  2. **Keyword constraints, solved jointly per component.** For keyword k, let `G_k` be the
+     groups whose tokens contain k, and its cost
      `|test tokens of k − Occ_k| + |train tokens of k − Inst_k|`, counting tokens in
-     transcripts before any aligner flag. Pick the minimum cost; break ties with the
-     lexicographically smallest sorted tuple of test-side group hashes. Fix those groups.
+     transcripts before any aligner flag. Keywords that share a group form a connected
+     component (on the HF copy: birth + organizations, love + youngsters,
+     meeting + tomorrow; every other keyword alone; at most 9 groups each). For each
+     component, in table order of its first keyword, enumerate every assignment of its
+     groups and pick the minimum **summed** cost. Break ties with the lexicographically
+     smallest sorted tuple of test-side group hashes over the component's groups.
+     (Changed before declaration: solving keywords one at a time left "tomorrow" at
+     cost 8, because "meeting" had already put their shared group on train.)
   3. **Fill to the official quotas:** the test side holds **120 multi-read groups** and
      **504 single-read groups** in total, counting groups already placed by step 2. Take the
      remaining test groups in ascending hash order within each stratum. Every other group goes
@@ -376,7 +381,8 @@ change becomes a new name (`..._v2`) with a written reason.
   - every group lands entirely on one side, and the train and test text sets are disjoint;
   - shuffling the input row order gives a byte-identical manifest;
   - a synthetic case where the cost-0 assignment exists is found; a tie is broken by hash;
-  - a keyword fixed by an earlier keyword is respected;
+  - two keywords sharing a group are solved jointly, reaching cost 0 where the one-at-a-time
+    order would not (a synthetic meeting/tomorrow case);
   - quotas are met on a synthetic universe;
   - a row that moved from HF test to the train side still resolves its word alignment from
     `timit_hf_words_test.tsv` (lookup by `(hf_split, row_index)`, never by a new index).
