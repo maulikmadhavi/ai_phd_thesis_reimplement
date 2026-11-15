@@ -38,6 +38,7 @@ from qbestd.data.feature_cache import (
     utterance_slice,
 )
 from qbestd.data.timit_hf import download_timit_parquet, iter_timit_rows
+from qbestd.eval.bootstrap import cluster_bootstrap
 from qbestd.eval.metrics import average_precision, precision_at_n, summarise
 from qbestd.eval.model_guard import check_model
 from qbestd.eval.timit_queries import (
@@ -225,7 +226,8 @@ def main(argv=None):
             "nonmatches": int(nonmatches.sum())})
     write_per_query(out / "per_query.tsv", per_query)
     summary = {
-        **aggregate(per_query), "model": args.gmm.name,
+        **aggregate(per_query), "bootstrap": cluster_bootstrap(per_query),
+        "model": args.gmm.name,
         "model_content_sha256": gmm_content_sha256(gmm),
         "model_info": info, "split_id": split_id,
         "feature_fingerprint": doc_meta["fingerprint"],
