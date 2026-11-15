@@ -299,6 +299,13 @@ sense of a cost difference, only in which equal-cost assignment was taken
 (Q28). The components "government" and "shellfish" lost one unit each to
 a link; their counts are 3 (was 5) and 3 (unchanged).
 
+The product of the counts over all components is 2,488,320 equal-cost
+keyword assignments, and v2 is one of them. For a component with a count
+above 1, *which* utterances are that keyword's queries and documents depends
+on the fixed choice; the Inst./Occ. counts do not. The keyword-cluster
+intervals do not measure this split-draw variation, which stays unmeasured.
+Alternative assignments are not scored.
+
 ## Keywords against the thesis (v2)
 
 | Keyword | Train tokens | Thesis Inst. | Test tokens | Thesis Occ. | Cost | Changed from v1 |
@@ -344,3 +351,28 @@ speakers not separated, only the Q-20 counts and the text constraint used.
 One-token variants beyond the 20 verified links, for example a
 variant of two or more tokens, are not merged; the scan only covers one-token
 variants.
+
+### Two-token variants that stay unmerged
+
+Two SX texts keep a variant that differs by **two tokens**, so no link joins
+it:
+
+- unit `675129c68a2c` (6 rows) with single-read group `b180942ceff1`
+  (1 row): a contraction written as two words;
+- unit `6d86e94d8394` (6 rows) with single-read group `4c952c3a51e1`
+  (1 row): one word moved.
+
+Both variants are on the train side together with their unit, so nothing
+crosses. That is by placement, not by rule. There is no v3: nothing crosses,
+and a v3 would change the manifest hash for no change in content
+(Orchestrator decision).
+
+### Corpus-count evidence for the links
+
+The v2 manifest holds 448 units of 7 rows, 2 units of 6 rows and 1892
+single-row units (5040 rows; checked on the manifest). TIMIT has 450 SX texts
+read by 7 speakers and 1890 SI texts, which is 5040 rows. The two 6-row units
+account for the 2 extra single-row units (1890 + 2 = 1892), and 448 + 2 = 450
+SX texts. A wrong link would break this count: a unit of 7 rows is one SX
+text, and a link between two different sentences would give a unit of
+another size.
