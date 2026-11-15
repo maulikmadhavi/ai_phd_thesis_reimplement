@@ -13,17 +13,25 @@ settings listed under "Thesis facts".
   (line 238).
 - LBG: K-means VQ, splitting constant 0.2, split at `mu +- eps * sigma` with
   the per-dimension standard deviation of the cluster (`Algorithm_LC.tex`).
-- 10 EM iterations (`Representation.tex` lines 196 and 1089); 64 and 128
-  mixtures for TIMIT (line 335).
+- 64 and 128 mixtures for TIMIT (`Representation.tex` line 335).
+- `Representation.tex` line 1089 states ten EM iterations only for the
+  **mixture-of-GMMs** setup; line 196 is commented out. So ten iterations
+  are **not** a verified thesis value for this baseline.
 
 ## Assumptions (thesis silent)
 
 - Diagonal covariances.
-- Variance floor of 0.01 times the global per-dimension variance (HTK `vFloor`
-  style). Open question 17.
-- k-means inside LBG stops at a relative distortion change below 1e-3 or after
-  20 iterations; an empty cluster is re-seeded by splitting the cluster with
-  the highest distortion.
+- `n_iter = 10` is an **experimental choice** (see above and the 30-iteration
+  sensitivity run below).
+- Variance floor of 0.01 times the global per-dimension variance: HTK
+  `HCompV`-style, **unverified for the thesis**. Open question 17.
+- k-means inside LBG stops when the relative distortion *decrease* is in
+  `[0, 1e-3)` or after 20 iterations; `tol = 1e-3` is **unverified**. A
+  distortion increase (for example after an empty-cluster re-seed) does not
+  stop it. An empty cluster is re-seeded by splitting the cluster with the
+  highest distortion.
+- c0 is **kept**: 13 cepstra including c0, as `Fx_mfcc.m` retains DCT row 1.
+  The thesis does not state a c0 policy (open question 19).
 - Training on all 39 dimensions and on every frame, with no speech-activity
   detection (open questions 18 and 19). The thesis used BUT phone-posterior
   SAD, which we do not have.
@@ -37,7 +45,7 @@ settings listed under "Thesis facts".
 | Training frames | 1,232,912 (about 3.4 h at a 10 ms shift) |
 | Features | 39-d float32, cached in `outputs/features/` (git-ignored) |
 | Seed | 0 |
-| Run | `pixi run -e align train-gmm --kind mfcc --profile timit_matlab --components 64` (and 128). The align environment is used only because it has `huggingface_hub`, which the core environment lacks; no torch code runs |
+| Run | `pixi run train-gmm --kind mfcc --profile timit_matlab --components 64` (and 128), from the core environment (it now includes `huggingface_hub`). Both models were re-trained after the k-means stop-rule fix and reproduced the earlier parameter hashes exactly |
 
 ## LBG distortion (mean squared Euclidean distance per frame)
 
@@ -78,6 +86,20 @@ about 1.2% and
 10 iterations are close to, but not fully at, convergence. The thesis figure
 `LthetaConverge` was not compared numerically.
 
+## 30-iteration sensitivity run (GMM-64)
+
+Same data, seed and settings with `--n-iter 30`; the 10-iteration model stays
+the baseline. Model written to `outputs/models_30iter/` (git-ignored).
+
+| Iteration | 0 | 5 | 10 | 15 | 20 | 25 | 30 |
+|---|---|---|---|---|---|---|---|
+| mean frame log-likelihood | -34.0032 | -32.1911 | -31.9857 | -31.9018 | -31.8564 | -31.8372 | -31.8223 |
+
+Going from 10 to 30 iterations adds 0.163 per frame; iteration 30
+still adds 0.0033. The curve flattens but has not fully converged.
+This run was **not** used for any evaluation; whether it changes retrieval
+is untested.
+
 ## Model summary
 
 | | GMM-64 | GMM-128 |
@@ -86,9 +108,9 @@ about 1.2% and
 | Smallest component weight | 0.00880 | 0.00418 |
 | Largest component weight | 0.02567 | 0.01799 |
 | Variances at the floor | 0 of 2496 | 0 of 4992 |
-| Wall time (feature cache already built for 128) | 102.5 s | 153.6 s |
+| Wall time (feature cache already built for 128) | 109.7 s | 155.8 s |
 | Model file | `outputs/models/mfcc_timit_matlab_gmm64.npz` | `..._gmm128.npz` |
-| File SHA-256 | `114f8ca8c0df8f943694d0ebe38423bde6773010e40aede562f16593ddecbfc5` | `f0956010c1cdda0e300bf5a2255ef1afe02c1cc062806fc09b397a7c5e3ef7f8` |
+| File SHA-256 | `d7abf929bd18dced0a6124789e54e38ec2710bbc232d45db836c0389ddf650c0` | `0c6d020063c4db3e40599f7f1b6584057dac23abf472ee2edbb90e7387e01b73` |
 | Parameter SHA-256 | `80a5b016398bd7e388ce2157465dd7ae55cb7d166ab492a2c2edd55f622603c1` | `c0e38a61730529dddcd5b33a8f84723b64b19a67f26d07edc619b505793a25b9` |
 
 The **file** hash includes zip timestamps, so a re-run gives a different file

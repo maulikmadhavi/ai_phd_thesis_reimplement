@@ -2,13 +2,19 @@
 
 Thesis (``ExpSetup.tex`` lines 229-238): the posterior of component k given
 frame o_t is ``P(C_k|o_t) = pi_k N(o_t; mu_k, Sigma_k) / sum_j pi_j N(...)``;
-the parameters are estimated by EM, initialised from an LBG VQ codebook, for
-10 iterations (``Representation.tex`` lines 196 and 1089).
+the parameters are estimated by EM, initialised from an LBG VQ codebook.
 
-Assumptions (thesis silent; unverified): diagonal covariances, and a variance
-floor of ``var_floor_ratio`` (0.01) times the global per-dimension variance
-(HTK ``vFloor`` style). Sufficient statistics are accumulated chunk by chunk
-so training memory stays bounded.
+Evidence and assumptions (all unverified for the thesis unless stated):
+
+* ``n_iter = 10`` is an **experimental choice**. ``Representation.tex``
+  line 1089 gives ten iterations only for the mixture-of-GMMs setup, and
+  line 196 is commented out.
+* Diagonal covariances.
+* The variance floor, ``var_floor_ratio`` (0.01) times the global
+  per-dimension variance, is HTK ``HCompV``-style; the thesis does not give
+  one.
+* Sufficient statistics are accumulated chunk by chunk so training memory
+  stays bounded.
 """
 
 import hashlib

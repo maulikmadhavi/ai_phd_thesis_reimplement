@@ -6,9 +6,10 @@ mean mu and standard deviation sigma of the cluster ("data uncorrelated
 assumption"), so a centroid becomes the pair ``mu - eps * sigma`` and
 ``mu + eps * sigma``. The codebook doubles until ``n_clusters`` is reached.
 
-Assumptions (the thesis is silent; marked unverified): k-means refinement
+Assumptions (the thesis is silent; all unverified): k-means refinement
 inside each level stops at a relative distortion decrease in ``[0, tol)``
-or after ``max_kmeans_iter`` iterations, and an empty cluster is re-seeded by
+(``tol = 1e-3`` is our choice, not a thesis value) or after
+``max_kmeans_iter`` iterations, and an empty cluster is re-seeded by
 splitting the cluster with the highest distortion. All statistics are
 accumulated in chunks so memory stays bounded.
 """
