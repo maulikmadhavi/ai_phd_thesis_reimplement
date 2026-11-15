@@ -18,6 +18,7 @@ PYTHONPATH = "src"
 [tasks]
 test = "pytest -q"
 train-gmm = "python -m qbestd.ml.train"
+eval-timit = "python -m qbestd.eval.run_timit"
 
 [feature.demo.dependencies]
 gradio = "*"
