@@ -82,3 +82,13 @@ def normalize_transcript(sentence):
     text = unicodedata.normalize("NFC", sentence).lower()
     words = (_EDGE_PUNCTUATION.sub("", token) for token in text.split())
     return [word for word in words if word]
+
+
+def read_sentences(parquet_paths):
+    """Sentence of every row, in row order, without loading the audio."""
+    import pyarrow.parquet as pq
+    sentences = []
+    for path in parquet_paths:
+        table = pq.read_table(path, columns=["sentence"])
+        sentences += table.column("sentence").to_pylist()
+    return sentences
