@@ -15,13 +15,14 @@ _EXTRACTORS = {
 FEATURE_KINDS = tuple(_EXTRACTORS)
 
 
-def extract_features(samples, sample_rate, kind, warp_factor=1.0, config=None):
+def extract_features(samples, sample_rate, kind, warp_factor=None,
+                     config=None):
     """Extract features of the given ``kind`` at one VTLN warp factor.
 
     Args:
         kind: one of "mfcc", "plp", "mfcc_tmp".
-        warp_factor: VTLN factor alpha; it always overrides the value stored
-            in ``config`` (1.0 means no warping).
+        warp_factor: VTLN factor alpha. None (default) uses the value stored
+            in ``config``; an explicit value overrides it (1.0 = no warping).
         config: the config class matching ``kind``; None uses its defaults.
 
     Raises:
@@ -36,8 +37,9 @@ def extract_features(samples, sample_rate, kind, warp_factor=1.0, config=None):
         raise ValueError(
             f"kind '{kind}' needs a {config_class.__name__}, "
             f"got {type(config).__name__}")
-    return extractor(samples, sample_rate,
-                     replace(config, warp_factor=warp_factor))
+    if warp_factor is not None:
+        config = replace(config, warp_factor=warp_factor)
+    return extractor(samples, sample_rate, config)
 
 
 def extract_warped_bank(samples, sample_rate, kind,

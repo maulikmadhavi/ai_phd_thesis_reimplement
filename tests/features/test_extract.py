@@ -53,3 +53,23 @@ def test_config_is_respected_and_warp_argument_wins():
     assert np.array_equal(
         features, extract_mfcc(signal(), 8000,
                                MfccConfig(deltas=False, warp_factor=1.12)))
+
+
+def test_none_warp_uses_config_value():
+    config = MfccConfig(deltas=False, warp_factor=0.9)
+    features = extract_features(signal(), 8000, "mfcc", config=config)
+    assert np.array_equal(features, extract_mfcc(signal(), 8000, config))
+    assert not np.allclose(features, extract_features(
+        signal(), 8000, "mfcc", 1.0, config))
+
+
+def test_explicit_one_overrides_config_warp():
+    config = MfccConfig(deltas=False, warp_factor=0.9)
+    assert np.array_equal(
+        extract_features(signal(), 8000, "mfcc", 1.0, config),
+        extract_mfcc(signal(), 8000, MfccConfig(deltas=False)))
+
+
+def test_default_config_and_default_warp_means_no_warp():
+    assert np.array_equal(extract_features(signal(), 8000, "mfcc"),
+                          extract_features(signal(), 8000, "mfcc", 1.0))
