@@ -241,3 +241,116 @@ def test_bad_header_is_rejected(tmp_path):
     path.write_text("hf_split\trow_index\n")
     with pytest.raises(ValueError):
         read_split_manifest(path)
+
+
+VARIANT_ROWS = [("we love tea", 3, 0), ("we love the tea", 0, 1),
+                ("a quiet street", 1, 0), ("the long road", 1, 0)]
+
+
+def linked(*texts):
+    return tuple(sorted(group_hash(t) for t in texts))
+
+
+def variant_universe():
+    rows, _ = make_rows(VARIANT_ROWS)
+    return rows
+
+
+def test_linked_variants_never_cross_sides_where_v1_would_split_them(
+        monkeypatch):
+    monkeypatch.setattr(text_split, "TEST_QUOTA", {"multi": 1, "single": 0})
+    rows = variant_universe()
+    v1 = build_text_split(rows, [])
+    split_v1 = {(r.hf_split, r.row_index): r.side for r in v1.rows}
+    assert {split_v1[("train", 0)], split_v1[("test", 0)]} == {
+        "train", "test"}  # v1 puts the two variants on opposite sides
+    link = linked("we love tea", "we love the tea")
+    v2 = build_text_split(rows, [], rule=text_split.RULE_V2, links=(link,))
+    sides = {r.side for r in v2.rows if r.group_hash == min(link)}
+    assert sides == {"test"} and len(
+        [r for r in v2.rows if r.group_hash == min(link)]) == 4
+    assert v2.rule == "textdisjoint_q20_v2"
+    assert v2.report["n_variant_groups"] == 4 and v2.report["n_groups"] == 3
+
+
+def test_the_unit_key_is_the_smallest_member_hash():
+    rows = variant_universe()
+    link = linked("we love tea", "we love the tea")
+    manifest = build_text_split(rows, [], rule=text_split.RULE_V2,
+                                links=(link,))
+    keys = {r.group_hash for r in manifest.rows
+            if (r.hf_split, r.row_index) in {("train", 0), ("train", 1),
+                                            ("train", 2), ("test", 0)}}
+    assert keys == {min(link)}
+
+
+def test_no_links_reproduce_v1_rows_on_a_synthetic_universe():
+    rows, _ = make_rows(VARIANT_ROWS + [("see you tomorrow", 2, 1)])
+    keywords = [("tomorrow", 2, 1)]
+    v1 = build_text_split(rows, keywords)
+    v2 = build_text_split(rows, keywords, rule=text_split.RULE_V2, links=())
+    assert v2.rows == v1.rows and v2.report == v1.report
+    assert v1.rule != v2.rule
+
+
+def test_v2_manifest_is_identical_under_shuffled_rows_and_links():
+    spec = VARIANT_ROWS + [("we run fast", 2, 0), ("we run very fast", 1, 0),
+                           ("see you tomorrow", 2, 1)]
+    links = [linked("we love tea", "we love the tea"),
+             linked("we run fast", "we run very fast")]
+    reference = None
+    for seed in range(4):
+        rows, _ = make_rows(spec)
+        random.Random(seed).shuffle(rows)
+        random.Random(seed).shuffle(links)
+        manifest = build_text_split(rows, [("tomorrow", 2, 1)],
+                                    rule=text_split.RULE_V2,
+                                    links=tuple(links))
+        data = text_split.manifest_bytes(manifest)
+        reference = reference or data
+        assert data == reference
+    assert reference.decode().startswith("# rule=textdisjoint_q20_v2\n")
+
+
+def test_keyword_counts_sum_over_the_variants_of_a_unit():
+    rows, _ = make_rows([("we love tea", 3, 0), ("we like tea", 1, 0)])
+    link = linked("we love tea", "we like tea")
+    manifest = build_text_split(rows, [("love", 3, 0)],
+                                rule=text_split.RULE_V2, links=(link,))
+    assert manifest.report["keyword_tokens"]["love"] == {"train": 3,
+                                                         "test": 0}
+    assert manifest.report["costs"] == {"love": 0}
+
+
+def test_a_link_naming_an_unknown_hash_raises():
+    rows = variant_universe()
+    unknown = (group_hash("we love tea"), "f" * 64)
+    with pytest.raises(ValueError, match="unknown group hash"):
+        build_text_split(rows, [], rule=text_split.RULE_V2, links=(unknown,))
+
+
+def test_a_link_must_be_a_sorted_pair_of_two_hashes():
+    rows = variant_universe()
+    link = linked("we love tea", "we love the tea")
+    with pytest.raises(ValueError, match="sorted pair"):
+        build_text_split(rows, [], rule=text_split.RULE_V2,
+                         links=(link[::-1],))
+    with pytest.raises(ValueError, match="sorted pair"):
+        build_text_split(rows, [], rule=text_split.RULE_V2,
+                         links=((link[0], link[0]),))
+
+
+def test_a_unit_of_more_than_seven_rows_raises():
+    rows, _ = make_rows([("one two", 4, 0), ("one too", 4, 0)])
+    link = linked("one two", "one too")
+    with pytest.raises(ValueError, match="more than 7"):
+        build_text_split(rows, [], rule=text_split.RULE_V2, links=(link,))
+
+
+def test_v2_defaults_to_the_committed_links(monkeypatch):
+    rows = variant_universe()
+    link = linked("we love tea", "we love the tea")
+    monkeypatch.setattr(text_split, "V2_VARIANT_LINKS", (link,))
+    manifest = build_text_split(rows, [], rule=text_split.RULE_V2)
+    assert manifest.report["n_links"] == 1
+    assert build_text_split(rows, []).report["n_links"] == 0

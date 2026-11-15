@@ -1,4 +1,4 @@
-"""Text-disjoint train/test split ``textdisjoint_q20_v1`` (no RNG).
+"""Text-disjoint train/test splits ``textdisjoint_q20_v1``/``_v2``.
 
 The Hugging Face TIMIT split is per utterance, so most test sentences also
 occur in train. The official TIMIT split never shares a non-SA text across
@@ -28,6 +28,17 @@ becomes a new name with a written reason):
    The remaining test groups are the untouched groups in ascending hash
    order within each stratum. Every other group is train. If step 2 already
    exceeds a quota, nothing is moved and the shortfall is reported.
+
+``textdisjoint_q20_v2`` adds one step between 1 and 2 (reason: "variant
+groups split SX texts across sides (found in review)"):
+
+1b. *Merge variant links*. ``V2_VARIANT_LINKS`` (``text_variants.py``) is an
+   explicit list of pairs of v1 group hashes, each a verified one-token
+   transcript variant of the same sentence. The connected components of
+   those links are *units*; a unit's key (used for the tie-break, the step 3
+   order and the manifest ``group_hash``) is its smallest member hash. The
+   hash prefix stays v1, so the links name existing v1 hashes. Steps 2 and
+   3 then work on units; a unit is multi-read when it holds several rows.
 """
 
 import argparse
@@ -37,14 +48,18 @@ from itertools import product
 from pathlib import Path
 
 from qbestd.data.feature_cache import is_sa_sentence
+from qbestd.data.text_variants import MAX_UNIT_ROWS, V2_VARIANT_LINKS
 from qbestd.data.timit_hf import normalize_transcript
 
 RULE = "textdisjoint_q20_v1"
+RULE_V2 = "textdisjoint_q20_v2"
+RULES = {"v1": RULE, "v2": RULE_V2}
 HASH_PREFIX = "qbestd-textsplit-v1\n"
 TEST_QUOTA = {"multi": 120, "single": 504}
 MAX_FREE_GROUPS = 16
 HEADER = ("hf_split", "row_index", "side", "group_hash")
-DEFAULT_PATH = Path("outputs/splits") / f"{RULE}.tsv"
+DEFAULT_DIR = Path("outputs/splits")
+DEFAULT_PATH = DEFAULT_DIR / f"{RULE}.tsv"
 
 
 @dataclass(frozen=True, order=True)
@@ -74,7 +89,10 @@ def group_hash(text):
 
 
 def _build_groups(rows):
-    """``{hash: {"tokens", "rows"}}`` over the non-SA rows."""
+    """``{hash: {"tokens", "rows", "variants"}}`` over the non-SA rows.
+
+    ``variants`` lists ``(tokens, number of rows)`` per transcript variant
+    of the entry (one item for a group, several for a merged unit)."""
     groups = {}
     for hf_split, row_index, sentence in rows:
         tokens = normalize_transcript(sentence)
@@ -85,7 +103,48 @@ def _build_groups(rows):
         entry["rows"].append((hf_split, row_index))
     for entry in groups.values():
         entry["rows"].sort()
+        entry["variants"] = [(entry["tokens"], len(entry["rows"]))]
     return groups
+
+
+def _merge_units(groups, links):
+    """Step 1b: merge linked groups into units keyed by the smallest hash.
+
+    Raises:
+        ValueError: for a link that is not a sorted pair, that names an
+            unknown hash, or that makes a unit of more than
+            ``MAX_UNIT_ROWS`` rows.
+    """
+    parent = {h: h for h in groups}
+
+    def find(h):
+        while parent[h] != h:
+            parent[h] = parent[parent[h]]
+            h = parent[h]
+        return h
+
+    for first, second in links:
+        if not first < second:
+            raise ValueError(f"link {first[:12]} / {second[:12]} is not a "
+                             "sorted pair of distinct hashes")
+        for h in (first, second):
+            if h not in groups:
+                raise ValueError(f"link names unknown group hash {h[:12]}")
+        parent[find(second)] = find(first)
+    members = {}
+    for h in groups:
+        members.setdefault(find(h), []).append(h)
+    units = {}
+    for found in members.values():
+        key = min(found)
+        rows = sorted(r for h in found for r in groups[h]["rows"])
+        if len(rows) > MAX_UNIT_ROWS:
+            raise ValueError(f"unit {key[:12]} has {len(rows)} rows, more "
+                             f"than {MAX_UNIT_ROWS}")
+        units[key] = {"tokens": groups[key]["tokens"], "rows": rows,
+                      "variants": [v for h in sorted(found)
+                                   for v in groups[h]["variants"]]}
+    return units
 
 
 def _stratum(group):
@@ -93,8 +152,9 @@ def _stratum(group):
 
 
 def _count(group, keyword):
-    """Keyword tokens a group contributes: occurrences times its rows."""
-    return group["tokens"].count(keyword) * len(group["rows"])
+    """Keyword tokens a group or unit contributes: occurrences times rows,
+    summed over its transcript variants."""
+    return sum(tokens.count(keyword) * n for tokens, n in group["variants"])
 
 
 def _components(keywords, groups):
@@ -184,13 +244,19 @@ def _fill_quotas(groups, side):
     return report
 
 
-def build_text_split(rows, keywords):
+def build_text_split(rows, keywords, rule=RULE, links=None):
     """Build the manifest from ``rows`` of ``(hf_split, row_index, sentence)``.
 
     ``keywords`` is a sequence of ``(name, Inst., Occ.)`` in table order.
-    The result does not depend on the order of ``rows``.
+    ``rule`` is ``RULE`` (v1, no links) or ``RULE_V2``; ``links`` defaults
+    to none for v1 and to ``V2_VARIANT_LINKS`` for v2. The result does not
+    depend on the order of ``rows`` or of ``links``.
     """
+    if links is None:
+        links = V2_VARIANT_LINKS if rule == RULE_V2 else ()
     groups = _build_groups(rows)
+    n_variant_groups = len(groups)
+    groups = _merge_units(groups, links)
     side, costs, components = {}, {}, []
     for component, hashes in _components(keywords, groups):
         found, n_min = _choose(component, hashes, groups, side)
@@ -204,13 +270,14 @@ def build_text_split(rows, keywords):
         ManifestRow(split, index, side[h], h)
         for h, g in groups.items() for split, index in g["rows"])
     report = {"quotas": quotas, "costs": costs, "components": components,
-              "n_groups": len(groups),
+              "n_groups": len(groups), "n_variant_groups": n_variant_groups,
+              "n_links": len(links),
               "keyword_tokens": {
                   name: {which: sum(_count(g, name) for h, g in
                                     groups.items() if side[h] == which)
                          for which in ("train", "test")}
                   for name, _, _ in keywords}}
-    return SplitManifest(RULE, tuple(manifest_rows), report)
+    return SplitManifest(rule, tuple(manifest_rows), report)
 
 
 def manifest_bytes(manifest):
@@ -253,15 +320,19 @@ def main(argv=None):
     from qbestd.data.timit_hf import download_timit_parquet, read_sentences
     from qbestd.eval.timit_queries import Q20_KEYWORDS
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--out", type=Path, default=DEFAULT_PATH)
+    parser.add_argument("--rule", choices=sorted(RULES), default="v1")
+    parser.add_argument("--out", type=Path, default=None,
+                        help="default: outputs/splits/<rule>.tsv")
     args = parser.parse_args(argv)
+    rule = RULES[args.rule]
+    out = args.out or DEFAULT_DIR / f"{rule}.tsv"
     rows = [(split, index, sentence)
             for split in ("train", "test")
             for index, sentence in enumerate(
                 read_sentences(download_timit_parquet(split)))]
-    manifest = build_text_split(rows, Q20_KEYWORDS)
-    write_split_manifest(args.out, manifest)
-    print(split_id(args.out), len(manifest.rows), "rows")
+    manifest = build_text_split(rows, Q20_KEYWORDS, rule=rule)
+    write_split_manifest(out, manifest)
+    print(split_id(out), len(manifest.rows), "rows")
     print(manifest.report["quotas"])
 
 
