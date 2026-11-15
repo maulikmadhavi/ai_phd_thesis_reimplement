@@ -67,9 +67,47 @@ def test_each_rule_is_reported(segments, duration, expected, fragment):
     assert any(fragment in problem for problem in problems), problems
 
 
-def test_equal_starts_are_allowed():
+def test_equal_starts_are_flagged_collapsed_run():
     segments = [seg(0, "a", 0.2, 0.4), seg(1, "b", 0.2, 0.5)]
-    assert check_segments(segments, 1.0) == []
+    problems = check_segments(segments, 1.0)
+    assert len(problems) == 1
+    assert problems[0].startswith("collapsed_run: words 0..1")
+
+
+def test_collapsed_run_of_three_is_one_warning():
+    segments = [seg(0, "a", 0.2, 0.4), seg(1, "b", 0.2, 0.5),
+                seg(2, "c", 0.2, 0.6), seg(3, "d", 0.7, 0.9)]
+    problems = [p for p in check_segments(segments, 1.0)
+                if p.startswith("collapsed_run")]
+    assert len(problems) == 1
+    assert "words 0..2" in problems[0]
+
+
+def test_two_separate_runs_give_two_warnings():
+    segments = [seg(0, "a", 0.1, 0.3), seg(1, "b", 0.1, 0.3),
+                seg(2, "c", 0.5, 0.7), seg(3, "d", 0.5, 0.8)]
+    assert sum(p.startswith("collapsed_run")
+               for p in check_segments(segments, 1.0)) == 2
+
+
+def test_distinct_starts_are_not_collapsed():
+    assert not any(p.startswith("collapsed_run")
+                   for p in check_segments(GOOD, 1.0))
+
+
+@pytest.mark.parametrize("start, end", [
+    (float("nan"), 0.4), (0.2, float("inf")), (float("-inf"), 0.4),
+    (0.2, float("nan"))])
+def test_non_finite_times_are_flagged(start, end):
+    problems = check_segments([seg(0, "a", start, end)], 1.0)
+    assert any(p.startswith("non_finite") for p in problems)
+
+
+def test_non_finite_word_does_not_hide_other_problems():
+    segments = [seg(0, "a", float("nan"), 0.4), seg(1, "b", 0.5, 0.5)]
+    problems = check_segments(segments, 1.0)
+    assert any("non_finite" in p for p in problems)
+    assert any("end <= start" in p for p in problems)
 
 
 def test_exactly_20_ms_and_2_s_are_allowed():

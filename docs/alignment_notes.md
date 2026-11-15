@@ -126,6 +126,25 @@ Word-count check: every aligned row has exactly as many segments as
    `train_3925_1_hats`, `train_4710_4_carry`, `train_4721_1_process`,
    `train_692_6_competitors`. **The user should listen to these**; no one has.
 
+## Re-check with the C6 rules (no re-alignment)
+
+`check_segments` now also reports `collapsed_run` (two or more consecutive
+words with the same start; the aligner's `end >= start + 0.01` clamp makes the
+old `end <= start` rule unable to fire for them) and `non_finite` (nan or inf
+times). Re-run on the existing manifests with
+`python -m qbestd.alignment.recheck --out outputs/alignment` (core
+environment; writes `outputs/alignment/recheck.json`):
+
+| Split | Rows | `collapsed_run` | Rows with a collapsed run | `non_finite` | Older rules |
+|---|---|---|---|---|---|
+| train | 5040 | 4 | 908, 2090, 3213, 3505 | 0 | 11 (same as before) |
+| test | 1260 | 1 | 1151 | 0 | 4 (same as before) |
+
+Every collapsed run is a run of words already in the under-20 ms list above,
+so the five collapsed rows are a subset of the violation rows; the other
+violating rows (train 1241, 4300, 4769; test 885) are single short function
+words. No row has missing segments or a word-count mismatch.
+
 ## Other observations
 
 - Neighbouring words overlap: 12732 of 38197 adjacent pairs in train (3254 of

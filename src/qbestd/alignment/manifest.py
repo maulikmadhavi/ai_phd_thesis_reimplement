@@ -4,6 +4,7 @@ A manifest is a TSV file whose first line is a comment
 ``# model=<sha> dataset=<sha>``, followed by a header and one row per word.
 """
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,6 +12,7 @@ HEADER = ("split", "row_index", "word_index", "word", "start_s", "end_s")
 FAILURE_HEADER = ("split", "row_index", "reason")
 MIN_WORD_S = 0.02
 MAX_WORD_S = 2.0
+EQUAL_START_TOLERANCE_S = 1e-6
 
 
 @dataclass(frozen=True)
@@ -74,12 +76,29 @@ def write_failures(path, failures):
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def check_segments(segments, duration_s, expected_words=None):
-    """List the rule violations of one utterance's segments (empty = fine).
+def _collapsed_runs(segments):
+    """Yield (first, last) segments of each run of equal consecutive starts."""
+    run_start = 0
+    for index in range(1, len(segments) + 1):
+        in_run = (index < len(segments) and abs(
+            segments[index].start_s - segments[index - 1].start_s)
+            <= EQUAL_START_TOLERANCE_S)
+        if in_run:
+            continue
+        if index - run_start > 1:
+            yield segments[run_start], segments[index - 1]
+        run_start = index
 
-    Rules: start < 0; end > duration; end <= start; starts not
-    non-decreasing; duration below 20 ms or above 2 s; word count differing
-    from ``expected_words`` (the transcript token count, when given).
+
+def check_segments(segments, duration_s, expected_words=None):
+    """List the problems of one utterance's segments (empty = fine).
+
+    Rules: non-finite start or end (``non_finite``); start < 0; end >
+    duration; end <= start; starts decreasing; duration below 20 ms or above
+    2 s; word count differing from ``expected_words`` (the transcript token
+    count, when given). Warning ``collapsed_run``: two or more consecutive
+    words with the same start, which the aligner's clamping produces when it
+    cannot separate them.
     """
     problems = []
     if expected_words is not None and len(segments) != expected_words:
@@ -89,6 +108,11 @@ def check_segments(segments, duration_s, expected_words=None):
     previous_start = None
     for segment in segments:
         label = f"word {segment.word_index} '{segment.word}'"
+        if not (math.isfinite(segment.start_s)
+                and math.isfinite(segment.end_s)):
+            problems.append(f"non_finite: {label}: start "
+                            f"{segment.start_s} end {segment.end_s}")
+            continue
         length = segment.end_s - segment.start_s
         if segment.start_s < 0:
             problems.append(f"{label}: start {segment.start_s:.3f} < 0")
@@ -105,4 +129,11 @@ def check_segments(segments, duration_s, expected_words=None):
         if previous_start is not None and segment.start_s < previous_start:
             problems.append(f"{label}: start earlier than previous word")
         previous_start = segment.start_s
+    finite = [s for s in segments
+              if math.isfinite(s.start_s) and math.isfinite(s.end_s)]
+    for first, last in _collapsed_runs(finite):
+        problems.append(
+            f"collapsed_run: words {first.word_index}..{last.word_index} "
+            f"('{first.word}'..'{last.word}') share start "
+            f"{first.start_s:.3f}")
     return problems
