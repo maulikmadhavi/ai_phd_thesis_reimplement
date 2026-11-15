@@ -120,6 +120,13 @@ in the same process (unit test); across machines or BLAS builds it may differ
 in the last bits. The feature-cache build took about 2 minutes for 4051 rows
 (first run only).
 
+**Cycle 5 retrain (A4).** After the source digest was added to the
+feature fingerprint, both caches and both models were rebuilt. Feature
+fingerprint `2c337a2602c49699416c0d75b1dc722c09e0f160047b074b9185fcc7f1f65df2`,
+`split_id` `hf-ef7bffd88de7-nonsa`; the parameter hashes above are
+**unchanged** (GMM-64 `80a5b016...`, GMM-128 `c0e38a61...`), so the front
+end did not move.
+
 ## What this does not show
 
 - No comparison with the thesis figure and no held-out likelihood.
