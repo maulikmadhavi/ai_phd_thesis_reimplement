@@ -29,23 +29,60 @@ SA_SENTENCES = ("She had your dark suit in greasy wash water all year",
                 "Don't ask me to carry an oily rag like that")
 SA_TOKENS = tuple(tuple(normalize_transcript(text)) for text in SA_SENTENCES)
 FEATURE_DIM = 39
-# Bump by hand whenever the meaning of cached features changes (front end,
-# framing, deltas, ...) so that old cache files are never silently reused.
+# Cache FORMAT schema version: bump it only when the layout of the ``.npz``
+# or its metadata changes. Changes to the feature maths are caught by the
+# source digest in the fingerprint, not by this number.
 FEATURE_CACHE_VERSION = 1
+# The modules that compute features: the transitive ``qbestd.audio`` and
+# ``qbestd.features`` imports of ``qbestd.features.extract`` (a test checks
+# this). Paths are relative to the ``qbestd`` package, sorted. Docs, tests
+# and other packages are deliberately not listed.
+FEATURE_SOURCE_FILES = (
+    "audio/framing.py",
+    "audio/pipeline.py",
+    "audio/preprocess.py",
+    "audio/resample.py",
+    "audio/spectrum.py",
+    "audio/windowing.py",
+    "features/cepstral.py",
+    "features/deltas.py",
+    "features/extract.py",
+    "features/filterbank.py",
+    "features/frontend.py",
+    "features/lpc.py",
+    "features/mfcc.py",
+    "features/mfcc_tmp.py",
+    "features/plp.py",
+    "features/scales.py",
+)
 
 
 class CacheMismatchError(ValueError):
     """A cache file was built with different settings than requested."""
 
 
+def feature_source_digest(root=None, files=FEATURE_SOURCE_FILES):
+    """SHA-256 over the feature source files: each relative path, then its
+    bytes with CRLF turned into LF (so git autocrlf does not change it)."""
+    root = Path(root) if root else Path(__file__).resolve().parents[1]
+    digest = hashlib.sha256()
+    for name in files:
+        digest.update(name.encode("utf-8") + b"\0")
+        data = (root / name).read_bytes().replace(b"\r\n", b"\n")
+        digest.update(data + b"\0")
+    return digest.hexdigest()
+
+
 def feature_fingerprint(kind, profile, exclude_sa=True,
                         dataset_revision=TIMIT_HF_REVISION):
     """SHA-256 over everything that decides what the cached features are:
-    the profile config values, feature kind, dataset revision, SA exclusion
-    and ``FEATURE_CACHE_VERSION``."""
+    the profile config values, feature kind, dataset revision, SA exclusion,
+    the feature source digest and ``FEATURE_CACHE_VERSION`` (the cache
+    format version)."""
     payload = {"config": asdict(get_profile(profile, kind)), "kind": kind,
                "dataset_revision": dataset_revision,
                "exclude_sa": bool(exclude_sa),
+               "source_digest": feature_source_digest(),
                "version": FEATURE_CACHE_VERSION}
     text = json.dumps(payload, sort_keys=True)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()

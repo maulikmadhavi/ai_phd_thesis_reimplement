@@ -1,3 +1,6 @@
+import ast
+from pathlib import Path
+
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -5,11 +8,13 @@ import pytest
 
 from qbestd.data.feature_cache import (
     FEATURE_CACHE_VERSION,
+    FEATURE_SOURCE_FILES,
     SA_SENTENCES,
     CacheMismatchError,
     build_feature_cache,
     cache_path,
     feature_fingerprint,
+    feature_source_digest,
     is_sa_sentence,
     load_feature_cache,
     utterance_slice,
@@ -148,3 +153,69 @@ def test_cache_without_fingerprint_is_rejected(tmp_path):
              metadata=np.array("{}"))
     with pytest.raises(CacheMismatchError):
         load_feature_cache(path, expected="abc")
+
+
+PACKAGE = Path(__file__).resolve().parents[2] / "src" / "qbestd"
+
+
+def transitive_feature_imports(start="features/extract.py"):
+    """Files under ``audio/`` and ``features/`` reached from ``start`` by
+    ``qbestd`` imports, found by parsing the source (``__init__`` skipped)."""
+    seen, todo = set(), [start]
+    while todo:
+        name = todo.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        for node in ast.walk(ast.parse((PACKAGE / name).read_text("utf-8"))):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                modules = [node.module]
+                modules += [f"{node.module}.{a.name}" for a in node.names]
+            elif isinstance(node, ast.Import):
+                modules = [a.name for a in node.names]
+            else:
+                continue
+            for module in modules:
+                parts = module.split(".")
+                if parts[0] == "qbestd" and parts[1:2] and parts[1] in (
+                        "audio", "features") and len(parts) > 2:
+                    candidate = "/".join(parts[1:3]) + ".py"
+                    if (PACKAGE / candidate).exists():
+                        todo.append(candidate)
+    return seen
+
+
+def test_source_files_are_the_transitive_feature_imports():
+    assert set(FEATURE_SOURCE_FILES) == transitive_feature_imports()
+    assert list(FEATURE_SOURCE_FILES) == sorted(FEATURE_SOURCE_FILES)
+
+
+def copy_sources(target):
+    for name in FEATURE_SOURCE_FILES:
+        (target / name).parent.mkdir(parents=True, exist_ok=True)
+        (target / name).write_bytes((PACKAGE / name).read_bytes())
+    return target
+
+
+def test_digest_matches_a_copy_and_changes_with_one_file(tmp_path):
+    root = copy_sources(tmp_path)
+    assert feature_source_digest(root) == feature_source_digest()
+    edited = root / "features/deltas.py"
+    edited.write_bytes(edited.read_bytes() + b"# edit\n")
+    assert feature_source_digest(root) != feature_source_digest()
+
+
+def test_digest_ignores_crlf_line_endings(tmp_path):
+    root = copy_sources(tmp_path)
+    changed = root / "features/mfcc.py"
+    text = changed.read_bytes().replace(b"\r\n", b"\n")
+    changed.write_bytes(text.replace(b"\n", b"\r\n"))
+    assert changed.read_bytes() != text
+    assert feature_source_digest(root) == feature_source_digest()
+
+
+def test_fingerprint_changes_with_the_source_digest(monkeypatch):
+    base = feature_fingerprint("mfcc", "timit_matlab", True)
+    monkeypatch.setattr("qbestd.data.feature_cache.feature_source_digest",
+                        lambda: "another digest")
+    assert feature_fingerprint("mfcc", "timit_matlab", True) != base
