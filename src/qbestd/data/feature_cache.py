@@ -9,7 +9,9 @@ The two SA sentences, which every TIMIT speaker reads, are excluded by
 default, as the thesis excluded them from GMM training (3696 utterances).
 """
 
+import hashlib
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -27,6 +29,26 @@ SA_SENTENCES = ("She had your dark suit in greasy wash water all year",
                 "Don't ask me to carry an oily rag like that")
 SA_TOKENS = tuple(tuple(normalize_transcript(text)) for text in SA_SENTENCES)
 FEATURE_DIM = 39
+# Bump by hand whenever the meaning of cached features changes (front end,
+# framing, deltas, ...) so that old cache files are never silently reused.
+FEATURE_CACHE_VERSION = 1
+
+
+class CacheMismatchError(ValueError):
+    """A cache file was built with different settings than requested."""
+
+
+def feature_fingerprint(kind, profile, exclude_sa=True,
+                        dataset_revision=TIMIT_HF_REVISION):
+    """SHA-256 over everything that decides what the cached features are:
+    the profile config values, feature kind, dataset revision, SA exclusion
+    and ``FEATURE_CACHE_VERSION``."""
+    payload = {"config": asdict(get_profile(profile, kind)), "kind": kind,
+               "dataset_revision": dataset_revision,
+               "exclude_sa": bool(exclude_sa),
+               "version": FEATURE_CACHE_VERSION}
+    text = json.dumps(payload, sort_keys=True)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def is_sa_sentence(tokens):
@@ -74,6 +96,7 @@ def build_feature_cache(split, kind, profile, out_dir, exclude_sa=True,
     offsets = np.concatenate([[0], np.cumsum(lengths)]).astype(np.int64)
     meta = {"split": split, "kind": kind, "profile": profile,
             "dataset_revision": TIMIT_HF_REVISION, "dims": FEATURE_DIM,
+            "fingerprint": feature_fingerprint(kind, profile, exclude_sa),
             "sample_rate": config.sample_rate, "exclude_sa": exclude_sa,
             "excluded_sa_rows": skipped_sa,
             "skipped_short_rows": skipped_short,
@@ -88,11 +111,24 @@ def build_feature_cache(split, kind, profile, out_dir, exclude_sa=True,
     return path, meta
 
 
-def load_feature_cache(path):
-    """Read ``(features, offsets, row_indices, meta)`` from a cache file."""
+def load_feature_cache(path, expected=None):
+    """Read ``(features, offsets, row_indices, meta)`` from a cache file.
+
+    Args:
+        expected: a :func:`feature_fingerprint`; when given, the file must
+            carry the same one.
+
+    Raises:
+        CacheMismatchError: if ``expected`` is given and the fingerprint of
+            the file differs or is missing (an older cache).
+    """
     with np.load(path, allow_pickle=False) as data:
-        return (data["features"], data["offsets"], data["row_indices"],
-                json.loads(str(data["metadata"])))
+        meta = json.loads(str(data["metadata"]))
+        if expected is not None and meta.get("fingerprint") != expected:
+            raise CacheMismatchError(
+                f"{path} was built with different settings (or before "
+                "fingerprints existed)")
+        return (data["features"], data["offsets"], data["row_indices"], meta)
 
 
 def utterance_slice(features, offsets, position):

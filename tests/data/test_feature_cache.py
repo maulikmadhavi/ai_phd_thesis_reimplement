@@ -4,9 +4,12 @@ import pyarrow.parquet as pq
 import pytest
 
 from qbestd.data.feature_cache import (
+    FEATURE_CACHE_VERSION,
     SA_SENTENCES,
+    CacheMismatchError,
     build_feature_cache,
     cache_path,
+    feature_fingerprint,
     is_sa_sentence,
     load_feature_cache,
     utterance_slice,
@@ -98,3 +101,50 @@ def test_unknown_profile_raises(tmp_path, parquet):
     with pytest.raises(ValueError):
         build_feature_cache("train", "mfcc", "nope", tmp_path,
                             parquet_paths=[parquet])
+
+
+def test_fingerprint_is_stored_and_accepted_on_load(tmp_path, parquet):
+    path, meta = build_feature_cache("train", "mfcc", "timit_matlab",
+                                     tmp_path, parquet_paths=[parquet])
+    expected = feature_fingerprint("mfcc", "timit_matlab", True)
+    assert meta["fingerprint"] == expected
+    assert load_feature_cache(path, expected=expected)[3] == meta
+    assert load_feature_cache(path)[3] == meta  # no check requested
+
+
+def test_fingerprint_changes_with_every_ingredient(monkeypatch):
+    base = feature_fingerprint("mfcc", "timit_matlab", True)
+    assert feature_fingerprint("plp", "timit_matlab", True) != base
+    assert feature_fingerprint("mfcc", "timit_matlab", False) != base
+    assert feature_fingerprint("mfcc", "timit_matlab", True,
+                               dataset_revision="x" * 40) != base
+    monkeypatch.setattr("qbestd.data.feature_cache.FEATURE_CACHE_VERSION",
+                        FEATURE_CACHE_VERSION + 1)
+    assert feature_fingerprint("mfcc", "timit_matlab", True) != base
+
+
+def test_fingerprint_changes_with_the_profile_config(monkeypatch):
+    from qbestd.features.mfcc import MfccConfig
+    base = feature_fingerprint("mfcc", "timit_matlab", True)
+    monkeypatch.setattr(
+        "qbestd.data.feature_cache.get_profile",
+        lambda name, kind: MfccConfig(sample_rate=16000, high_hz=3000.0))
+    assert feature_fingerprint("mfcc", "timit_matlab", True) != base
+
+
+def test_cache_with_other_settings_is_never_silently_reused(tmp_path,
+                                                            parquet):
+    path, _ = build_feature_cache("train", "mfcc", "timit_matlab", tmp_path,
+                                  exclude_sa=False, parquet_paths=[parquet])
+    wanted = feature_fingerprint("mfcc", "timit_matlab", True)
+    with pytest.raises(CacheMismatchError):
+        load_feature_cache(path, expected=wanted)
+
+
+def test_cache_without_fingerprint_is_rejected(tmp_path):
+    path = tmp_path / "old.npz"
+    np.savez(path, features=np.zeros((1, 39), np.float32),
+             offsets=np.array([0, 1]), row_indices=np.array([0]),
+             metadata=np.array("{}"))
+    with pytest.raises(CacheMismatchError):
+        load_feature_cache(path, expected="abc")

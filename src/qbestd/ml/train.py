@@ -19,8 +19,10 @@ from pathlib import Path
 import numpy as np
 
 from qbestd.data.feature_cache import (
+    CacheMismatchError,
     build_feature_cache,
     cache_path,
+    feature_fingerprint,
     load_feature_cache,
 )
 from qbestd.ml.gmm import (
@@ -64,13 +66,21 @@ def file_sha256(path):
 
 
 def get_features(args):
-    """Features of the training split, from the cache (built on demand)."""
+    """Features of the training split, from the cache (built on demand).
+
+    A missing cache is built; one whose fingerprint does not match the
+    requested settings is only replaced with ``--rebuild-cache``.
+    """
     path = cache_path(args.features_dir, args.split, args.kind, args.profile)
     if args.rebuild_cache or not path.is_file():
         LOGGER.info("building feature cache %s", path)
         path, _ = build_feature_cache(args.split, args.kind, args.profile,
                                       args.features_dir)
-    return load_feature_cache(path)
+    expected = feature_fingerprint(args.kind, args.profile, exclude_sa=True)
+    try:
+        return load_feature_cache(path, expected=expected)
+    except CacheMismatchError as error:
+        raise SystemExit(f"{error}; rerun with --rebuild-cache") from error
 
 
 def train_from_features(features, meta, args):
@@ -89,7 +99,8 @@ def train_from_features(features, meta, args):
             "var_floor_ratio": args.var_floor_ratio, "seed": args.seed,
             "training_rows": meta["n_rows"],
             "training_frames": int(len(features)),
-            "dataset_revision": meta["dataset_revision"]}
+            "dataset_revision": meta["dataset_revision"],
+            "feature_fingerprint": meta.get("fingerprint")}
     save_gmm(npz_path, result.gmm, info)
     log = {**info, "name": name,
            "ll_history": result.log_likelihood_history,

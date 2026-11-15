@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from qbestd.data.feature_cache import build_feature_cache
 from qbestd.ml.gmm import (
     gmm_content_sha256,
     load_gmm,
@@ -11,6 +12,7 @@ from qbestd.ml.gmm import (
     train_gmm_detailed,
 )
 from qbestd.ml.train import (
+    get_features,
     model_name,
     parse_args,
     train_from_features,
@@ -93,3 +95,44 @@ def test_content_hash_is_deterministic_and_parameter_sensitive():
     assert gmm_content_sha256(first) == gmm_content_sha256(second)
     other = train_gmm(data, 2, n_iter=0)[0]
     assert gmm_content_sha256(first) != gmm_content_sha256(other)
+
+
+def make_cache(tmp_path, exclude_sa):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    rng = np.random.default_rng(0)
+    audio = [{"array": (0.1 * rng.normal(size=8000)).astype("float32")
+              .tolist(), "sampling_rate": 16000}]
+    source = tmp_path / "t.parquet"
+    pq.write_table(pa.table({"audio": audio,
+                             "sentence": ["Combine all."]}), source)
+    return build_feature_cache("train", "mfcc", "timit_matlab", tmp_path,
+                               exclude_sa=exclude_sa,
+                               parquet_paths=[source])
+
+
+def test_get_features_accepts_a_matching_cache(tmp_path):
+    make_cache(tmp_path, exclude_sa=True)
+    args = parse_args(["--features-dir", str(tmp_path)])
+    assert get_features(args)[0].shape[1] == 39
+
+
+def test_get_features_refuses_a_mismatched_cache(tmp_path):
+    make_cache(tmp_path, exclude_sa=False)
+    args = parse_args(["--features-dir", str(tmp_path)])
+    with pytest.raises(SystemExit, match="--rebuild-cache"):
+        get_features(args)
+
+
+def test_rebuild_cache_replaces_a_mismatched_cache(tmp_path, monkeypatch):
+    make_cache(tmp_path, exclude_sa=False)
+    calls = []
+
+    def fake_build(split, kind, profile, out_dir):
+        calls.append(split)
+        return make_cache(tmp_path, exclude_sa=True)
+
+    monkeypatch.setattr("qbestd.ml.train.build_feature_cache", fake_build)
+    args = parse_args(["--features-dir", str(tmp_path), "--rebuild-cache"])
+    assert get_features(args)[0].shape[1] == 39
+    assert calls == ["train"]
