@@ -154,6 +154,34 @@ for both sizes (11 values: the LBG start and 10 iterations):
 
 Retrieval numbers are in `docs/results_timit_q20_features.md`.
 
+## MFCC-TMP on `textdisjoint_q20_v2` (cycle 6, P2)
+
+MFCC-TMP, profile `timit_matlab` (16 kHz, 4 kHz band), 39 dimensions, same
+GMM recipe and split as the PLP models above. Feature fingerprint
+`d4410351e5a91ee9319e10b1555701a24445dc6741970ed7bad23edae656de78`.
+
+| Model | Parameter SHA-256 | Training rows | Training frames | Mean log-likelihood per frame, start -> end |
+|---|---|---|---|---|
+| GMM-64 | `bebabe4220162631...` | 3696 | 1119053 | -34.872 -> -32.840 |
+| GMM-128 | `105fb5ff5093fbcb...` | 3696 | 1119053 | -34.230 -> -32.052 |
+
+The EM log-likelihood per frame rises monotonically at every iteration for
+both sizes:
+
+- GMM-64: -34.872, -34.226, -33.767, -33.420, -33.194, -33.059, -32.978, -32.925, -32.888, -32.861, -32.840
+- GMM-128: -34.230, -33.566, -33.129, -32.789, -32.539, -32.372, -32.262, -32.185, -32.128, -32.086, -32.052
+
+**TEO floor hits** (subband Teager sums at or below the log floor 1e-10,
+counted during the cache build; every cached feature was finite):
+
+| HF split | Rows | Floor hits | Values |
+|---|---|---|---|
+| train | 4051 | 0 | 32055712 |
+| test | 989 | 0 | 7873606 |
+
+No Teager sum reached the floor in either cache, so the floor did not alter a
+feature. Retrieval numbers: `docs/results_timit_q20_features.md`.
+
 ## What this does not show
 
 - No comparison with the thesis figure and no held-out likelihood.
