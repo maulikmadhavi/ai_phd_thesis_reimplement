@@ -3,7 +3,9 @@
 - **Cycle:** 6 (Orchestrator)
 - **Handoff input:** `handoff_response.md` at `ba99a8a` (Codex review of cycle 5, Q1–Q6)
 - **Stage status:** Stages 0–3, TIMIT word alignment, the thesis endpoint rule, keyword-cluster
-  statistics and the text-disjoint split v1 are done. 519 passed, 1 skipped at `1b76d12`.
+  statistics, text-disjoint splits v1 and v2, and cycle 6 part A (C1–C6) are done. Part B is
+  in progress (§9 status). 563 passed, 1 skipped at `baa3bc3` (full suite, re-run by the
+  Orchestrator on 2026-11-16).
 - **This cycle:** provenance fixes and a corrected text-disjoint split `textdisjoint_q20_v2`
   that keeps SX transcript variants together (part A, §8), then PLP and MFCC-TMP on v2
   (part B, §9)
@@ -243,6 +245,14 @@ Codex decisions adopted:
   variant pair, not only the 8 that crossed in v1. Merging those 8 changes the step 2 and
   step 3 placements, so an unlinked pair (for example the shellfish 5 + 2 groups) could
   cross in v2. Codex's own test ("linked variants cannot cross sides") needs the full list.
+- **Cycle 6 part A done** (`3fb279d..220d321`): C1 `3fb279d`, C2 `b57397b`, C3 `2a93634`
+  (HF parameter hashes unchanged), C4 `d6de36b`, C5 `4e95d7e` (v2 split doc before any v2
+  model; all 20 keywords at cost 0, coverage kept), C6 `220d321`.
+  - MFCC v2: GMM-64 p@N 40.02 / MAP 42.23, GMM-128 42.94 / 44.96 (instance average). The
+    paired 128 − 64 intervals exclude 0 for both metrics and both averages.
+- **Protocol change** (`1286fad`, `0f513f4`): Codex is retired. The Claude Code session
+  Handoff_feedback writes `handoff_response.md`; every role hands on by SendMessage
+  (`requirements.md`, "Agentic handoff").
 
 ---
 
@@ -431,6 +441,31 @@ Codex decisions adopted:
 **Gate:** start only after C6 is on `main` and C5 kept full keyword coverage. Same v2
 manifest, LC2, clip features, A1 scorer and bootstrap. **No VTLN yet** (Stage 4 is not
 built). No tuning towards §3.
+
+**Status at 2026-11-16 01:25 (Orchestrator check).** The gate is met: C6 is on `main` and
+C5 kept coverage.
+- `baa3bc3` (P2 preparation, done): `build_feature_cache` counts TEO floor hits into the
+  cache metadata (`teo_floor_hits`, `teo_values`) and raises on non-finite features. The
+  full suite was green after it.
+- The Executor's background chain `outputs/pb_chain.sh` (git-ignored) is running:
+  - PLP GMM-64 and GMM-128 are trained (LL rising 25.32 → 27.68 and 26.50 → 28.79);
+  - PLP GMM-64 is evaluated;
+  - it then evaluates PLP GMM-128, and then trains and evaluates MFCC-TMP 64 and 128.
+  - It writes `outputs/pb_done` when it finishes, or `outputs/pb_fail` on an error.
+- **Nothing from part B is committed yet.** Do not restart the chain or re-run finished
+  steps. Wait for `pb_done`; if `pb_fail` appears, **stop and report**.
+
+**Next atomic tasks, in order:**
+1. **P1:** when the PLP evals are done, record the hashes and EM curves in
+   `docs/gmm_notes.md`, then commit P1. The numbers go into P3's doc, not
+   `docs/results_timit_q20.md`.
+2. **P2:** when the MFCC-TMP evals are done, read `teo_floor_hits` / `teo_values` from both
+   MFCC-TMP cache metadata files and report them in `docs/gmm_notes.md` together with the
+   hashes and curves. A non-finite feature would have raised and written `pb_fail`. Commit
+   P2.
+3. **P3:** the feature comparison doc as specified below.
+4. Then hand off to the Reviewer (cycle 6 `handoff_request.md`), which includes open
+   questions 27–30.
 
 ### P1: PLP, GMM-64 and GMM-128
 - `timit_matlab` profile (16 kHz, 8 kHz band, §4 Q14). Build the per-HF-split caches, then
