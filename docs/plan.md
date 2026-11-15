@@ -1,9 +1,12 @@
 # Execution Plan: QbE-STD Thesis Reimplementation
 
-- **Cycle:** 4 (Orchestrator)
-- **Handoff input:** `handoff_response.md` at `5c5dea8` (Codex review of cycle 3, Q1–Q15)
-- **Stage status:** Stages 0–3 and TIMIT word alignment are done. 366 tests green at `c992e9d`.
-- **This cycle:** Codex's requested fix-ups E1–E7, then the first end-to-end TIMIT Q-20 number (Stage 5 LC2 + Stage 7 p@N/MAP)
+- **Cycle:** 5 (Orchestrator)
+- **Handoff input:** `handoff_response.md` at `a8e2b02` (Codex review of cycle 4, Q1–Q9)
+- **Stage status:** Stages 0–3, TIMIT word alignment and the first TIMIT Q-20 number (LC2,
+  p@N/MAP) are done. 457 tests green at `e63e723`.
+- **This cycle:** thesis endpoint rule, provenance guards and keyword-cluster statistics
+  (part A), then a text-disjoint split that reproduces the thesis query/document counts
+  (part B)
 - **Source of truth:** thesis `D:\Storage\career_phd_daiict_work\Thesis` (`Chapters/*.tex`,
   `Backmatter/*.tex`) and the MATLAB feature repo
   `github.com/maulikmadhavi/research_myMATLAB_codes/tree/master/Analysis/Feature_Extraction`
@@ -20,12 +23,12 @@ MFCC/PLP, so every choice that isn't pinned down stays configurable.
 |---|---|---|---|
 | 0 | pixi env, skeleton, test runner | done | requirements.md |
 | 1 | Audio base: I/O, resampling, pre-emphasis, framing, windowing, spectrum, energy, TEO | done | ExpSetup §Front-end |
-| 2 | Features: mel/Bark scales, VTLN frequency warping, mel filterbank, MFCC + Δ/ΔΔ, PLP, MFCC-TMP | done; fix-ups in §8 | ExpSetup §Acoustic Representation; Warped_Feature appendix |
-| 3 | ML: LBG VQ codebook → diagonal GMM by EM, log-likelihood | done; fix-ups in §8 | ExpSetup §Posterior Representation; `Backmatter/Algorithm_LC` |
-| 4 | Posteriorgrams: Gaussian, iterative GMM-VTLN, mixture of GMMs | | Representation §GMM-based VTLN; §Mixture of GMMs |
-| 5 | Matching: symmetric KL, subDTW LC1/2/3 (S/T/P), path selection, z-norm; DTW, fastDTW, partial matching | **this cycle:** KL, LC2, z-norm (§9) | ExpSetup §Searching, §Detection; Matching §Partial Matching |
+| 2 | Features: mel/Bark scales, VTLN frequency warping, mel filterbank, MFCC + Δ/ΔΔ, PLP, MFCC-TMP | done; source digest in §8 A2 | ExpSetup §Acoustic Representation; Warped_Feature appendix |
+| 3 | ML: LBG VQ codebook → diagonal GMM by EM, log-likelihood | done; split guard in §8 A3 | ExpSetup §Posterior Representation; `Backmatter/Algorithm_LC` |
+| 4 | Posteriorgrams: Gaussian, iterative GMM-VTLN, mixture of GMMs | Gaussian done | Representation §GMM-based VTLN; §Mixture of GMMs |
+| 5 | Matching: symmetric KL, subDTW LC1/2/3 (S/T/P), path selection, z-norm; DTW, fastDTW, partial matching | KL, LC2, z-norm done; **this cycle:** endpoint rule (§8 A1) | ExpSetup §Searching, §Detection; Matching §Partial Matching |
 | 6 | Indexing: **STM** phone segmentation → posterior averaging; segment-level BoAW tf-idf | | Matching §Feature Reduction (STM, lines 287–339), §BoAW |
-| 7 | Evaluation: p@N, MAP, recall, TWV/MTWV, C<sub>nxe</sub><sup>min</sup>, DET; TIMIT Q-20/Q-84 manifests | **this cycle:** Q-20, p@N, MAP (§9) | survey §Metrics; Appendix θ, β |
+| 7 | Evaluation: p@N, MAP, recall, TWV/MTWV, C<sub>nxe</sub><sup>min</sup>, DET; TIMIT Q-20/Q-84 manifests | Q-20, p@N, MAP done; **this cycle:** cluster bootstrap, text-disjoint split (§8–§9) | survey §Metrics; Appendix θ, β |
 
 Later: re-scoring with detection sources, score fusion, phonetic posteriorgrams (these need
 the BUT phone recognizer).
@@ -91,9 +94,27 @@ TIMIT Q-20, 64 mixtures (Table `Tab:TIMITVTLNPerformance1`), p@N / MAP:
 | PLP | 35.50 / 37.58 | 37.48 / 39.95 |
 | MFCC-TMP | 40.03 / 41.50 | 42.88 / 45.52 |
 
-**First milestone:** MFCC, then a 64-component Gaussian posteriorgram, then subDTW-LC2, landing
-near p@N ≈ 35 / MAP ≈ 37 on TIMIT Q-20. The numbers are only comparable if the TIMIT copy
-matches (see §4, D1).
+TIMIT Q-20, no VTLN, by local constraint (`Unsupervised.tex` lines 125–141,
+`Tab:ExpResultTIMIT`), p@N / MAP:
+
+| Feature | NG | LC | GMM | Mix GMM |
+|---|---|---|---|---|
+| MFCC | 64 | LC1 | 31.75 / 32.27 | 36.73 / 38.95 |
+| MFCC | 64 | **LC2** | **34.91 / 36.71** | 39.22 / 42.18 |
+| MFCC | 64 | LC3 | 30.35 / 31.08 | 36.25 / 38.94 |
+| MFCC | 128 | LC1 | 33.20 / 35.69 | 39.57 / 41.56 |
+| MFCC | 128 | **LC2** | **36.81 / 38.34** | 41.34 / 44.29 |
+| MFCC | 128 | LC3 | 30.67 / 32.33 | 35.10 / 37.11 |
+| PLP | 64 | LC1 | 33.45 / 34.43 | 39.56 / 42.33 |
+| PLP | 64 | LC2 | 35.50 / 37.58 | 41.91 / 44.75 |
+| PLP | 64 | LC3 | 31.82 / 33.00 | 37.48 / 39.18 |
+| PLP | 128 | LC1 | 33.73 / 36.12 | 39.87 / 41.84 |
+| PLP | 128 | LC2 | 37.30 / 40.18 | 43.14 / 45.14 |
+| PLP | 128 | LC3 | 31.19 / 32.52 | 35.93 / 38.23 |
+
+**Thesis protocol sizes:** 3696 train utterances, 1344 test documents, 145 query instances,
+160 keyword occurrences (tokens). Our numbers are protocol references only, not directly
+comparable, until the split matches (§9).
 
 ---
 
@@ -106,6 +127,10 @@ matches (see §4, D1).
 | 15 | Q-84 list | **Unknown.** Derive it deterministically in Stage 7 from the official split and normalized transcripts, compare the count to 84, and commit the list as an artifact. |
 | 16 | Phone segmentation for Stage 6 | **Resolved:** STM (`stm_computation.m`, Matching.tex lines 287–339). |
 | D1 | **User decision:** is a licensed LDC TIMIT copy with `.WRD` files available? | **Resolved 2026-11-14:** no LDC copy. The user chose the forced aligner [`Scicom-intl/Where-Words-Begin-and-End-Whisper-Large-V3`](https://huggingface.co/Scicom-intl/Where-Words-Begin-and-End-Whisper-Large-V3) to produce the word boundaries on the HF copy. This replaces the Reviewer's MFA proposal in `handoff_request.md` Q14. Results are labelled approximate against the thesis. Done in cycle 2b (§7). |
+| 20 | How were a keyword's instances combined? | **Unknown** (Codex Q1). Each instance stays its own query; report instance and keyword averages; neither is called the thesis aggregate. |
+| 21 | Is Occ. a document or token count? | **Token count** (Codex Q2, `ExpSetup.tex` lines 75, 80). Relevance stays binary per document, exact token match. Morphological variants unknown. |
+| 22 | Query features from clip or slice? | Clip stays primary; slice is a sensitivity run (§9 B4). |
+| 23 | Path validity measure? | **Resolved** (Codex Q5): `wr = (i − P(i,N))/N` in test frames; min `S/T` over valid endpoints (§8 A1). |
 
 Codex decisions adopted:
 - Keep `win-64` only.
@@ -159,269 +184,289 @@ Codex decisions adopted:
 - **SAD:** the baseline uses every frame. Energy SAD or edge trimming is a later named
   ablation, not thesis parity.
 
----
+- **Cycle 4:** fix-ups E1–E7 and the first TIMIT Q-20 number, T7.1–T7.5 and T5.1–T5.3
+  (`73ea23b..e63e723`, 457 tests).
+  - MFCC `timit_matlab`, LC2, 221 query instances × 989 documents, 18 scorable keywords:
+    GMM-64 p@N 36.89 / MAP 41.20, GMM-128 39.58 / 44.23. These become **HF v1** in §8 A6.
+  - Reviewer finding: 42 of 52 relevant documents share their sentence text with a train
+    query source. The official split never allows that.
 
-## 8. Cycle 4, part A: fix-ups (Codex "change requested", `5c5dea8`)
-
-Conventions: one commit per task, `exec: …`, 10 words or fewer, no trailers. Push after every
-commit. Tests for every change; every file under 400 lines.
-
-### E1: Drop the `htk_like` profile (Codex Q2)
-- **Files:** `features/profiles.py`, its tests, any doc mention
-- **Do:** remove `htk_like`. Keep the generic `PlpConfig` options and the `timit_matlab`
-  profile.
-- **Commit:** `exec: drop unverified htk_like profile`
-
-### E2: Two parity-doc cells (Codex Q3)
-- **Files:** `docs/feature_parity.md`
-- **Do:**
-  - Move `Fx_mfcc_lift.m` `Nlift=-20` out of the **Thesis** column. The thesis gives no
-    lifter.
-  - Change the "Delta formula" thesis cell from "same" to "not stated".
-- **Commit:** `exec: fix lifter and delta thesis cells`
-
-### E3: k-means stop rule (Codex Q4)
-- **Files:** `ml/vq.py`, `tests/ml/test_vq.py`
-- **Do:** stop only when `0 ≤ relative decrease < tol`. A distortion increase, for example
-  after an empty-cluster re-seed, continues until it recovers or `max_iter` is reached.
-- **Tests:** a forced re-seed whose distortion rises does not stop the refinement early.
-- **Commit:** `exec: continue kmeans after distortion increase`
-
-### E4: Feature-cache fingerprint (Codex Q6, Q15)
-- **Files:** `data/feature_cache.py`, `ml/train.py`, tests
-- **Do:**
-  - Store `fingerprint = sha256(json(sorted))` over:
-    - `get_profile(...).to_dict()`
-    - feature kind
-    - dataset revision
-    - `exclude_sa`
-    - `FEATURE_CACHE_VERSION`, a module constant bumped by hand whenever feature semantics
-      change.
-  - `load_feature_cache(path, expected=...)` raises `CacheMismatchError` on a mismatch.
-  - `train.py` rebuilds on mismatch when `--rebuild-cache` is given, and otherwise fails with
-    a clear message.
-- **Tests:** a changed config, `exclude_sa` or version is never silently reused.
-- **Commit:** `exec: fingerprint feature cache and validate on load`
-
-### E5: `huggingface_hub` in the core env (Codex Q7)
-- **Files:** `pixi.toml`, `pixi.lock`, `ml/train.py` docstring
-- **Do:**
-  - Add `huggingface_hub` to the core dependencies. torch and transformers stay in `align`
-    only.
-  - `pixi run train-gmm` must work from the core env. Verify this with
-    `--help` plus a cached run.
-- **Commit:** `exec: add huggingface hub to core environment`
-
-### E6: Speaker-overlap wording (Codex Q9)
-- **Files:** `docs/data_notes.md`, `docs/alignment_notes.md`
-- **Do:** replace "near-certain"/"unverified" with the narrower finding:
-  - SA1 and SA2 counts differ (train 488/501, test 142/129);
-  - so the split is **not strictly speaker-independent**: at least 13 speakers' SA
-    utterances cross it;
-  - the counts do not prove a random split.
-- Add the standard label *"speaker overlap present; approximate versus the thesis"*.
-- **Commit:** `exec: state narrower speaker overlap finding`
-
-### E7: GMM evidence and convergence notes (Codex Q11, Q13, Q14)
-- **Files:** `ml/gmm.py`, `ml/vq.py` docstrings, `docs/gmm_notes.md`
-- **Do:**
-  - Variance floor `0.01×` global is "HTK HCompV-style, unverified for the thesis". The
-    k-means `tol` is "unverified".
-  - `n_iter=10` is "experimental choice". `Representation.tex` line 1089 states ten
-    iterations only for the **mixture-of-GMMs** setup; line 196 is commented out.
-  - Record the c0 choice: c0 kept, as `Fx_mfcc.m` retains DCT row 1.
-  - **Optional:** a 30-iteration sensitivity run of GMM-64, with its curve recorded in the
-    notes. The 10-iteration model stays the baseline.
-- **Commit:** `exec: correct gmm evidence and convergence notes`
+**Decisions adopted from `a8e2b02`:**
+- The HF split numbers are a useful baseline but **not** a thesis-parity claim. Keep them,
+  labelled; never replace them.
+- Text overlap: option (a), a separately named text-disjoint split (§9).
+- Endpoint rule from `ExpSetup.tex` lines 442–469; no silent fallback (§8 A1).
+- Provenance: source digest in the feature fingerprint, `split_id`, and a model guard in
+  the runner (§8 A2–A3).
+- Uncertainty: bootstrap over keywords, paired for model comparisons (§8 A5).
+- GMM-128 target 36.81 / 38.34 (§3).
 
 ---
 
-## 9. Cycle 4, part B: first comparable number (TIMIT Q-20, MFCC, subDTW-LC2)
+## 8. Cycle 5, part A: scorer, provenance and statistics (Codex `a8e2b02` Q5–Q8)
 
-The goal is **one end-to-end number** to compare with the thesis target: MFCC Gaussian
-posteriorgram, 64 mixtures, no VTLN, p@N **34.91**, MAP **36.71** (§3). Every result is
-labelled *"speaker overlap present; approximate versus the thesis"*.
+**Order matters.** Land A1–A4 before any new scoring. A5 re-runs the HF baseline under the new
+scorer, so that the later HF-vs-text-disjoint comparison changes only the split. The cycle 4
+numbers stay in the results doc, labelled **v1 (cycle 4 scorer)**.
 
-**Thesis and MATLAB facts** (cite these in docstrings):
-- **Q-20 keywords and counts:** `ExpSetup.tex` lines 78–97 (`Table:TIMITdata`). Keyword
-  (Inst./Occ.):
-  - artists 7/7, beautiful 3/8, birth 4/7, destroy 9/7, development 9/8
-  - garbage 8/7, government 14/8, intelligence 8/7, love 4/16, marriage 3/7
-  - meeting 7/7, morning 15/14, ocean 7/7, organizations 7/7, problems 5/7
-  - shellfish 14/7, simple 8/8, surface 3/7, tomorrow 3/7, youngsters 7/7
-  - Queries come from train and documents from test; `/sa/` is excluded (lines 73–75).
-- **Local distance:** symmetric KL,
-  `Σ t log(t/q) + Σ q log(q/t)` (`ExpSetup.tex` line 304).
-- **subDTW LC2:** the reference kernel is **`research_qbestd/matlab/NSDTW_c_skel.cpp`**.
-  `Fx_do_SDTW.m` is *segmental* DTW, so do not follow it. `D` is (test frames M × query
-  frames N).
-  - **First column (n = 0):** `S = D`, `T = 1`, `P = m`.
-  - **First two test rows (m = 0, 1):** accumulate along n, so
-    `S(m,n) = S(m,n−1) + D(m,n)`, `T = n+1`, `P = m`.
-  - **Otherwise:** predecessors are `(m, n−1)`, `(m−1, n−1)` and `(m−2, n−1)`.
-    - `S = D + min`, `T = T_pred + 1`, `P = P_pred`.
-    - **Tie order:** `(m, n−1)` first, then `(m−1, n−1)`, then `(m−2, n−1)`
-      (`min_fun_ind`).
-  - Every predecessor is in column n−1, so each query column can be computed
-    **vectorised over m**.
-- **Distance per test utterance:** `dist(i) = S(i,N)/T(i,N)` (`ExpSetup.tex` line 442).
-  - A path is valid when `0.5 ≤ (i − P(i,N) + 1)/N ≤ 2`, the interval in test frames.
-  - The utterance distance is the minimum over valid end frames.
-- **p@N** (`survey.tex` lines 40–50): N is the number of relevant documents, and p@N is the
-  number of relevant documents in the top N, divided by N, × 100.
-- **AP** (`survey.tex` line 65): `(1/N) Σ_k p@k · 1(k)`. MAP is the mean over queries.
-  - Test case: `t,t,f,f,t,f,f,t,f,f` with N = 4 gives p@N = 50 % and AP = 0.775.
-- **Score normalisation:** `s = −(d − μ_q)/σ_q`, sample std (`ExpSetup.tex` lines 497–515).
-  It is monotonic per query, so it does not change p@N or MAP. Implement it anyway for
-  SWS/QUESST later.
-- **Assumptions** (thesis silent; configurable, listed in the results doc):
-  - **Instances:** each spoken instance is its own query; p@N and AP are averaged over all
-    instances. A per-keyword average is reported too.
-  - **Relevance:** exact token match against `normalize_transcript`; a document is relevant
-    if it contains the token at least once.
-  - **Query audio:** cut from the train audio at aligner `[start − 20 ms, end + 20 ms]`,
-    clipped to the utterance, with features extracted **from the clip** (like a separate
-    query file). Rows flagged `collapsed_run` or under 20 ms are skipped.
-  - **Posterior floor:** `1e-10`, then renormalise (`floor_and_renormalise`).
-
-### T7.1: Q-20 query and relevance manifests
-- **Files:** `src/qbestd/eval/__init__.py`, `src/qbestd/eval/timit_queries.py`, tests,
-  `docs/q20_counts.md`
-- **API:**
-  - `Q20_KEYWORDS`: a tuple of `(keyword, thesis_inst, thesis_occ)`.
-  - `build_query_examples(train_word_manifest, train_rows, keywords, pad_s=0.02)
-    -> list[QueryExample]`, skipping SA rows and flagged segments.
-  - `build_relevance(test_rows, keywords, exclude_sa=True) -> dict[keyword, set[row_index]]`.
-    Use `is_sa_sentence` and `normalize_transcript` from the existing modules.
-  - `write_*` / `read_*` TSV helpers. Outputs go to `outputs/eval/` (git-ignored).
-- **`docs/q20_counts.md`** (committed; small derived statistics, no audio or transcripts):
-  - per keyword: thesis Inst/Occ against ours (train instances, test documents, test token
-    occurrences);
-  - document-set size after SA exclusion (expect 1260 − 271 = 989);
-  - skipped flagged instances.
-- **Tests:** synthetic manifests:
-  - SA rows excluded from both queries and documents;
-  - padding clipped to the utterance bounds;
-  - flagged segments skipped;
-  - exact token matching (`love` does not match `lovely`).
-- **Commit:** `exec: add timit q20 query and relevance manifests`
-
-### T7.2: Ranked-retrieval metrics
-- **Files:** `src/qbestd/eval/metrics.py`, tests
-- **API:**
-  - `precision_at_n(ranked_is_relevant, n_relevant)`;
-  - `average_precision(ranked_is_relevant, n_relevant)`;
-  - `summarise(per_query) -> {p_at_n, map, n_queries}`.
-  - If `n_relevant == 0`, raise `ValueError`.
-- **Tests:** the thesis example gives 50 % and 0.775; a perfect ranking gives 100 %; no
-  relevant document in the ranking gives 0.
-- **Commit:** `exec: add p at n and map metrics`
-
-### T5.1: Symmetric KL local distance
-- **Files:** `src/qbestd/search/__init__.py`, `src/qbestd/search/distance.py`, tests
-- **API:** `symmetric_kl_matrix(test_post (M,K), query_post (N,K), floor=1e-10) -> (M,N)`,
-  vectorised as `(t·log t).sum − t·log qᵀ + (q·log q).sum − log t·qᵀ`.
+### A1: Thesis endpoint rule, no silent fallback (Codex Q5)
+- **Files:** `src/qbestd/search/subdtw.py`, `src/qbestd/search/score.py`,
+  `src/qbestd/eval/run_timit.py`, `demo/stage5_search_demo.py`, tests
+- **Thesis:** `ExpSetup.tex` lines 442–448 give `dist(i) = S(i,N)/T(i,N)` and
+  `wr(i) = (i − P(i,N))/N`, valid when `0.5 ≤ wr ≤ 2`. Lines 467–469 take the minimum `dist`
+  over valid endpoints. Validity is the test-frame displacement from `P`; `T` only normalises.
+- **Do:**
+  - Zero-based: `end` is the test frame index and `P[end]` the start frame, so
+    `wr = (end − P[end]) / N`. The `+1` goes away.
+  - Keep the minimum of `S/T` over **valid** endpoints. Under LC2 every endpoint has `T = N`,
+    so this equals `argmin S` over the same candidate set (the C++ shortcut).
+  - Remove `used_fallback`. When no endpoint is valid (for example a document shorter than
+    about N/2 frames), return `dist = +inf` with `start = end = -1` and a `nonmatch=True`
+    flag. **Never raise per document**: one short document must not stop a run.
+  - `rank_documents`: `+inf` ranks last, ties keep document order (stable sort).
+  - `znorm_scores`: compute μ and σ over **finite** distances only. A `+inf` distance gets
+    score `-inf`. Raise only if fewer than 2 finite values remain.
+  - `run_timit`: replace the `fallbacks` columns and keys with `nonmatches`
+    (`per_query.tsv` and `summary.json` → `total_nonmatches`). Update the demo the same way.
 - **Tests:**
-  - identical rows give 0;
-  - the result is symmetric under swapping the inputs (transposed);
-  - it is non-negative;
-  - it equals a double-loop reference;
-  - zeros in the input stay finite through the floor.
-- **Commit:** `exec: add symmetric kl distance matrix`
+  - `wr` exactly 0.5 and exactly 2.0 are valid; one frame either side is invalid;
+  - an all-invalid `S` gives `+inf`, `nonmatch=True`;
+  - ranking with `+inf` values, and stable ties;
+  - `znorm_scores` with `+inf` present gives no `nan`.
+- **Commit:** `exec: apply thesis endpoint rule and mark nonmatches`
 
-### T5.2: subDTW LC2 kernel and path selection
-- **Files:** `src/qbestd/search/subdtw.py`, tests
-- **API:**
-  - `subdtw_lc2(D) -> (S, T, P)`, with columns vectorised over test frames and
-    `NSDTW_c_skel.cpp` initialisation and tie order.
-  - `best_utterance_distance(S, T, P, min_ratio=0.5, max_ratio=2.0) -> (dist, start, end,
-    used_fallback)`. If no end frame is valid, take the minimum over all of them with
-    `used_fallback=True`.
+### A2: Source digest in the feature fingerprint (Codex Q6)
+- **Files:** `src/qbestd/data/feature_cache.py`, tests
+- **Do:**
+  - Add `FEATURE_SOURCE_FILES`: an explicit, sorted tuple of the modules that compute
+    features. Start from the transitive `qbestd.audio.*` / `qbestd.features.*` imports of
+    `qbestd.features.extract`, and list each file by name. Do **not** hash the whole package:
+    a doc or test edit must not invalidate the caches.
+  - `feature_source_digest()`: sha256 over, for each file in that order, its relative path,
+    then its bytes **with CRLF normalised to LF** (so git autocrlf on Windows does not change
+    the digest).
+  - Add the digest to `feature_fingerprint(...)`. Keep `FEATURE_CACHE_VERSION`, renamed in
+    meaning to the cache **format** schema version (bump only when the file layout changes).
+    Add a docstring line saying so.
 - **Tests:**
-  - matches a plain double-loop transcription of the C++ (kept in the test file) on 20
-    random `D` matrices, including tie-heavy integer `D`;
-  - a query planted inside a random utterance is found at the right start and end;
-  - `M < 3` and `N = 1` edge cases;
-  - the fallback flag.
-- **Commit:** `exec: add subdtw lc2 kernel and path selection`
+  - changing one listed file's bytes (monkeypatched or tmp copy) changes the fingerprint;
+  - CRLF vs LF bytes give the same digest;
+  - `FEATURE_SOURCE_FILES` equals the set of `qbestd.audio` / `qbestd.features` modules that
+    `qbestd.features.extract` imports transitively (walk `sys.modules` after a fresh import,
+    or parse imports with `ast`). This catches a newly imported module that nobody listed.
+- **Commit:** `exec: hash feature sources into cache fingerprint`
 
-### T5.3: Score normalisation
-- **Files:** `src/qbestd/search/score.py`, tests
+### A3: Model and split guard in the runner (Codex Q6)
+- **Files:** `src/qbestd/ml/train.py`, `src/qbestd/eval/run_timit.py`, tests
+- **Do:**
+  - **Split identity.** `split_id` is a string recorded everywhere a split matters:
+    - the HF baseline is `hf-<first 12 hex of the dataset revision>-nonsa`;
+    - a manifest split (part B) is `<name>-<first 12 hex of the manifest file sha256>`.
+  - `train-gmm` gets `--split-id` (default: the HF id) and writes `split_id` into the model
+    `.json`/metadata next to `kind`, `profile` and `feature_fingerprint`.
+  - `run_timit`, before any scoring, raises `ModelMismatchError` when the GMM's `kind`,
+    `profile` or `split_id` differs from the request, or when its `feature_fingerprint`
+    differs from `feature_fingerprint(kind, profile, exclude_sa=True)` under the current code.
+    The fingerprint excludes rows, which is why `split_id` is checked separately.
+  - Record `split_id`, the model's fingerprint and the model parameter hash in `summary.json`.
+- **Tests:** one mismatch test per field, plus a pass case.
+- **Commit:** `exec: reject gmm with mismatched features or split`
+
+### A4: Rebuild caches and retrain HF GMMs (regression check)
+- A2 changes the fingerprint, so A3 rejects the cycle 3 models. Rebuild both HF feature
+  caches, then retrain MFCC `timit_matlab` GMM-64 and GMM-128 on the HF train side with
+  `--split-id` set to the HF id.
+- **Check:** the parameter hashes must equal the cycle 3 hashes in `docs/gmm_notes.md`. If they
+  differ, stop and report: something in the front end moved.
+- Add one line to `docs/gmm_notes.md`: the new fingerprint, the `split_id`, and "parameter
+  hashes unchanged".
+- **Commit:** `exec: retrain hf gmms under new fingerprint`
+
+### A5: Keyword-cluster bootstrap (Codex Q7)
+- **Files:** `src/qbestd/eval/metrics.py` (or a new `src/qbestd/eval/bootstrap.py` if
+  `metrics.py` would grow past about 150 lines), tests
 - **API:**
-  - `znorm_scores(distances) -> -(d − mean)/std(ddof=1)`, raising on fewer than 2 values or
-    zero std;
-  - `rank_documents(distances) -> order`, stable.
-- **Tests:** a hand-worked example; ranking by z-score equals ranking by distance.
-- **Commit:** `exec: add score normalisation and ranking`
+  - `cluster_bootstrap(per_query, n_boot=10000, seed=0) -> dict`: resample **keywords** with
+    replacement, carrying all of a keyword's instances together. Return 95 % percentile
+    intervals for the instance-weighted mean (all instances of the drawn keywords, with
+    multiplicity) and the keyword-weighted mean (mean of per-keyword means), for both p@N
+    and AP.
+  - `paired_keyword_bootstrap(per_query_a, per_query_b, ...)`: the same resampling of
+    keywords, applied to per-keyword differences B − A. It requires identical keyword and
+    instance sets in A and B.
+  - Use `numpy.random.default_rng(seed)` only.
+- **Tests:** a hand-made 3-keyword case with known means; identical inputs give a zero
+  paired interval; mismatched instance sets raise; fixed seed gives a fixed result.
+- **Commit:** `exec: add keyword cluster bootstrap`
 
-### T7.3: TIMIT Q-20 evaluation runner
-- **Files:** `src/qbestd/eval/run_timit.py` (CLI), a pixi task `eval-timit`, tests for
-  argument parsing and the aggregation helpers
-- **CLI:** `python -m qbestd.eval.run_timit --kind mfcc --profile timit_matlab --gmm
-  <model.npz> --keywords q20 --out outputs/eval/<run_name>/`
-- **Steps:**
-  1. Load or build the test feature cache (`exclude_sa=True`, fingerprint-validated).
-  2. Cut the query clips from the train audio and extract their features.
-  3. Compute posteriorgrams for queries and documents.
-  4. For every query × document pair: KL matrix, then LC2, then utterance distance.
-  5. Rank, then p@N and AP per instance.
-- **Outputs:**
-  - `per_query.tsv` (keyword, instance row, p@N, AP, fallbacks);
-  - `summary.json`: instance-averaged and keyword-averaged p@N/MAP, counts, runtime, model
-    and feature fingerprints, git commit.
-- **Commit:** `exec: add timit q20 evaluation runner`
+### A6: HF baseline v2 and corrected labels (Codex Q1, Q2, Q7, Q8)
+- **Run:** `eval-timit` on the HF split with the A4 models, GMM-64 and GMM-128.
+- **Rewrite `docs/results_timit_q20.md`:**
+  - Section **"HF split, v1 (cycle 4 scorer)"**: keep the cycle 4 numbers as they are, with
+    the label *"exploratory: instance bootstrap, `(end−start+1)/N` endpoint, fallback
+    scorer"*.
+  - Section **"HF split, v2"**: the new numbers. Give keyword-cluster intervals for both
+    averages, the paired GMM-128 − GMM-64 interval, the nonmatch count, `split_id`, model
+    hashes and the git commit.
+  - **Targets** (`Unsupervised.tex` lines 125–134, `Tab:ExpResultTIMIT`, MFCC, GMM, LC2):
+    64 Gaussians 34.91 / 36.71, **128 Gaussians 36.81 / 38.34**. Delete the sentence saying
+    no 128 target exists. The thesis 128 − 64 gain is +1.90 p@N / +1.63 MAP.
+  - **Denominators**, stated explicitly so nobody compares them:
+    - query instances: thesis 145, ours 221 on the HF split;
+    - thesis Occ. 160 is a **token** count; ours is 52 relevant document-keyword pairs on the
+      HF split; relevance is binary per document either way.
+  - **Labels on every table:** "sentence-text overlap between queries and documents (HF
+    split)" and "speaker overlap present; approximate versus the thesis". **Do not describe
+    the HF split as speaker-separated.** The SA counts (488/501) are what a random row split
+    would give, so speaker overlap may be large.
+  - **Unknowns:** the instance aggregation (each instance as a query is our choice; the
+    thesis does not say whether the reported figure averages over instances or keywords),
+    and morphological variants in relevance.
+- **Commit:** `exec: rerun hf baseline with thesis scorer`
 
-### T7.4: Run and record the first numbers
-- **Run:** MFCC `timit_matlab` with GMM-64, then GMM-128, both LC2.
-- **Write `docs/results_timit_q20.md`:**
-  - a table of ours against the thesis (GMM-64 target 34.91 / 36.71);
-  - both averaging modes;
-  - per-keyword AP;
-  - the fallback count;
-  - runtime;
-  - the assumption list above;
-  - the speaker-overlap label.
-- The gap is explained with evidence, not tuned away. **Do not change any setting to chase
-  the target.**
-- **Commit:** `exec: record first timit q20 results`
+---
 
-### T7.5: Stage 5 search demo
-- **Files:** `demo/stage5_search_demo.py` (≤ 250 lines); pixi task `demo-stage5` in the
-  `demo` feature
-- **Inputs:** either two audio clips (query and document) or a Q-20 keyword plus an
-  instance; a GMM selector.
-- **Outputs:**
-  - both posteriorgrams;
-  - KL matrix `D`, and `S` with the best path overlaid;
-  - the utterance distance;
-  - for a keyword: the top-10 ranked documents with relevance marks and p@N/AP.
-- Put a usage note at the top. Import from `qbestd` only.
-- **Commit:** `exec: add stage 5 search demo`
+## 9. Cycle 5, part B: text-disjoint split (Codex `a8e2b02` Q3, Q4)
 
-**Cycle 4 definition of done:**
-- E1–E7, T7.1, T7.2, T5.1–T5.3 and T7.3–T7.5 are on `main`, and `pixi run test` is green in
-  the core env.
-- Every module is under 400 lines.
-- `docs/results_timit_q20.md` has the first MFCC GMM-64 and GMM-128 numbers.
-- The Reviewer writes `handoff_request.md` for cycle 4 with the open questions below.
+**Why.** In the official TIMIT split, SX and SI texts never cross between train and test
+(NIST TIMIT documentation; only SA is shared). On the HF split, 42 of 52 relevant documents
+share their sentence text with a train query source. Codex chose option (a): a separately
+named, text-disjoint split, reported **next to** the HF baseline, never replacing it.
 
-**Open questions for the cycle 4 review:**
-- 20: How did the thesis combine a keyword's several spoken instances (Inst. 3–15)? Was each
-  instance its own query, or were scores fused per keyword?
-- 21: Is "Occ." in `Table:TIMITdata` a document count or a token count? Did relevance include
-  morphological variants?
-- 22: Query features: from the cut clip (current) or sliced from the full-utterance features?
-- 23: Path validity: is the interval measured in test frames from `P` (current) or as the path
-  length `T`?
+**What the Orchestrator counted** (transcripts only, no scores; scratch script, not
+committed). The 5040 non-SA rows of both HF splits form 2362 normalised-text groups:
+- 1909 groups read once (SI-like), and 453 read 2–7 times (SX-like: 429 groups of 7, 18 of 6,
+  2 of 5, 1 of 4, 3 of 2). The odd sizes are probably SX texts split by transcript variants.
+- **Assigning whole groups to one side can reproduce the thesis `Table:TIMITdata` exactly**,
+  Inst. and Occ. for all 20 keywords. For example:
+  - government, groups 7, 7, 6, 1, 1: test 7 + 1 = 8, train 7 + 6 + 1 = 14 (thesis 14/8);
+  - love, groups 7, 7 and six singles: test 7 + 7 + 2 = 16, train 4 (thesis 4/16);
+  - beautiful, groups 7 and four singles: test 7 + 1 = 8, train 3 (thesis 3/8).
+- The thesis also states 3696 train utterances (`Representation.tex` line 174) and 1344 test
+  documents (`Unsupervised.tex` line 74), which is 462 and 168 speakers × 8 non-SA sentences.
+
+So the split rule below uses only transcripts, the thesis count table and the official
+quotas. It is **declared before any score is computed on it, and is never redrawn.** Any
+change becomes a new name (`..._v2`) with a written reason.
+
+### B1: Split rule and manifest (`textdisjoint_q20_v1`)
+- **Files:** `src/qbestd/data/text_split.py`, tests, `docs/split_textdisjoint.md`
+- **Rule:**
+  1. **Universe:** every non-SA row of both HF splits, keyed by the original
+     `(hf_split, row_index)`. Group by `" ".join(normalize_transcript(sentence))`. The group
+     hash is `sha256("qbestd-textsplit-v1\n" + text)`. No RNG anywhere.
+  2. **Keyword constraints**, keywords in `Q20_KEYWORDS` table order. For keyword k, let
+     `G_k` be the groups whose tokens contain k. Groups fixed by an earlier keyword keep
+     their side. Enumerate every assignment of the free groups (at most 2⁸). Its cost is
+     `|test tokens of k − Occ_k| + |train tokens of k − Inst_k|`, counting tokens in
+     transcripts before any aligner flag. Pick the minimum cost; break ties with the
+     lexicographically smallest sorted tuple of test-side group hashes. Fix those groups.
+  3. **Fill to the official quotas:** the test side holds **120 multi-read groups** and
+     **504 single-read groups** in total, counting groups already placed by step 2. Take the
+     remaining test groups in ascending hash order within each stratum. Every other group goes
+     to train. If step 2 already exceeds a quota, move nothing and report it.
+- **API:**
+  - `build_text_split(rows, keywords) -> SplitManifest`;
+  - `write_split_manifest(path, manifest)` / `read_split_manifest(path)`: a TSV of
+    `hf_split, row_index, side, group_hash` with a `# rule=textdisjoint_q20_v1` header. No
+    sentence text in the file.
+  - `split_id(path)`: `textdisjoint_q20_v1-<first 12 hex of the file sha256>`.
+  - Output goes to `outputs/splits/textdisjoint_q20_v1.tsv` (git-ignored, reproducible).
+- **Tests:**
+  - every group lands entirely on one side, and the train and test text sets are disjoint;
+  - shuffling the input row order gives a byte-identical manifest;
+  - a synthetic case where the cost-0 assignment exists is found; a tie is broken by hash;
+  - a keyword fixed by an earlier keyword is respected;
+  - quotas are met on a synthetic universe;
+  - a row that moved from HF test to the train side still resolves its word alignment from
+    `timit_hf_words_test.tsv` (lookup by `(hf_split, row_index)`, never by a new index).
+- **`docs/split_textdisjoint.md`**, committed **before** B3 runs:
+  - the rule (copy of the above) and the manifest sha256;
+  - row counts per side (expected near 3696 / 1344) and group counts per stratum;
+  - per-keyword train tokens and test tokens next to the thesis Inst./Occ., and the step 2
+    cost for each (expected 0 for all 20);
+  - how many rows moved relative to the HF split;
+  - labels: "closer to the thesis on sentence context; not an official TIMIT
+    reconstruction; speaker overlap present (amount unknown, likely larger than on the HF
+    split, because each speaker's sentences are now spread across both sides)".
+- **Commit:** `exec: declare text disjoint split rule and manifest`
+
+### B2: Run the pipeline on a manifest split
+- **Files:** `src/qbestd/ml/train.py`, `src/qbestd/eval/timit_queries.py`,
+  `src/qbestd/eval/run_timit.py`, tests
+- **Do:**
+  - Keep the feature caches **per HF split** (they already hold every non-SA row). A
+    manifest split is a selection layer over them, keyed by `(hf_split, row_index)`.
+  - `train-gmm --split-manifest <tsv>`: train on the manifest's train rows from both caches;
+    `split_id` comes from the manifest.
+  - `timit_queries`: queries come from train-side rows of either HF split, using that split's
+    word manifest. Documents and relevance come from test-side rows. Query and document keys
+    become `(hf_split, row_index)` pairs in the TSVs.
+  - `run_timit --split-manifest <tsv>`: the A3 guard also checks that the model's `split_id`
+    equals the manifest's.
+  - Without `--split-manifest`, behaviour stays exactly the HF baseline.
+  - Keep `run_timit.py` under 400 lines; move helpers into `eval/` modules if needed.
+- **Tests:** the selection layer picks the right rows from two fake caches; queries and
+  documents never share a text group; HF behaviour is unchanged without the flag.
+- **Commit:** `exec: run gmm training and eval on split manifest`
+
+### B3: Train and evaluate on `textdisjoint_q20_v1`
+- Train MFCC `timit_matlab` GMM-64 and GMM-128 on the manifest train side, then run
+  `eval-timit`, LC2, clip query features, with the A1 scorer.
+- **Add to `docs/results_timit_q20.md`**, section **"Text-disjoint split
+  (`textdisjoint_q20_v1`)"**:
+  - query instances and relevant pairs per keyword, against the thesis table;
+  - p@N/MAP for both averages, keyword-cluster intervals, the paired 128 − 64 interval,
+    nonmatches, `split_id`, model hashes;
+  - a three-row comparison: thesis, HF v2, text-disjoint. Same labels as A6.
+- **Do not tune anything to reach a target**, and do not change the split after seeing the
+  scores.
+- **Commit:** `exec: evaluate q20 on text disjoint split`
+
+### B4: Query-feature sensitivity, clip vs slice (Codex Q4)
+- **Files:** `src/qbestd/eval/run_timit.py` (or a helper module), tests
+- **Do:**
+  - Add `--query-features clip|slice`; the default and primary result stays `clip`.
+  - `slice`: compute features on the whole train utterance, then keep frame `t` when its
+    centre `t·shift + win/2` lies in `[start − pad, end + pad]`.
+  - Note in the docstring that `slice` changes Δ/ΔΔ edges **and** any utterance-level
+    waveform normalisation (DC removal and `max|x|` scaling are per utterance, which shifts
+    c0).
+  - Record the mode in `summary.json`.
+- **Run:** GMM-64 on `textdisjoint_q20_v1`, both modes, same model, alignments and relevance.
+- **Add to the results doc** a small table labelled "sensitivity, not a thesis-mandated
+  correction".
+- **Tests:** the frame-selection rule at both interval edges; `clip` output unchanged.
+- **Commit:** `exec: add query feature slicing sensitivity run`
+
+**Cycle 5 definition of done:**
+- A1–A6 and B1–B4 are on `main`, in that order (B1's doc commit before B3's scores), and
+  `pixi run test` is green in the core env.
+- Every module is under 400 lines and every new function has tests.
+- `docs/results_timit_q20.md` holds HF v1 (labelled exploratory), HF v2, text-disjoint, and
+  the clip/slice sensitivity, with both thesis targets.
+- The Reviewer writes `handoff_request.md` for cycle 5 with the questions below.
+
+**Open questions for the cycle 5 review:**
+- 24: Is the step 2 tie-break (hash order) acceptable where two group choices both match the
+  thesis counts exactly (for example shellfish: test the 7-group, or the 5 + 2 variant
+  groups)?
+- 25: If the text-disjoint numbers still sit above the thesis, what is the next suspect: the
+  speaker overlap, the GMM training set, the 16 kHz features, or the Inst. aggregation?
+- 26: Should the HF split be kept as a reported baseline in later stages (PLP, MFCC-TMP,
+  VTLN), or should only `textdisjoint_q20_v1` carry forward?
+
+**Not adopted:** option (b) (keep the HF split, drop the overlapping queries). Codex chose (a),
+and (b) would not control for speakers either.
 
 ---
 
 ## 10. Next cycles (preview)
 
-1. **Gap analysis** of the first numbers, then PLP and MFCC-TMP on the same pipeline (§3
-   targets).
+1. **Gap analysis** of the text-disjoint numbers, then PLP and MFCC-TMP on the same pipeline
+   (§3 targets).
 2. **Stage 4:** iterative GMM-VTLN (5 iterations, 13 warps). Use the `extract_warped_bank`
    caching that Codex deferred to here.
-3. LC1 and LC3, Q-84, and the optional SAD ablation (Codex Q12).
-4. Mixture of GMMs, then DTW and fastDTW, then indexing (STM, BoAW).
+3. LC1 and LC3 (§3 has their TIMIT targets), Q-84, and the optional SAD ablation (Codex Q12).
+4. Mixture of GMMs (§3 targets), then DTW and fastDTW, then indexing (STM, BoAW).
 5. SWS 2013 and QUESST 2014: path selection with 7 paths, z-norm, MTWV and Cnxe.
