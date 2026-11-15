@@ -11,6 +11,7 @@ default, as the thesis excluded them from GMM training (3696 utterances).
 
 import hashlib
 import json
+import logging
 from dataclasses import asdict
 from pathlib import Path
 
@@ -22,9 +23,12 @@ from qbestd.data.timit_hf import (
     iter_timit_rows,
     normalize_transcript,
 )
+from qbestd.features.cepstral import LOG_FLOOR
 from qbestd.features.extract import extract_features
+from qbestd.features.mfcc_tmp import subband_teager_energies
 from qbestd.features.profiles import get_profile
 
+LOGGER = logging.getLogger(__name__)
 SA_SENTENCES = ("She had your dark suit in greasy wash water all year",
                 "Don't ask me to carry an oily rag like that")
 SA_TOKENS = tuple(tuple(normalize_transcript(text)) for text in SA_SENTENCES)
@@ -125,19 +129,23 @@ def build_feature_cache(split, kind, profile, out_dir, exclude_sa=True,
     """Extract features for every row of ``split`` and save one ``.npz``.
 
     Rows are optionally skipped when they are SA sentences; a row too short
-    to give a frame is skipped and counted. ``parquet_paths`` overrides the
-    download (used by the tests).
+    to give a frame is skipped and counted. For ``mfcc_tmp`` the number of
+    subband Teager sums at or below the log floor is counted into the
+    metadata (``teo_floor_hits``, ``teo_values``). ``parquet_paths``
+    overrides the download (used by the tests).
 
     Returns:
         ``(path, meta)`` of the written file.
 
     Raises:
-        ValueError: if the features do not have 39 dimensions.
+        ValueError: if the features do not have 39 dimensions or are not
+            all finite.
     """
     config = get_profile(profile, kind)
     paths = parquet_paths or download_timit_parquet(split)
     blocks, lengths, row_indices = [], [], []
     skipped_sa = skipped_short = 0
+    floor_hits = teo_values = 0
     for row in iter_timit_rows(paths, split):
         if exclude_sa and is_sa_sentence(normalize_transcript(row.sentence)):
             skipped_sa += 1
@@ -147,6 +155,14 @@ def build_feature_cache(split, kind, profile, out_dir, exclude_sa=True,
         if features.shape[1] != FEATURE_DIM:
             raise ValueError(f"expected {FEATURE_DIM} dims, got "
                              f"{features.shape[1]}")
+        if not np.isfinite(features).all():
+            raise ValueError(f"non-finite {kind} feature in row "
+                             f"{row.row_index} of {split}")
+        if kind == "mfcc_tmp":
+            energies = subband_teager_energies(row.audio, row.sample_rate,
+                                               config)
+            floor_hits += int((energies <= LOG_FLOOR).sum())
+            teo_values += energies.size
         if len(features) == 0:
             skipped_short += 1
             continue
@@ -161,6 +177,11 @@ def build_feature_cache(split, kind, profile, out_dir, exclude_sa=True,
             "excluded_sa_rows": skipped_sa,
             "skipped_short_rows": skipped_short,
             "n_rows": len(lengths), "n_frames": int(offsets[-1])}
+    if kind == "mfcc_tmp":
+        meta["teo_floor_hits"] = floor_hits
+        meta["teo_values"] = teo_values
+        LOGGER.info("%s %s: %d of %d subband Teager sums were at or below "
+                    "the log floor", split, kind, floor_hits, teo_values)
     path = cache_path(out_dir, split, kind, profile)
     path.parent.mkdir(parents=True, exist_ok=True)
     stacked = (np.concatenate(blocks) if blocks

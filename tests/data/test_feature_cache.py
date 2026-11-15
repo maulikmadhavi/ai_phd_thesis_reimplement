@@ -291,3 +291,36 @@ def test_fingerprint_changes_with_the_row_selection_version(monkeypatch):
     monkeypatch.setattr("qbestd.data.feature_cache.ROW_SELECTION_VERSION",
                         ROW_SELECTION_VERSION + 1)
     assert feature_fingerprint("mfcc", "timit_matlab", True) != base
+
+
+def test_mfcc_tmp_cache_counts_teo_floor_hits(tmp_path):
+    silent = {"array": [0.0] * 8000, "sampling_rate": RATE}
+    rng = np.random.default_rng(1)
+    noisy = {"array": (0.1 * rng.normal(size=8000)).tolist(),
+             "sampling_rate": RATE}
+    source = tmp_path / "t.parquet"
+    pq.write_table(pa.table({"audio": [silent, noisy],
+                             "sentence": ["quiet one", "noisy one"]}),
+                   source)
+    _, meta = build_feature_cache("train", "mfcc_tmp", "timit_matlab",
+                                  tmp_path / "out", parquet_paths=[source])
+    frames = 1 + (8000 - 400) // 160
+    assert meta["teo_values"] == 2 * frames * 26
+    # the silent row alone contributes frames x 26 values at the floor
+    assert frames * 26 <= meta["teo_floor_hits"] < 2 * frames * 26
+
+
+def test_other_kinds_carry_no_teo_counts(tmp_path, parquet):
+    _, meta = build_feature_cache("train", "mfcc", "timit_matlab", tmp_path,
+                                  parquet_paths=[parquet])
+    assert "teo_floor_hits" not in meta
+
+
+def test_a_non_finite_feature_stops_the_build(tmp_path, parquet,
+                                              monkeypatch):
+    def broken(samples, rate, kind, config=None):
+        return np.full((10, 39), np.nan)
+    monkeypatch.setattr("qbestd.data.feature_cache.extract_features", broken)
+    with pytest.raises(ValueError, match="non-finite"):
+        build_feature_cache("train", "mfcc", "timit_matlab", tmp_path,
+                            parquet_paths=[parquet])
