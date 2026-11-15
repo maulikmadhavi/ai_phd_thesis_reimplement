@@ -143,6 +143,54 @@ utterance in MFCC, and through the LPC gain in PLP).
   GMM-64 row of the same feature (same queries); PLP minus MFCC under the
   flip. No cause is claimed beyond what the paired intervals show.
 
+### Result of the level-handling check
+
+Run as declared: GMM-64, split v2, LC2, clip query features, A1 scorer, the
+same 145 queries and 1344 documents, the keyword-cluster bootstrap (10000
+resamples, seed 0). The primary rows above are unchanged. Nothing was tuned
+and no setting was chosen from this result.
+
+| Row | p@N, instance avg (95% CI) | MAP, instance avg (95% CI) | p@N, keyword avg (95% CI) | MAP, keyword avg (95% CI) | Queries | Non-matches |
+|---|---|---|---|---|---|---|
+| MFCC primary (`timit_matlab`) | 40.02 (30.8-49.7) | 42.23 (31.5-53.6) | 36.92 (28.1-45.9) | 39.09 (29.3-49.2) | 145 | 0 |
+| MFCC flipped (peak normalisation off) | 41.54 (32.3-51.4) | 42.32 (31.8-53.7) | 38.60 (29.7-47.6) | 38.79 (29.3-48.6) | 145 | 0 |
+| PLP primary (`timit_matlab`) | 33.22 (22.8-45.0) | 33.55 (22.6-46.1) | 29.41 (21.2-38.5) | 30.03 (21.4-39.7) | 145 | 0 |
+| PLP flipped (peak normalisation on) | 31.77 (21.6-43.7) | 32.30 (21.3-45.5) | 28.93 (20.8-38.0) | 28.95 (20.4-38.8) | 145 | 0 |
+
+Paired differences (same queries; second minus first; 95 % keyword-cluster
+bootstrap; the last column says whether the interval excludes 0 for p@N /
+MAP). They are descriptive: no thesis direction is attached.
+
+| Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) |
+|---|---|---|---|---|
+| MFCC: flipped - primary | instance | +1.51 (-0.9 to +3.6) | +0.09 (-2.6 to +2.8) | no / no |
+| MFCC: flipped - primary | keyword | +1.68 (-0.8 to +4.0) | -0.30 (-3.0 to +2.5) | no / no |
+| PLP: flipped - primary | instance | -1.45 (-3.0 to +0.3) | -1.26 (-2.8 to +0.4) | no / no |
+| PLP: flipped - primary | keyword | -0.48 (-2.2 to +1.3) | -1.08 (-2.6 to +0.4) | no / no |
+| PLP - MFCC, both flipped | instance | -9.77 (-14.8 to -4.9) | -10.02 (-14.8 to -5.4) | yes / yes |
+| PLP - MFCC, both flipped | keyword | -9.67 (-14.9 to -4.9) | -9.84 (-14.7 to -5.3) | yes / yes |
+| PLP - MFCC, both primary (for reference) | instance | -6.80 (-11.9 to -2.0) | -8.67 (-14.0 to -3.8) | yes / yes |
+| PLP - MFCC, both primary (for reference) | keyword | -7.51 (-12.6 to -2.8) | -9.05 (-14.4 to -4.1) | yes / yes |
+
+What the intervals show, and no more: flipping the level handling gives
+paired differences whose intervals all include 0, for both features and both
+averages, so this check shows no change in either feature. PLP minus MFCC
+stays negative with both features flipped (instance p@N -9.77, -14.8 to -4.9),
+with intervals that exclude 0. The check does not say why the two features
+sit on different sides of their thesis values, and it gives no reason to
+change level handling for MFCC-TMP. The profile changes level handling only;
+band, filter count and pre-emphasis still differ (`docs/feature_parity.md`).
+
+Provenance:
+
+| Model | Parameter SHA-256 | Feature fingerprint | Non-matches | Commit the run started from |
+|---|---|---|---|---|
+| MFCC flipped GMM-64 | `16d28a65ecbb4488...` | `662051e26345...` | 0 | `6f72775` |
+| PLP flipped GMM-64 | `b93620c6635e2fab...` | `627b4edd180b...` | 0 | `6f72775` |
+
+The primary models are `docs/gmm_notes.md`; the EM curves of these two models
+are in `outputs/models/textdisjoint_q20_v2/` (git-ignored).
+
 ## MFCC-TMP: TEO floor hits
 
 Subband Teager sums at or below the log floor (1e-10) are floored before the
