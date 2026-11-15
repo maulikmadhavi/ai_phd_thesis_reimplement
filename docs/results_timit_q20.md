@@ -102,7 +102,8 @@ exactly one relevant document, so p@N is 0 or 100 for each of their queries.
 
 **Labels: closer to the thesis on sentence context; not an official TIMIT
 reconstruction; speaker overlap present (amount unknown, likely larger than on
-the HF split).** Rule, manifest hash and per-keyword thesis counts:
+the HF split); 8 SX sentence variants crossed sides; government affected; not
+fully sentence-disjoint.** Rule, manifest hash and per-keyword thesis counts:
 `docs/split_textdisjoint.md` (declared before any score was computed). Same
 features, GMM recipe, LC2 scorer and clip query features as HF v2; only the
 rows of the two sides differ. Nothing was tuned.
@@ -209,7 +210,13 @@ bears on the comparison, none of it tested by changing a setting:
   the 989 test rows also occur in train (Reviewer count, cycle 4). In the
   official TIMIT split no non-SA text crosses between train and test. A query
   cut from a train utterance can therefore have a document with the *same
-  sentence* in the search set. The text-disjoint split removes this, and its scores are **not** lower (text-disjoint section above): GMM-64 p@N 38.45 against 36.95 on the HF split, MAP 40.61 against 41.25, differences far inside the intervals. So sentence overlap does not explain the distance to the thesis figures in this data. Speaker overlap on that split is probably larger, so the two effects are not separated here.
+  sentence* in the search set. The text-disjoint v1 split removes most of
+  this (8 SX sentence variants still crossed sides). Its scores are given
+  above for description only: GMM-64 p@N 38.45 against 36.95 on the HF
+  split, MAP 40.61 against 41.25. The two runs differ in queries, documents,
+  relevance and GMM training rows, so the comparison is unpaired and no test
+  is made. It does not show that removing sentence overlap raised, lowered
+  or failed to explain the scores. Speaker overlap on v1 is probably larger.
 - **Speaker overlap.** The HF split is per utterance, not per speaker
   (`docs/data_notes.md`). The amount of overlap is unknown.
 - **Different setups.** On the HF split the keyword counts, query set and
@@ -220,8 +227,13 @@ bears on the comparison, none of it tested by changing a setting:
 - **Coarse metric.** With 1 to 8 relevant documents per keyword (HF split; 7 to 16 on the text-disjoint split), one document
   moving in the ranking changes a keyword's p@N by 12 to 100 points. The
   keyword-cluster intervals are about 24 points wide and contain the thesis
-  figures, and the paired 128 minus 64 intervals contain 0: this data cannot
-  separate our numbers from the thesis ones, nor the two model sizes.
+  figures, so this data cannot separate our numbers from the thesis ones.
+  For GMM-128 minus GMM-64 on v1 (fixed experiment, section above), the
+  instance-averaged MAP difference is +2.95, 95 % keyword-cluster interval
+  0.2 to 5.7: positive, in the thesis's direction (thesis +1.63 MAP). The
+  p@N interval (-1.5 to 5.5) and the keyword-averaged MAP interval (-0.3
+  to 4.4) include 0. On the HF split the paired intervals all include 0.
+  This is not a claim of numerical parity.
 - **Unverified choices** between the thesis and this run (list below). The
   10-iteration GMM is an experimental choice.
 
