@@ -130,3 +130,30 @@ def test_float32_input_is_accepted():
     codebook, _, _ = lbg_codebook(blobs().astype(np.float32), 4)
     assert codebook.dtype == np.float64
     assert codebook.shape == (4, 2)
+
+
+def test_distortion_increase_does_not_stop_refinement(monkeypatch):
+    values = iter([10.0, 12.0, 6.0, 5.9999, 5.9999])
+
+    def scripted(features, codebook, chunk_frames=0):
+        return np.zeros(len(features), dtype=np.int64), np.full(
+            len(features), next(values))
+
+    monkeypatch.setattr("qbestd.ml.vq.assign_with_distortion", scripted)
+    data = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 2.0], [3.0, 3.0]])
+    _, _, history = kmeans_refine(data, data[:2], 0.2, 20, 1e-3, 100)
+    # Rise 10 -> 12 is skipped; stops at the flat 6 -> 5.9999; plus final.
+    assert history == [10.0, 12.0, 6.0, 5.9999, 5.9999]
+
+
+def test_small_decrease_still_stops_refinement(monkeypatch):
+    values = iter([10.0, 9.9999, 9.9999])
+
+    def scripted(features, codebook, chunk_frames=0):
+        return np.zeros(len(features), dtype=np.int64), np.full(
+            len(features), next(values))
+
+    monkeypatch.setattr("qbestd.ml.vq.assign_with_distortion", scripted)
+    data = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 2.0], [3.0, 3.0]])
+    _, _, history = kmeans_refine(data, data[:2], 0.2, 20, 1e-3, 100)
+    assert len(history) == 3

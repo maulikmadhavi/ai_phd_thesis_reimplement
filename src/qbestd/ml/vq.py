@@ -7,8 +7,8 @@ assumption"), so a centroid becomes the pair ``mu - eps * sigma`` and
 ``mu + eps * sigma``. The codebook doubles until ``n_clusters`` is reached.
 
 Assumptions (the thesis is silent; marked unverified): k-means refinement
-inside each level stops at a relative distortion change below ``tol`` or
-after ``max_kmeans_iter`` iterations, and an empty cluster is re-seeded by
+inside each level stops at a relative distortion decrease in ``[0, tol)``
+or after ``max_kmeans_iter`` iterations, and an empty cluster is re-seeded by
 splitting the cluster with the highest distortion. All statistics are
 accumulated in chunks so memory stays bounded.
 """
@@ -115,12 +115,24 @@ def _reseed_empty(codebook, counts, means, stds, distortions, epsilon):
     return codebook
 
 
+def _converged(previous, current, tol):
+    """True when the relative decrease is in ``[0, tol)``.
+
+    A distortion *increase* (for example after an empty-cluster re-seed) is
+    not convergence: refinement carries on until it recovers or runs out of
+    iterations.
+    """
+    decrease = previous - current
+    return 0.0 <= decrease < tol * max(previous, 1e-300)
+
+
 def kmeans_refine(features, codebook, epsilon, max_iter, tol, chunk_frames):
     """Lloyd iterations; returns (codebook, assignments, distortion list).
 
     Each list entry is the mean squared distance per frame before that
-    iteration's update; refinement stops when it changes by less than
-    ``tol`` (relative) or after ``max_iter`` iterations.
+    iteration's update; refinement stops when it *decreases* by less than
+    ``tol`` (relative, unverified default) or after ``max_iter`` iterations.
+    An increase does not stop it.
     """
     codebook = np.array(codebook, dtype="float64")
     n_clusters = len(codebook)
@@ -134,8 +146,7 @@ def kmeans_refine(features, codebook, epsilon, max_iter, tol, chunk_frames):
         codebook = np.where(counts[:, None] > 0, means, codebook)
         codebook = _reseed_empty(codebook, counts, means, stds, distortions,
                                  epsilon)
-        if len(history) > 1 and (history[-2] - history[-1]
-                                 <= tol * max(history[-2], 1e-300)):
+        if len(history) > 1 and _converged(history[-2], history[-1], tol):
             break
     assignments, distances = assign_with_distortion(features, codebook,
                                                     chunk_frames)
