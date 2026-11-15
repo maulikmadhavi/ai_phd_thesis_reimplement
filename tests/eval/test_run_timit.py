@@ -26,6 +26,7 @@ def test_defaults_and_required_model():
     assert args.gmm == Path("m.npz")
     assert args.out is None and args.limit_queries is None
     assert args.split_manifest is None
+    assert args.query_features == "clip"
 
 
 def test_model_is_required():

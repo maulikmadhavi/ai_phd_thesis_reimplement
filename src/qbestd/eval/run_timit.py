@@ -60,8 +60,8 @@ from qbestd.eval.selection_data import (
     selection_examples,
     selection_relevance,
 )
-from qbestd.eval.timit_queries import Q20_KEYWORDS, cut_clip
-from qbestd.features.extract import extract_features
+from qbestd.eval.query_features import MODES, query_features_for
+from qbestd.eval.timit_queries import Q20_KEYWORDS
 from qbestd.features.profiles import get_profile
 from qbestd.ml.gmm import gmm_content_sha256, load_gmm
 from qbestd.ml.posteriorgram import (
@@ -90,6 +90,10 @@ def parse_args(argv=None):
                         default=Path("outputs/features"))
     parser.add_argument("--alignment-dir", type=Path,
                         default=Path("outputs/alignment"))
+    parser.add_argument("--query-features", default="clip", choices=MODES,
+                        help="clip (primary): features of the cut clip; "
+                        "slice (sensitivity): frames of the whole "
+                        "utterance inside the interval")
     parser.add_argument("--split-manifest", type=Path, default=None,
                         help="text-disjoint manifest (default: HF split)")
     parser.add_argument("--limit-queries", type=int, default=None,
@@ -188,13 +192,10 @@ def query_features(args, examples):
                                    hf_split):
             if (hf_split, row.row_index) in wanted:
                 audio[(hf_split, row.row_index)] = row
-    out = []
-    for example in examples:
-        row = audio[(example.hf_split, example.row_index)]
-        clip = cut_clip(row.audio, row.sample_rate, example)
-        out.append(extract_features(clip, row.sample_rate, args.kind,
-                                    config=config))
-    return out
+    full_cache = {}
+    return [query_features_for(
+        args.query_features, audio[(e.hf_split, e.row_index)], e, args.kind,
+        config, full_cache) for e in examples]
 
 
 def load_inputs(args, selection):
@@ -258,6 +259,7 @@ def main(argv=None):
         "model_content_sha256": gmm_content_sha256(gmm),
         "model_info": info, "split_id": split_id,
         "feature_fingerprint": fingerprint,
+        "query_features": args.query_features,
         "split_manifest": (str(args.split_manifest)
                            if args.split_manifest else None),
         "n_documents": len(doc_rows), "n_queries": len(per_query),

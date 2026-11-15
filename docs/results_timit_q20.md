@@ -177,6 +177,27 @@ pairs).
 | HF split v2, GMM-128 | 39.36 (28.7-50.6) | 44.21 (32.8-56.3) | 39.14 (29.6-49.0) | 44.10 (33.7-54.8) | 221 |
 | text-disjoint v1, GMM-128 | 40.60 (30.3-51.1) | 43.57 (32.3-55.5) | 37.26 (28.1-46.7) | 40.37 (30.5-50.4) | 145 |
 
+## Sensitivity: query features, clip vs slice (GMM-64, text-disjoint)
+
+*Sensitivity, not a thesis-mandated correction.* Same GMM-64, alignments,
+relevance and documents on `textdisjoint_q20_v1`; only the query features
+differ. `clip` (primary) extracts features from the cut clip. `slice`
+extracts them on the whole utterance and keeps the frames whose centre lies in
+the padded query interval. `slice` changes the delta and delta-delta values at
+the edges **and** the per-utterance waveform normalisation (DC removal), which
+shifts c0.
+
+| Mode | p@N, instance avg (95% CI) | MAP, instance avg (95% CI) | p@N, keyword avg (95% CI) | MAP, keyword avg (95% CI) | Queries | Queries without frames |
+|---|---|---|---|---|---|---|
+| clip (primary) | 38.45 (28.2-50.0) | 40.61 (29.5-52.9) | 36.98 (27.5-47.0) | 38.44 (28.7-48.7) | 145 | 0 |
+| slice | 37.12 (27.2-47.6) | 40.06 (29.0-52.0) | 35.10 (26.3-43.9) | 37.78 (28.2-47.6) | 145 | 0 |
+
+Paired difference slice minus clip (same queries, paired keyword-cluster bootstrap, 95 %):
+
+| Average | p@N | MAP |
+|---|---|---|
+| instance average | -1.34 (-4.2-1.3) | -0.55 (-2.4-1.3) |
+| keyword average | -1.88 (-5.2-1.0) | -0.65 (-2.7-1.3) |
 
 ## How to read the gap
 
