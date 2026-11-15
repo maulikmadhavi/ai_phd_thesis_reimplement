@@ -9,6 +9,7 @@ numpy = "*"
 scipy = "*"
 pysoundfile = "*"
 pyarrow = "*"
+huggingface_hub = "*"
 pytest = "*"
 
 [activation.env]
@@ -34,7 +35,6 @@ cuda = "12"
 [feature.align.dependencies]
 pytorch-gpu = "*"
 transformers = "*"
-huggingface_hub = "*"
 safetensors = "*"
 
 [feature.align.tasks]

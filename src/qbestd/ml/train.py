@@ -1,6 +1,7 @@
 """Train a baseline GMM on cached TIMIT features and log how it went.
 
-Usage (core environment)::
+Usage (core environment, which includes ``huggingface_hub`` for the
+dataset download)::
 
     pixi run train-gmm --kind mfcc --profile timit_matlab --components 64
 

@@ -36,8 +36,8 @@ def test_options():
     args = parse_args(["--kind", "plp", "--profile", "timit_matlab",
                        "--components", "128", "--out", "m",
                        "--rebuild-cache"])
-    assert (args.kind, args.profile, args.components) == ("plp", "timit_matlab",
-                                                          128)
+    assert (args.kind, args.profile) == ("plp", "timit_matlab")
+    assert args.components == 128
     assert args.rebuild_cache is True
 
 
