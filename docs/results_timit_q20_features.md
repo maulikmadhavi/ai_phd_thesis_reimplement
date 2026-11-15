@@ -117,6 +117,32 @@ read on its own.
   (MFCC-TMP and MFCC GMM-128) rank a document last and are counted, not
   dropped.
 
+## Level-handling check (declared)
+
+**Declared before any run of it** (cycle 7, L1; Handoff_feedback Q4 items 1
+and 2, Reviewer Q5). The two features differ in several settings at once
+(`docs/feature_parity.md`). The one difference the thesis cannot settle is
+level handling: our MFCC removes DC and peak-normalises the waveform, our PLP
+does neither (as `Fx_PLPCC_htk.m` does not). This check flips only that, in
+both directions. A gain change moves only the static c0 (a constant per
+utterance in MFCC, and through the LPC gain in PLP).
+
+- **Setting:** the ablation profile `timit_matlab_levelflip`.
+  - MFCC: `timit_matlab` with `normalize_peak=False`.
+  - PLP: `timit_matlab` with `normalize_peak=True`.
+  - Nothing else changes: band, filters, pre-emphasis, LPC order, DC
+    removal, lifter, deltas, the GMM recipe, the seed and the split.
+  - It raises for MFCC-TMP.
+- **Scope:** GMM-64 only, split v2 (`textdisjoint_q20_v2`), LC2, clip query
+  features, the A1 scorer and the keyword-cluster bootstrap (10000
+  resamples, seed 0). 2 caches, 2 models, 2 evaluations.
+- **Rule:** both results are reported, whatever they show. The primary
+  `timit_matlab` rows above stay unchanged. No tuning follows from this
+  check, and no setting is chosen because of it. Reported: p@N and MAP for
+  both averages with intervals; paired differences against the primary
+  GMM-64 row of the same feature (same queries); PLP minus MFCC under the
+  flip. No cause is claimed beyond what the paired intervals show.
+
 ## MFCC-TMP: TEO floor hits
 
 Subband Teager sums at or below the log floor (1e-10) are floored before the
