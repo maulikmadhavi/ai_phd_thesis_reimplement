@@ -20,20 +20,38 @@ does not say which it reports (open question 20).
 |---|---|---|---|---|---|---|
 | MFCC, GMM-64, thesis | 34.91 | 36.71 | not stated | not stated | 145 | n/a |
 | MFCC, GMM-64, ours v2 | 40.02 (30.8-49.7) | 42.23 (31.5-53.6) | 36.92 (28.1-45.9) | 39.09 (29.3-49.2) | 145 | 0 |
-| PLP, GMM-64, thesis | 35.5 | 37.58 | not stated | not stated | 145 | n/a |
+| PLP, GMM-64, thesis | 35.50 | 37.58 | not stated | not stated | 145 | n/a |
 | PLP, GMM-64, ours v2 | 33.22 (22.8-45.0) | 33.55 (22.6-46.1) | 29.41 (21.2-38.5) | 30.03 (21.4-39.7) | 145 | 0 |
-| MFCC-TMP, GMM-64, thesis | 40.03 | 41.5 | not stated | not stated | 145 | n/a |
+| MFCC-TMP, GMM-64, thesis | 40.03 | 41.50 | not stated | not stated | 145 | n/a |
 | MFCC-TMP, GMM-64, ours v2 | 39.17 (29.6-48.9) | 41.15 (30.7-52.1) | 35.44 (26.4-44.5) | 37.65 (28.3-47.3) | 145 | 1 |
 | MFCC, GMM-128, thesis | 36.81 | 38.34 | not stated | not stated | 145 | n/a |
 | MFCC, GMM-128, ours v2 | 42.94 (32.8-54.1) | 44.96 (34.2-56.7) | 40.19 (31.3-49.5) | 42.38 (32.9-52.3) | 145 | 1 |
-| PLP, GMM-128, thesis | 37.3 | 40.18 | not stated | not stated | 145 | n/a |
+| PLP, GMM-128, thesis | 37.30 | 40.18 | not stated | not stated | 145 | n/a |
 | PLP, GMM-128, ours v2 | 31.91 (23.6-41.0) | 32.26 (21.9-43.9) | 30.11 (22.9-37.9) | 30.46 (21.7-40.0) | 145 | 0 |
 | MFCC-TMP, GMM-128, thesis | not in thesis | not in thesis | not stated | not stated | - | n/a |
 | MFCC-TMP, GMM-128, ours v2 | 41.94 (33.0-51.1) | 43.88 (33.9-54.3) | 38.04 (29.5-46.5) | 40.20 (30.8-49.5) | 145 | 1 |
 
 The thesis does **not** give a GMM-128 value for MFCC-TMP; there is no
-target for that row. Thesis figures are the `Tab:ExpResultTIMIT` GMM rows
-(`Unsupervised.tex`); the thesis does not state intervals.
+target for that row. The thesis does not state intervals.
+
+**Sources of the thesis values.** MFCC and PLP come from
+`Tab:ExpResultTIMIT` (GMM rows, `Unsupervised.tex`). MFCC-TMP 40.03 / 41.50
+comes from `Tab:TIMITVTLNPerformance1` (`Representation.tex` line 270, the
+MFCC-TMP "no VTLN" row), a different table.
+
+### Gap to the thesis (descriptive, no cause attached)
+
+Ours v2 minus thesis, instance average, p@N / MAP:
+
+| Feature | GMM-64 | GMM-128 |
+|---|---|---|
+| MFCC | +5.11 / +5.52 | +6.13 / +6.62 |
+| PLP | -2.28 / -4.03 | -5.39 / -7.92 |
+| MFCC-TMP | -0.86 / -0.35 | no thesis value |
+
+The gaps differ in sign and size across features. This table states them and
+nothing more: it gives no reason for them, and no feature is called near or
+far from its thesis value.
 
 ## Paired differences
 
@@ -44,6 +62,16 @@ excludes 0 on the thesis side; it is never a claim of numerical parity.
 Thesis differences are computed from the thesis table values.
 
 ### Feature minus MFCC
+
+PLP and MFCC differ here in band, filter count, pre-emphasis and level
+handling, so "against the thesis's direction" describes this profile, not PLP
+as such (`docs/feature_parity.md`).
+
+The paired tables below hold 28 unadjusted 95 % intervals (16 for feature
+minus MFCC, 12 for GMM-128 minus GMM-64). With that many, an interval that
+barely excludes 0 is not strong evidence. The single marginal one,
+MFCC-TMP minus MFCC at GMM-64, keyword p@N (-2.8 to -0.1), should not be
+read on its own.
 
 | Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Thesis diff p@N / MAP | p@N verdict | MAP verdict |
 |---|---|---|---|---|---|---|
