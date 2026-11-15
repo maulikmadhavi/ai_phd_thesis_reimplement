@@ -167,6 +167,55 @@ Train: `don't` 531, `it's` 42, `didn't` 25, `we'll` 13, `you'll` 10, `i'd` 10, `
 
 Test: `don't` 137, `it's` 12, `we'll` 8, `didn't` 7, `you're` 4, `i'd` 4, `nevada's` 4, `singer's` 4, `barb's` 3, `jim's` 3, `he'd` 3, `herb's` 3, `he's` 3, `lori's` 3, `one's` 3, `you'll` 3, `they'll` 3, `bride's` 3, `nancy's` 2, `nora's` 2, `otto's` 2, `baboon's` 2, `brother's` 2, `we've` 2, `they're` 2, `irving's` 2, `ma'am` 2, `anyone's` 2, `cliff's` 2, `experiment's` 2, `daphne's` 2, `ship's` 2, `phil's` 2, `c'mon` 1, `it'd` 1, `i'll` 1, `alice's` 1, `drug's` 1, `you've` 1, `ron's` 1, `couldn't` 1, `farmer's` 1, `what's` 1, `wasn't` 1, `weren't` 1, `somebody'll` 1, `man's` 1, `serpent's` 1, `nan's` 1, `lamb's` 1, `that's` 1, `tenant's` 1, `year's` 1, `jeff's` 1, `won't` 1, `ocean's` 1, `company's` 1, `y'all` 1, `john's` 1, `general's` 1, `father's` 1, `roger's` 1, `you'd` 1, `would've` 1.
 
+## Caveats (C9)
+
+- **The 10.7 ms is the model card's figure, not ours.** It was measured on the
+  card's own TIMIT test setup (official TIMIT `.WRD` references, official
+  test speakers). It is **not** a measured error for these manifests, whose
+  reference words we do not have. Do not quote it as the accuracy of these
+  boundaries; the only independent evidence we have is the sanity checks and
+  the ASR audit below.
+- **Speaker overlap is unverified.** The Hugging Face rows carry no speaker
+  or sentence IDs and the split is a redrawn 80/20 (see `docs/data_notes.md`),
+  so we cannot tell whether speakers (or the sentences read by them) appear in
+  both the train and the test set. Overlap would make both the alignment
+  quality and later QbE scores look better than a speaker-disjoint setup
+  would. The aligner itself was also trained on human boundaries from the
+  official TIMIT *training* speakers, and some of those speakers may sit in
+  our test split; this is unverified too.
+
+## Environment record
+
+| Item | Value |
+|---|---|
+| Lock file | `pixi.lock` as of commit `7fd4848` (sha256 starts `172009f6950b1261`) |
+| Key versions | torch 2.13.0 (CUDA 12.8 build, `sm_120` in its arch list), transformers 5.23.0, huggingface_hub 1.32.0, safetensors 0.8.0, numpy 2.4.6, pyarrow 26.0.0 |
+| Model precision | bf16 on the GPU (CPU fallback float32); batch size 16; no sampling, one forward pass |
+| Per-split quantiles | in the counts table above; train / test p5 0.072 / 0.072 s, p50 0.285 / 0.283 s, p95 0.651 / 0.650 s |
+
+## ASR audit (optional diagnostic, not a gate)
+
+`pixi run -e align python -m qbestd.alignment.asr_audit` cuts 300 random
+words (seed 0, both splits, at least 3 letters, shifted cuts kept inside the
+audio) with 20 ms padding at the aligned position and at +-0.25 s, and asks
+`openai/whisper-base` (revision `e37978b90ca9030d5170a5c07aadb050351a65bb`, Apache-2.0) what it hears. A hit
+is an exact match or a difflib ratio of at least 0.75.
+
+| Cut | Hit rate |
+|---|---|
+| true alignment | 0.713 |
+| shifted by -0.25 s | 0.127 |
+| shifted by +0.25 s | 0.063 |
+
+True cuts are recognised about five to ten times as often as shifted ones, so
+the boundaries land on the words. The absolute true-cut rate is capped by
+Whisper-base on 0.2 to 0.5 s clips and on function words, not necessarily by
+alignment errors, and the shifted cuts can still catch a neighbouring word
+(the hit rate is not zero). The Reviewer's earlier ad hoc check (0.65 true,
+0.16 and 0.06 shifted; different words and rule) agrees. Output:
+`outputs/alignment/asr_audit.json` (git-ignored). It does not replace
+listening to the spot-check WAVs.
+
 ## Other observations
 
 - Neighbouring words overlap: 12732 of 38197 adjacent pairs in train (3254 of
