@@ -1,4 +1,6 @@
 import ast
+import hashlib
+import inspect
 import shutil
 from pathlib import Path
 
@@ -10,6 +12,7 @@ import pytest
 from qbestd.data.feature_cache import (
     FEATURE_CACHE_VERSION,
     FEATURE_SOURCE_FILES,
+    ROW_LOOP_SOURCE_SHA256,
     ROW_SELECTION_VERSION,
     ROW_SOURCE_FILES,
     SA_SENTENCES,
@@ -324,3 +327,18 @@ def test_a_non_finite_feature_stops_the_build(tmp_path, parquet,
     with pytest.raises(ValueError, match="non-finite"):
         build_feature_cache("train", "mfcc", "timit_matlab", tmp_path,
                             parquet_paths=[parquet])
+
+
+def test_row_loop_digest_is_pinned():
+    source = inspect.getsource(build_feature_cache)
+    source = source.replace(chr(13) + chr(10), chr(10))
+    digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    assert digest == ROW_LOOP_SOURCE_SHA256, (
+        "the row loop changed: bump `ROW_SELECTION_VERSION` if rows, order, "
+        "offsets or skips changed, then update the pinned digest")
+
+
+def test_row_loop_digest_is_not_in_the_fingerprint(tmp_path, parquet):
+    _, meta = build_feature_cache("train", "mfcc", "timit_matlab", tmp_path,
+                                  parquet_paths=[parquet])
+    assert ROW_LOOP_SOURCE_SHA256 not in str(meta)

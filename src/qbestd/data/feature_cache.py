@@ -67,6 +67,11 @@ ROW_SOURCE_FILES = ("data/timit_hf.py",)
 # Version of the row-selection loop inside ``build_feature_cache`` (SA skip,
 # row order, offsets, short-row skip). Bump it whenever that logic changes.
 ROW_SELECTION_VERSION = 1
+# sha256 of ``inspect.getsource(build_feature_cache)`` (LF endings). A
+# test compares it, so a change to the row loop cannot pass unnoticed.
+# Not part of the fingerprint: it only guards the version above.
+ROW_LOOP_SOURCE_SHA256 = (
+    "9e2a4e6d5ba488cbe719d5c9f43ac04a37188b513e456846095b922849c67140")
 
 
 class CacheMismatchError(ValueError):
