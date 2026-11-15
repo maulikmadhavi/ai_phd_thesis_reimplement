@@ -16,6 +16,7 @@ PYTHONPATH = "src"
 
 [tasks]
 test = "pytest -q"
+train-gmm = "python -m qbestd.ml.train"
 
 [feature.demo.dependencies]
 gradio = "*"

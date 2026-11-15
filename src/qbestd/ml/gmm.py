@@ -11,6 +11,7 @@ floor of ``var_floor_ratio`` (0.01) times the global per-dimension variance
 so training memory stays bounded.
 """
 
+import hashlib
 import json
 from dataclasses import dataclass
 
@@ -164,20 +165,28 @@ def em_step(gmm, features, var_floor, chunk_frames=DEFAULT_CHUNK_FRAMES):
             total_ll / len(features))
 
 
-def train_gmm(features, n_components, n_iter=10, epsilon=0.2,
-              var_floor_ratio=0.01, seed=0,
-              chunk_frames=DEFAULT_CHUNK_FRAMES):
+@dataclass(frozen=True, eq=False)
+class TrainResult:
+    """Everything :func:`train_gmm_detailed` produces."""
+
+    gmm: DiagonalGmm
+    log_likelihood_history: list
+    lbg_distortion_history: list
+    var_floor: np.ndarray
+
+
+def train_gmm_detailed(features, n_components, n_iter=10, epsilon=0.2,
+                       var_floor_ratio=0.01, seed=0,
+                       chunk_frames=DEFAULT_CHUNK_FRAMES):
     """LBG initialisation followed by ``n_iter`` EM iterations.
 
-    Returns:
-        ``(gmm, log_likelihood_history)`` where the history has ``n_iter + 1``
-        entries: the mean frame log-likelihood of the initial model, then of
-        the model after each EM iteration (so it can be plotted as the
-        convergence curve). It is non-decreasing up to flooring effects.
+    The log-likelihood history has ``n_iter + 1`` entries: the mean frame
+    log-likelihood of the initial model, then of the model after each EM
+    iteration. It is non-decreasing up to flooring effects.
     """
     features = np.asarray(features)
     var_floor = global_variance_floor(features, var_floor_ratio)
-    codebook, assignments, _ = lbg_codebook(
+    codebook, assignments, lbg_history = lbg_codebook(
         features, n_components, epsilon=epsilon, seed=seed,
         chunk_frames=chunk_frames)
     gmm = init_gmm_from_codebook(features, codebook, assignments, var_floor,
@@ -188,7 +197,28 @@ def train_gmm(features, n_components, n_iter=10, epsilon=0.2,
         history.append(likelihood)
     history.append(float(frame_log_likelihoods(gmm, features,
                                                chunk_frames).mean()))
-    return gmm, history
+    return TrainResult(gmm, history, lbg_history, var_floor)
+
+
+def train_gmm(features, n_components, n_iter=10, epsilon=0.2,
+              var_floor_ratio=0.01, seed=0,
+              chunk_frames=DEFAULT_CHUNK_FRAMES):
+    """Train a diagonal GMM; returns ``(gmm, log_likelihood_history)``.
+
+    See :func:`train_gmm_detailed` for the history and the LBG details.
+    """
+    result = train_gmm_detailed(features, n_components, n_iter, epsilon,
+                                var_floor_ratio, seed, chunk_frames)
+    return result.gmm, result.log_likelihood_history
+
+
+def gmm_content_sha256(gmm):
+    """SHA-256 of the parameter bytes (the ``.npz`` file hash is not stable
+    because zip entries carry timestamps)."""
+    digest = hashlib.sha256()
+    for array in (gmm.weights, gmm.means, gmm.variances):
+        digest.update(np.ascontiguousarray(array, dtype="<f8").tobytes())
+    return digest.hexdigest()
 
 
 def save_gmm(path, gmm, metadata=None):
