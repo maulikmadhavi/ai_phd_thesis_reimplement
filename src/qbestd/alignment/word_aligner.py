@@ -106,6 +106,10 @@ def align_rows_detailed(rows, aligner, batch_size=16):
     Transcripts go to the aligner as word lists from
     ``normalize_transcript``, so the output words are exactly our tokens.
     An item the aligner returns as an Exception becomes a failed result.
+
+    Raises:
+        ValueError: if ``batch_size`` is below 1, or the aligner returns a
+            different number of outcomes than rows in a batch.
     """
     if batch_size < 1:
         raise ValueError(f"batch_size must be positive, got {batch_size}")
@@ -114,6 +118,11 @@ def align_rows_detailed(rows, aligner, batch_size=16):
         outcomes = aligner.align_batch(
             [row.audio for row in batch], word_lists,
             [ALIGN_LANGUAGE] * len(batch))
+        if len(outcomes) != len(batch):
+            raise ValueError(
+                f"aligner returned {len(outcomes)} outcomes for "
+                f"{len(batch)} rows (rows {batch[0].row_index}.."
+                f"{batch[-1].row_index})")
         for row, words, outcome in zip(batch, word_lists, outcomes):
             yield _result(row, words, outcome)
 

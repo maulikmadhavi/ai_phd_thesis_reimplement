@@ -91,6 +91,26 @@ def test_batch_size_must_be_positive():
         list(align_rows([make_row(0, "a")], FakeAligner(), batch_size=0))
 
 
+class ShortAligner:
+    def __init__(self, count):
+        self.count = count
+
+    def align_batch(self, audios, transcripts, languages=None):
+        return [[{"word": "a", "start": 0.0, "end": 0.1}]] * self.count
+
+
+@pytest.mark.parametrize("count", [1, 3])
+def test_wrong_outcome_count_raises(count):
+    rows = [make_row(0, "a"), make_row(1, "a")]
+    with pytest.raises(ValueError, match="outcomes for 2 rows"):
+        list(align_rows(rows, ShortAligner(count), batch_size=8))
+
+
+def test_correct_outcome_count_passes():
+    rows = [make_row(0, "a"), make_row(1, "a")]
+    assert len(list(align_rows(rows, ShortAligner(2), batch_size=8))) == 2
+
+
 def write_module(directory, body="VALUE = 41\n"):
     (directory / "align.py").write_text(body)
     return sha256_of_file(directory / "align.py")
