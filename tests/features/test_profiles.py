@@ -1,5 +1,7 @@
 from dataclasses import replace
 
+import hashlib
+
 import numpy as np
 import pytest
 
@@ -42,7 +44,8 @@ def test_unknown_name_or_kind_raises(name, kind):
         get_profile(name, kind)
 
 
-NOT_DEFINED = {("timit_matlab_levelflip", "mfcc_tmp")}
+NOT_DEFINED = {("timit_matlab_levelflip", "mfcc_tmp"),
+               ("htk_described", "mfcc_tmp")}
 
 
 @pytest.mark.parametrize("name", PROFILE_NAMES)
@@ -97,3 +100,84 @@ def test_levelflip_changes_only_the_level_dependent_dimensions_of_mfcc():
     # a gain moves c0 only: the static c1..c12 are unchanged to rounding
     assert np.allclose(base[:, 1:13], flip[:, 1:13], atol=1e-6)
     assert not np.allclose(base[:, 0], flip[:, 0])
+
+
+# sha256 of np.round(features, 8) for seeded noise, recorded from the code
+# before ``htk_described`` was added: the ``timit_matlab`` features must not
+# move (cycle 7, H1).
+GOLDEN = {
+    ("mfcc", 1.0):
+        "8a9fd62c3d308fac5dabcdf950e9f64c9cc1b67fc1026395e06b42f659307820",
+    ("mfcc", 0.92):
+        "ef3053cf397e772205c066d565b99e3e721c78067923a442176a9b0d23aca58f",
+    ("plp", 1.0):
+        "ed946b88794a5af1f712bad6f6755a98895d85bd9e844c96d0af4c6b6a3ca31d",
+    ("plp", 0.92):
+        "af8515ed2656f1453eb8b737b4288963aadeae8c197482088a978b61bb3b2ad9",
+    ("mfcc_tmp", 1.0):
+        "21b616f3166904db0c8e39cefc4311183c638bb43ff7a8099ffa768f3c9ef9e9",
+    ("mfcc_tmp", 0.92):
+        "81b6eda7036c16025f0b96b60f7650f11ba8ca0e9f584dd54d51d7564d6cb820",
+}
+
+
+@pytest.mark.parametrize("kind, warp", sorted(GOLDEN))
+def test_timit_matlab_features_are_byte_identical_to_before_h1(kind, warp):
+    signal = 0.1 * np.random.default_rng(7).normal(size=24000) + 0.02
+    features = extract_features(signal, 16000, kind, warp_factor=warp,
+                                config=get_profile("timit_matlab", kind))
+    digest = hashlib.sha256(np.round(features, 8).tobytes()).hexdigest()
+    assert digest == GOLDEN[(kind, warp)]
+
+
+@pytest.mark.parametrize("kind, cls", [("mfcc", MfccConfig),
+                                       ("plp", PlpConfig)])
+def test_htk_described_has_40_channels_3400_hz_and_39_dimensions(kind, cls):
+    config = get_profile("htk_described", kind)
+    assert isinstance(config, cls)
+    assert (config.n_filters, config.low_hz, config.high_hz) == (40, 0.0,
+                                                                 3400.0)
+    assert config.sample_rate == 16000
+    assert (config.preemphasis, config.lifter_length) == (0.97, 22)
+    assert config.remove_dc is False and config.normalize_peak is False
+    noise = 0.1 * np.random.default_rng(3).normal(size=16000)
+    features = extract_features(noise, 16000, kind, config=config)
+    assert features.shape == (98, 39)
+    assert np.all(np.isfinite(features))
+
+
+def test_htk_described_filterbank_top_edge_is_3400_hz():
+    from qbestd.features.filterbank import mel_filter_edges_hz
+    config = get_profile("htk_described", "plp")
+    edges = mel_filter_edges_hz(config.n_filters, config.low_hz,
+                                config.high_hz)
+    assert len(edges) == 42 and edges[-1] == pytest.approx(3400.0)
+
+
+def test_htk_described_plp_uses_lpc_order_12_and_the_power_spectrum():
+    config = get_profile("htk_described", "plp")
+    assert config.lpc_order == 12
+
+
+def test_htk_described_mfcc_uses_the_magnitude_spectrum_with_c0():
+    config = get_profile("htk_described", "mfcc")
+    assert config.spectrum_type == "magnitude" and config.include_c0
+
+
+def test_htk_described_raises_for_mfcc_tmp():
+    with pytest.raises(ValueError, match="mfcc_tmp stays on timit_matlab"):
+        get_profile("htk_described", "mfcc_tmp")
+
+
+def test_plp_band_limits_change_the_features_and_warping_stays_finite():
+    base = PlpConfig(sample_rate=16000, lpc_order=8, n_filters=21)
+    narrow = PlpConfig(sample_rate=16000, lpc_order=8, n_filters=21,
+                       high_hz=3400.0)
+    noise = 0.1 * np.random.default_rng(4).normal(size=16000)
+    assert not np.allclose(extract_features(noise, 16000, "plp", config=base),
+                           extract_features(noise, 16000, "plp",
+                                            config=narrow))
+    for alpha in (0.88, 1.12):
+        warped = extract_features(noise, 16000, "plp", warp_factor=alpha,
+                                  config=narrow)
+        assert np.all(np.isfinite(warped))

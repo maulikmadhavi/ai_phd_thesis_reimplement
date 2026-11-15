@@ -32,6 +32,8 @@ class PlpConfig(AudioFrontEndConfig):
     normalize_peak: bool = False
     pcm_scale: float = PCM_SCALE
     n_filters: int | None = None  # None: ceil(bark(fs/2)) + 1 as in MATLAB
+    low_hz: float = 0.0
+    high_hz: float | None = None  # None: Nyquist (fs/2), as in MATLAB
     lpc_order: int = 12  # unverified default: MATLAB code 8, HTK 12
     n_ceps: int = 13
     lifter_length: int = 22  # HTK default
@@ -55,7 +57,8 @@ def default_filter_count(sample_rate):
 def extract_plp(samples, sample_rate, config=None):
     """Return PLP cepstra, (n_frames, 13) or (n_frames, 39) with deltas.
 
-    Power spectrum -> mel bank over 0..fs/2 -> equal-loudness weights (at
+    Power spectrum -> mel bank over ``low_hz``..``high_hz`` (default
+    0..fs/2; the spacing is mel, not Bark) -> equal-loudness weights (at
     the warped filter centres) -> power 0.33 -> copy edge bands from their
     neighbours -> LPC (autocorrelation + Levinson) -> cepstrum -> lifter.
     """
@@ -65,11 +68,13 @@ def extract_plp(samples, sample_rate, config=None):
     if n_filters < 3 or n_filters < config.lpc_order + 1:
         raise ValueError("need at least max(3, lpc_order + 1) filters")
     power = power_spectrum(frames, n_fft)
-    bank = mel_filterbank(n_filters, n_fft, rate, 0.0, rate / 2.0,
+    high_hz = rate / 2.0 if config.high_hz is None else config.high_hz
+    bank = mel_filterbank(n_filters, n_fft, rate, config.low_hz, high_hz,
                           config.warp_factor)
-    centers = mel_filter_centers_hz(n_filters, 0.0, rate / 2.0)
+    centers = mel_filter_centers_hz(n_filters, config.low_hz, high_hz)
     if config.warp_factor != 1.0:
-        centers = warp_frequency_piecewise(centers, config.warp_factor, rate)
+        centers = warp_frequency_piecewise(centers, config.warp_factor, rate,
+                                           upper_hz=min(high_hz, rate / 2.0))
     bands = (power @ bank.T) * equal_loudness_weights(centers)
     bands = bands ** LOUDNESS_EXPONENT
     # MATLAB z([2, 2:(n-1), n-1], :): first/last bands copy their neighbours

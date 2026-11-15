@@ -62,6 +62,11 @@ is thesis-verified.
 | Profile | MFCC / MFCC-TMP | PLP |
 |---|---|---|
 | `timit_matlab` | 16 kHz, 0-4000 Hz | 16 kHz, 0-8000 Hz, LPC order 8, no DC removal, no pre-emphasis, no peak normalisation, x 32768 (FP:30-39, 69) |
+| `timit_matlab_levelflip` | as `timit_matlab`, MFCC without peak normalisation | as `timit_matlab`, with peak normalisation (ablation, cycle 7 L1; raises for MFCC-TMP) |
+| `htk_described` | 16 kHz, 0-3400 Hz, 40 filters, pre-emphasis 0.97, lifter 22, no DC removal, no peak normalisation, magnitude spectrum, c0 kept, 13 + delta + delta-delta | same band and filters, LPC order 12, mel-spaced bank, power spectrum; raises for MFCC-TMP (author statement 2026-11-16; the rest are recalled, unverified HTK defaults; see the profile docstring) |
+
+`Fx_PLPCC_htk.m` already builds a **mel**-spaced bank, so no Bark-spacing option was
+added to `PlpConfig`; only `low_hz` and `high_hz` (default 0 and Nyquist) were.
 
 The generic config defaults (8 kHz, order 12) are unchanged.
 
