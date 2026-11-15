@@ -1,9 +1,9 @@
 # Execution Plan: QbE-STD Thesis Reimplementation
 
-- **Cycle:** 3 (Orchestrator)
-- **Handoff input:** `handoff_response.md` at `bc8279a` (Codex review of cycles 2 and 2b, Q1–Q20)
-- **Stage status:** Stages 0–2 are done, and TIMIT word alignment (D1) is done. 178+ tests green.
-- **This cycle:** Codex's requested fix-ups C1–C9, then Stage 3 (LBG codebook and diagonal GMM by EM)
+- **Cycle:** 4 (Orchestrator)
+- **Handoff input:** `handoff_response.md` at `5c5dea8` (Codex review of cycle 3, Q1–Q15)
+- **Stage status:** Stages 0–3 and TIMIT word alignment are done. 366 tests green at `c992e9d`.
+- **This cycle:** Codex's requested fix-ups E1–E7, then the first end-to-end TIMIT Q-20 number (Stage 5 LC2 + Stage 7 p@N/MAP)
 - **Source of truth:** thesis `D:\Storage\career_phd_daiict_work\Thesis` (`Chapters/*.tex`,
   `Backmatter/*.tex`) and the MATLAB feature repo
   `github.com/maulikmadhavi/research_myMATLAB_codes/tree/master/Analysis/Feature_Extraction`
@@ -21,11 +21,11 @@ MFCC/PLP, so every choice that isn't pinned down stays configurable.
 | 0 | pixi env, skeleton, test runner | done | requirements.md |
 | 1 | Audio base: I/O, resampling, pre-emphasis, framing, windowing, spectrum, energy, TEO | done | ExpSetup §Front-end |
 | 2 | Features: mel/Bark scales, VTLN frequency warping, mel filterbank, MFCC + Δ/ΔΔ, PLP, MFCC-TMP | done; fix-ups in §8 | ExpSetup §Acoustic Representation; Warped_Feature appendix |
-| 3 | ML: LBG VQ codebook → diagonal GMM by EM, log-likelihood | **this cycle** (§9) | ExpSetup §Posterior Representation; `Backmatter/Algorithm_LC` |
+| 3 | ML: LBG VQ codebook → diagonal GMM by EM, log-likelihood | done; fix-ups in §8 | ExpSetup §Posterior Representation; `Backmatter/Algorithm_LC` |
 | 4 | Posteriorgrams: Gaussian, iterative GMM-VTLN, mixture of GMMs | | Representation §GMM-based VTLN; §Mixture of GMMs |
-| 5 | Matching: symmetric KL, subDTW LC1/2/3 (S/T/P), path selection, z-norm; DTW, fastDTW, partial matching | | ExpSetup §Searching, §Detection; Matching §Partial Matching |
+| 5 | Matching: symmetric KL, subDTW LC1/2/3 (S/T/P), path selection, z-norm; DTW, fastDTW, partial matching | **this cycle:** KL, LC2, z-norm (§9) | ExpSetup §Searching, §Detection; Matching §Partial Matching |
 | 6 | Indexing: **STM** phone segmentation → posterior averaging; segment-level BoAW tf-idf | | Matching §Feature Reduction (STM, lines 287–339), §BoAW |
-| 7 | Evaluation: p@N, MAP, recall, TWV/MTWV, C<sub>nxe</sub><sup>min</sup>, DET; TIMIT Q-20/Q-84 manifests | | survey §Metrics; Appendix θ, β |
+| 7 | Evaluation: p@N, MAP, recall, TWV/MTWV, C<sub>nxe</sub><sup>min</sup>, DET; TIMIT Q-20/Q-84 manifests | **this cycle:** Q-20, p@N, MAP (§9) | survey §Metrics; Appendix θ, β |
 
 Later: re-scoring with detection sources, score fusion, phonetic posteriorgrams (these need
 the BUT phone recognizer).
@@ -120,7 +120,7 @@ Codex decisions adopted:
 - Alg. `pseudocode_vtlnwarping`: `WHILE (k ≥ N_iter)` should be `k < N_iter`.
 - Alg. `pseudocode_warping_path_select`: initialize `G` and `CG` once, before the loop.
 - Alg. `pseudocode_STP_Computation_LC2`: the first-rows block should write `T(i,j)` / `P(i,j)`, not `T(1,j)` / `P(1,j)`.
-- subDTW init equations mix up i and j. Follow the algorithm boxes and `research_code_qbe_std/matlab/Fx_do_SDTW.m`.
+- subDTW init equations mix up i and j. Follow the algorithm boxes and `research_qbestd/matlab/NSDTW_c_skel.cpp` (LC2). `Fx_do_SDTW.m` is *segmental* DTW, not the subDTW kernel.
 - MFCC-TMP DCT formula indexes `k = 1..N_c` (no c0), but the MATLAB code keeps c0. Make it `include_c0`, defaulting to True per MATLAB.
 
 ## 6. Risks
@@ -135,287 +135,293 @@ Codex decisions adopted:
 
 - **Cycle 1:** Stage 0 and Stage 1 (T0.1–T1.11).
 - **Cycle 2:** Stage 1 fix-ups F1–F7 and Stage 2 features T2.1–T2.11 (`11862f2..a0c46c4`).
-- **Cycle 2b:** TIMIT word alignment A1–A5 (`9498174..4d6f1af`).
-  - 6300/6300 rows aligned, every row confirmed 16 kHz.
-  - Manifests are local in `outputs/alignment/`, documented in `docs/alignment_notes.md`.
-- Codex reviewed all of this in `handoff_response.md` at `bc8279a` (Q1–Q20). Its requested
-  changes are Part A below.
+- **Cycle 2b:** TIMIT word alignment A1–A5 (`9498174..4d6f1af`). All 6300 rows aligned, all
+  16 kHz.
+- **Cycle 3:** Codex fix-ups C1–C9 and Stage 3 T3.1–T3.6 (`799b826..c992e9d`, 366 tests).
+  - The MFCC (`timit_matlab`, 39-dim) GMM-64 and GMM-128 were trained on 4051 non-SA train
+    rows.
+  - Their EM curves rise monotonically (`docs/gmm_notes.md`).
+- Codex reviewed cycle 3 in `handoff_response.md` at `5c5dea8` (Q1–Q15). Its requested
+  changes are Part A below. Its SA, SAD and speaker-overlap answers shape Part B.
+
+**Decisions adopted from `5c5dea8`:**
+- Keep the band-edge VTLN anchor.
+- Keep the float64 one-pass variance.
+- Keep the parameter and file hashes.
+- 39-dim MFCC with c0 stays the baseline. 13-static and no-c0 variants are later ablations.
+- `n_iter=10` stays fixed as an experimental choice, not a thesis fact.
+- The variance floor and k-means tolerance stay marked unverified.
+- **HF split:** it is **not strictly speaker-independent** (at least 13 speakers' SA
+  utterances cross it). Every HF result is labelled *"speaker overlap present; approximate
+  versus the thesis"*. No inferred speaker re-split.
+- **SA rows:** dropped from the test documents as well as from training (thesis
+  `ExpSetup.tex` lines 73–75).
+- **SAD:** the baseline uses every frame. Energy SAD or edge trimming is a later named
+  ablation, not thesis parity.
 
 ---
 
-## 8. Cycle 3, part A: fix-ups (Codex "change requested", `bc8279a`)
+## 8. Cycle 4, part A: fix-ups (Codex "change requested", `5c5dea8`)
 
-Conventions:
-- One commit per task, `exec: …`, 10 words or fewer, no trailers. Push after every commit.
-- Tests for every changed function; every file under 400 lines.
+Conventions: one commit per task, `exec: …`, 10 words or fewer, no trailers. Push after every
+commit. Tests for every change; every file under 400 lines.
 
-### C1: VTLN warp anchored at the band edge (Codex Q3)
-- **Files:** `features/scales.py`, `features/filterbank.py`, tests
-- **Do:**
-  - Give `warp_frequency_piecewise` / `vtln_cutoff_frequency` an explicit `upper_hz`
-    anchor, replacing the hard-wired `sample_rate / 2`.
-  - `mel_filterbank` passes `upper_hz = high_hz` when `high_hz < fs/2`, otherwise `fs/2`.
-    The cutoff is `0.875 · upper_hz`, which gives 3500 Hz for a 4 kHz band (thesis
-    `Warped_Feature.tex` line 30).
-  - Full-band PLP keeps `fs/2`.
-  - Document it as thesis-based, not proven MATLAB parity, because `Fx_melfiltbank.m` is
-    missing.
-- **Tests:** 16 kHz audio, `high_hz=4000`, α ∈ {0.88, 1.12}:
-  - `upper_hz` maps to itself;
-  - every filter's nonzero support stays at or below 4 kHz;
-  - α = 1 is unchanged from before;
-  - the full-band case is unchanged.
-- **Commit:** `exec: anchor vtln warp at feature band edge`
+### E1: Drop the `htk_like` profile (Codex Q2)
+- **Files:** `features/profiles.py`, its tests, any doc mention
+- **Do:** remove `htk_like`. Keep the generic `PlpConfig` options and the `timit_matlab`
+  profile.
+- **Commit:** `exec: drop unverified htk_like profile`
 
-### C2: Named feature profiles (Codex Q7, Q12)
-- **Files:** `src/qbestd/features/profiles.py`, `features/plp.py` (DC-removal switch if
-  missing), tests
-- **Do:** add `get_profile(name, kind) -> config` without changing the generic defaults.
-  - `"timit_matlab"`:
-    - MFCC and MFCC-TMP use 16 kHz with `high_hz=4000`;
-    - PLP uses 16 kHz with `high_hz=8000`, `lpc_order=8`, no DC removal, `x·32768` scaling
-      (`Fx_PLPCC_htk.m` lines 30–39, 35, 69).
-  - `"htk_like"`: PLP `lpc_order=12`, DC removal on.
-  - An unknown name or kind raises `ValueError`. Each profile's docstring cites its sources
-    and says that **no profile is thesis-verified**.
-- **Tests:** profile values; generic defaults unchanged; unknown name raises; each profile
-  extracts finite features from 1 s of noise.
-- **Commit:** `exec: add named feature profiles`
-
-### C3: `warp_factor=None` in `extract_features` (Codex Q9)
-- **Files:** `features/extract.py`, tests
-- **Do:** default `warp_factor=None`, meaning use `config.warp_factor`. An explicit value
-  overrides the config.
-- **Tests:** both paths. Caching across the 13 warps is deferred until Stage 4 profiling.
-- **Commit:** `exec: let config warp factor apply by default`
-
-### C4: Parity doc corrections (Codex Q6, Q7, Q10, Q13)
+### E2: Two parity-doc cells (Codex Q3)
 - **Files:** `docs/feature_parity.md`
-- **Do:** re-read `Chapters/ExpSetup.tex` lines 191–223 and fill the thesis column **per
-  feature**:
-  - MFCC: 26 filters, 0–4 kHz, 13 coefficients, HTK.
-  - PLP: no filter count, band, c0 or delta setting is stated.
-  - MFCC-TMP: 25/10 ms, 26 filters, 13 + Δ + ΔΔ, `k=1..13`, band not stated in that passage.
-  - Label the thesis's "Type III DCT" wording separately from our orthonormal DCT-II
-    ("convention not checked").
-  - Record these as parity differences or assumptions:
-    - forward-warped equal-loudness centres (MATLAB-faithful);
-    - `max|x|` versus `max(x)` peak normalisation;
-    - unit-peak triangles.
-  - Mark HTK cells written from memory as "unverified".
-- **Commit:** `exec: correct thesis claims in feature parity doc`
-
-### C5: Test and style cleanup (Codex Q11, Reviewer minor notes)
-- **Files:** `tests/features/test_mfcc_tmp.py`, plus the 14 files with lines over 79
-  characters
 - **Do:**
-  - Make the floor-hit test assert `floor_hits < energies.size` on seeded noise, and keep
-    printing the count.
-  - Wrap the 37 lines over 79 characters.
-  - No behaviour change.
-- **Commit:** `exec: tighten floor hit test and wrap long lines`
+  - Move `Fx_mfcc_lift.m` `Nlift=-20` out of the **Thesis** column. The thesis gives no
+    lifter.
+  - Change the "Delta formula" thesis cell from "same" to "not stated".
+- **Commit:** `exec: fix lifter and delta thesis cells`
 
-### C6: Manifest checks (Codex Q14, Q20)
-- **Files:** `alignment/manifest.py`, tests
+### E3: k-means stop rule (Codex Q4)
+- **Files:** `ml/vq.py`, `tests/ml/test_vq.py`
+- **Do:** stop only when `0 ≤ relative decrease < tol`. A distortion increase, for example
+  after an empty-cluster re-seed, continues until it recovers or `max_iter` is reached.
+- **Tests:** a forced re-seed whose distortion rises does not stop the refinement early.
+- **Commit:** `exec: continue kmeans after distortion increase`
+
+### E4: Feature-cache fingerprint (Codex Q6, Q15)
+- **Files:** `data/feature_cache.py`, `ml/train.py`, tests
 - **Do:**
-  - In `check_segments`, add a distinct `collapsed_run` warning for equal consecutive
-    starts.
-  - Reject or flag non-finite start/end values.
-  - Keep the existing rules.
-- **Tests:** two words over 20 ms with an equal start are flagged `collapsed_run`; `nan` and
-  `inf` are flagged.
-- **Re-run the checks** over the existing local manifests (no re-alignment). Add the
-  collapsed-run counts and rows to `docs/alignment_notes.md`.
-- **Commit:** `exec: flag collapsed runs and non-finite times`
+  - Store `fingerprint = sha256(json(sorted))` over:
+    - `get_profile(...).to_dict()`
+    - feature kind
+    - dataset revision
+    - `exclude_sa`
+    - `FEATURE_CACHE_VERSION`, a module constant bumped by hand whenever feature semantics
+      change.
+  - `load_feature_cache(path, expected=...)` raises `CacheMismatchError` on a mismatch.
+  - `train.py` rebuilds on mismatch when `--rebuild-cache` is given, and otherwise fails with
+    a clear message.
+- **Tests:** a changed config, `exclude_sa` or version is never silently reused.
+- **Commit:** `exec: fingerprint feature cache and validate on load`
 
-### C7: One outcome per row (Codex Q20)
-- **Files:** `alignment/word_aligner.py`, tests
-- **Do:** raise if `len(align_batch(...)) != len(batch)` before the `zip`.
-- **Tests:** a fake aligner that returns too few outcomes raises.
-- **Commit:** `exec: check aligner returns one outcome per row`
-
-### C8: NFC transcript normalisation and token audit (Codex Q15)
-- **Files:** `data/timit_hf.py`, tests, `docs/alignment_notes.md`
+### E5: `huggingface_hub` in the core env (Codex Q7)
+- **Files:** `pixi.toml`, `pixi.lock`, `ml/train.py` docstring
 - **Do:**
-  - Apply `unicodedata.normalize("NFC", …)` before lowercasing.
-  - Audit both splits for tokens with hyphens, apostrophes or non-ASCII characters. List the
-    distinct tokens and counts in the notes.
-  - Re-normalise every sentence and compare with the tokens in the manifests.
-    - **If identical** (expected for ASCII TIMIT), no re-alignment is needed. Say so in the
-      notes.
-    - **If not**, stop and report it in the review. Do not silently re-run.
-- **Tests:** composed and decomposed `é` give the same tokens.
-- **Commit:** `exec: nfc normalise transcripts and audit tokens`
+  - Add `huggingface_hub` to the core dependencies. torch and transformers stay in `align`
+    only.
+  - `pixi run train-gmm` must work from the core env. Verify this with
+    `--help` plus a cached run.
+- **Commit:** `exec: add huggingface hub to core environment`
 
-### C9: Alignment caveats and optional ASR audit (Codex Q17, Q18, Q19)
-- **Files:** `docs/alignment_notes.md`, `src/qbestd/alignment/asr_audit.py` (align env),
-  tests for its pure functions (word filter, shift, hit scoring)
+### E6: Speaker-overlap wording (Codex Q9)
+- **Files:** `docs/data_notes.md`, `docs/alignment_notes.md`
+- **Do:** replace "near-certain"/"unverified" with the narrower finding:
+  - SA1 and SA2 counts differ (train 488/501, test 142/129);
+  - so the split is **not strictly speaker-independent**: at least 13 speakers' SA
+    utterances cross it;
+  - the counts do not prove a random split.
+- Add the standard label *"speaker overlap present; approximate versus the thesis"*.
+- **Commit:** `exec: state narrower speaker overlap finding`
+
+### E7: GMM evidence and convergence notes (Codex Q11, Q13, Q14)
+- **Files:** `ml/gmm.py`, `ml/vq.py` docstrings, `docs/gmm_notes.md`
 - **Do:**
-  - **Notes:** the model card's 10.7 ms was measured on the card's own TIMIT test setup.
-    It is **not** a measured error for these manifests.
-  - **Notes:** speaker overlap between the HF query/train and document/test sets is
-    unverified, and it may inflate both the alignment quality and later QbE scores.
-  - **Notes:** record environment lock, precision and per-split quantiles next to the hashes.
-  - **Audit:** `python -m qbestd.alignment.asr_audit`, an optional, reproducible check:
-    - `openai/whisper-base` at a pinned revision;
-    - fixed seed, words of at least 3 letters, 300 words;
-    - true cuts and ±0.25 s shifted cuts, 20 ms padding;
-    - hit means an exact match or difflib ratio ≥ 0.75;
-    - writes `outputs/alignment/asr_audit.json`.
-  - The audit is a **diagnostic, not a gate**. Record its numbers in the notes.
-- **Commit:** `exec: add asr alignment audit and caveats`
+  - Variance floor `0.01×` global is "HTK HCompV-style, unverified for the thesis". The
+    k-means `tol` is "unverified".
+  - `n_iter=10` is "experimental choice". `Representation.tex` line 1089 states ten
+    iterations only for the **mixture-of-GMMs** setup; line 196 is commented out.
+  - Record the c0 choice: c0 kept, as `Fx_mfcc.m` retains DCT row 1.
+  - **Optional:** a 30-iteration sensitivity run of GMM-64, with its curve recorded in the
+    notes. The 10-iteration model stays the baseline.
+- **Commit:** `exec: correct gmm evidence and convergence notes`
 
 ---
 
-## 9. Cycle 3, part B: Stage 3 (LBG codebook and diagonal GMM)
+## 9. Cycle 4, part B: first comparable number (TIMIT Q-20, MFCC, subDTW-LC2)
 
-**Thesis facts** (cite these in docstrings):
-- **Posterior:** `P(C_k|o_t) = π_k N(o_t; μ_k, Σ_k) / Σ_j π_j N(o_t; μ_j, Σ_j)`
-  (`ExpSetup.tex` lines 229–237).
-- **Estimation:** EM, initialised from an LBG VQ codebook (line 238).
-- **LBG** (`Algorithm_LC.tex`, Fig. VQ):
-  - K-means VQ with splitting constant **ε = 0.2**;
-  - each split uses the per-dimension mean μ and std σ ("data uncorrelated assumption");
-  - so a centroid splits into μ ± ε·σ, where σ is the std of that cluster's members;
-  - the codebook doubles until `N_clust`.
-- **EM:** **10 iterations** (`Representation.tex` lines 196 and 1089).
-- **Mixtures:** 64 and 128 for TIMIT (line 335). 128 is the main setting from Chapter 4 on.
-- **Training set:** the thesis used 3696 TIMIT training utterances (line 174), which is the
-  official train set without SA. Our equivalent is the HF train split minus the two SA texts.
-- **Assumptions** (thesis silent; keep configurable, document as assumptions):
-  - diagonal covariances;
-  - variance floor at `0.01 ×` the global per-dimension variance (HTK `vFloor` style);
-  - k-means refinement inside LBG stops at a relative distortion change < 1e-3 or after 20
-    iterations;
-  - an empty cluster is re-seeded by splitting the cluster with the highest distortion.
+The goal is **one end-to-end number** to compare with the thesis target: MFCC Gaussian
+posteriorgram, 64 mixtures, no VTLN, p@N **34.91**, MAP **36.71** (§3). Every result is
+labelled *"speaker overlap present; approximate versus the thesis"*.
 
-### T3.1: LBG vector quantiser
-- **Files:** `src/qbestd/ml/__init__.py`, `src/qbestd/ml/vq.py`, tests
+**Thesis and MATLAB facts** (cite these in docstrings):
+- **Q-20 keywords and counts:** `ExpSetup.tex` lines 78–97 (`Table:TIMITdata`). Keyword
+  (Inst./Occ.):
+  - artists 7/7, beautiful 3/8, birth 4/7, destroy 9/7, development 9/8
+  - garbage 8/7, government 14/8, intelligence 8/7, love 4/16, marriage 3/7
+  - meeting 7/7, morning 15/14, ocean 7/7, organizations 7/7, problems 5/7
+  - shellfish 14/7, simple 8/8, surface 3/7, tomorrow 3/7, youngsters 7/7
+  - Queries come from train and documents from test; `/sa/` is excluded (lines 73–75).
+- **Local distance:** symmetric KL,
+  `Σ t log(t/q) + Σ q log(q/t)` (`ExpSetup.tex` line 304).
+- **subDTW LC2:** the reference kernel is **`research_qbestd/matlab/NSDTW_c_skel.cpp`**.
+  `Fx_do_SDTW.m` is *segmental* DTW, so do not follow it. `D` is (test frames M × query
+  frames N).
+  - **First column (n = 0):** `S = D`, `T = 1`, `P = m`.
+  - **First two test rows (m = 0, 1):** accumulate along n, so
+    `S(m,n) = S(m,n−1) + D(m,n)`, `T = n+1`, `P = m`.
+  - **Otherwise:** predecessors are `(m, n−1)`, `(m−1, n−1)` and `(m−2, n−1)`.
+    - `S = D + min`, `T = T_pred + 1`, `P = P_pred`.
+    - **Tie order:** `(m, n−1)` first, then `(m−1, n−1)`, then `(m−2, n−1)`
+      (`min_fun_ind`).
+  - Every predecessor is in column n−1, so each query column can be computed
+    **vectorised over m**.
+- **Distance per test utterance:** `dist(i) = S(i,N)/T(i,N)` (`ExpSetup.tex` line 442).
+  - A path is valid when `0.5 ≤ (i − P(i,N) + 1)/N ≤ 2`, the interval in test frames.
+  - The utterance distance is the minimum over valid end frames.
+- **p@N** (`survey.tex` lines 40–50): N is the number of relevant documents, and p@N is the
+  number of relevant documents in the top N, divided by N, × 100.
+- **AP** (`survey.tex` line 65): `(1/N) Σ_k p@k · 1(k)`. MAP is the mean over queries.
+  - Test case: `t,t,f,f,t,f,f,t,f,f` with N = 4 gives p@N = 50 % and AP = 0.775.
+- **Score normalisation:** `s = −(d − μ_q)/σ_q`, sample std (`ExpSetup.tex` lines 497–515).
+  It is monotonic per query, so it does not change p@N or MAP. Implement it anyway for
+  SWS/QUESST later.
+- **Assumptions** (thesis silent; configurable, listed in the results doc):
+  - **Instances:** each spoken instance is its own query; p@N and AP are averaged over all
+    instances. A per-keyword average is reported too.
+  - **Relevance:** exact token match against `normalize_transcript`; a document is relevant
+    if it contains the token at least once.
+  - **Query audio:** cut from the train audio at aligner `[start − 20 ms, end + 20 ms]`,
+    clipped to the utterance, with features extracted **from the clip** (like a separate
+    query file). Rows flagged `collapsed_run` or under 20 ms are skipped.
+  - **Posterior floor:** `1e-10`, then renormalise (`floor_and_renormalise`).
+
+### T7.1: Q-20 query and relevance manifests
+- **Files:** `src/qbestd/eval/__init__.py`, `src/qbestd/eval/timit_queries.py`, tests,
+  `docs/q20_counts.md`
 - **API:**
-  - `lbg_codebook(features, n_clusters, epsilon=0.2, max_kmeans_iter=20, tol=1e-3, seed=0)
-    -> (codebook, assignments, distortion_history)`;
-  - `assign_to_codebook(features, codebook)`, chunked so memory stays bounded.
-- `n_clusters` must be a power of two; otherwise raise.
+  - `Q20_KEYWORDS`: a tuple of `(keyword, thesis_inst, thesis_occ)`.
+  - `build_query_examples(train_word_manifest, train_rows, keywords, pad_s=0.02)
+    -> list[QueryExample]`, skipping SA rows and flagged segments.
+  - `build_relevance(test_rows, keywords, exclude_sa=True) -> dict[keyword, set[row_index]]`.
+    Use `is_sa_sentence` and `normalize_transcript` from the existing modules.
+  - `write_*` / `read_*` TSV helpers. Outputs go to `outputs/eval/` (git-ignored).
+- **`docs/q20_counts.md`** (committed; small derived statistics, no audio or transcripts):
+  - per keyword: thesis Inst/Occ against ours (train instances, test documents, test token
+    occurrences);
+  - document-set size after SA exclusion (expect 1260 − 271 = 989);
+  - skipped flagged instances.
+- **Tests:** synthetic manifests:
+  - SA rows excluded from both queries and documents;
+  - padding clipped to the utterance bounds;
+  - flagged segments skipped;
+  - exact token matching (`love` does not match `lovely`).
+- **Commit:** `exec: add timit q20 query and relevance manifests`
+
+### T7.2: Ranked-retrieval metrics
+- **Files:** `src/qbestd/eval/metrics.py`, tests
+- **API:**
+  - `precision_at_n(ranked_is_relevant, n_relevant)`;
+  - `average_precision(ranked_is_relevant, n_relevant)`;
+  - `summarise(per_query) -> {p_at_n, map, n_queries}`.
+  - If `n_relevant == 0`, raise `ValueError`.
+- **Tests:** the thesis example gives 50 % and 0.775; a perfect ranking gives 100 %; no
+  relevant document in the ranking gives 0.
+- **Commit:** `exec: add p at n and map metrics`
+
+### T5.1: Symmetric KL local distance
+- **Files:** `src/qbestd/search/__init__.py`, `src/qbestd/search/distance.py`, tests
+- **API:** `symmetric_kl_matrix(test_post (M,K), query_post (N,K), floor=1e-10) -> (M,N)`,
+  vectorised as `(t·log t).sum − t·log qᵀ + (q·log q).sum − log t·qᵀ`.
 - **Tests:**
-  - 4 well-separated 2-D blobs give 4 centroids within 0.1 of the truth;
-  - distortion is non-increasing;
-  - empty-cluster re-seed path;
-  - deterministic under a seed;
-  - chunked assignment equals full assignment.
-- **Commit:** `exec: add lbg vector quantiser`
+  - identical rows give 0;
+  - the result is symmetric under swapping the inputs (transposed);
+  - it is non-negative;
+  - it equals a double-loop reference;
+  - zeros in the input stay finite through the floor.
+- **Commit:** `exec: add symmetric kl distance matrix`
 
-### T3.2: Diagonal GMM with EM
-- **Files:** `src/qbestd/ml/gmm.py`, tests
+### T5.2: subDTW LC2 kernel and path selection
+- **Files:** `src/qbestd/search/subdtw.py`, tests
 - **API:**
-  - `DiagonalGmm(weights, means, variances)`, a frozen dataclass with shape validation.
-  - `init_gmm_from_codebook(features, codebook, assignments, var_floor)`.
-  - `frame_log_likelihoods(gmm, features) -> (T,)`, using log-sum-exp.
-  - `component_posteriors(gmm, features) -> (T, K)`, with rows summing to 1.
-  - `em_step(gmm, features, var_floor, chunk_frames=100_000)`, accumulating sufficient
-    statistics chunk by chunk.
-  - `train_gmm(features, n_components, n_iter=10, epsilon=0.2, var_floor_ratio=0.01, seed=0)
-    -> (gmm, log_likelihood_history)`.
-  - `save_gmm` / `load_gmm`: `.npz` with a metadata JSON string (feature kind, profile,
-    dims, n_iter, training row count).
+  - `subdtw_lc2(D) -> (S, T, P)`, with columns vectorised over test frames and
+    `NSDTW_c_skel.cpp` initialisation and tie order.
+  - `best_utterance_distance(S, T, P, min_ratio=0.5, max_ratio=2.0) -> (dist, start, end,
+    used_fallback)`. If no end frame is valid, take the minimum over all of them with
+    `used_fallback=True`.
 - **Tests:**
-  - recovers the means and weights of a synthetic 3-component 2-D mixture;
-  - average log-likelihood is non-decreasing over iterations (tolerance 1e-6);
-  - posteriors sum to 1 and are finite even for an outlier frame 1e3 σ away;
-  - variance floor engages on a constant dimension;
-  - chunked EM equals unchunked EM;
-  - save/load round-trip.
-- **Commit:** `exec: add diagonal gmm trained by em`
+  - matches a plain double-loop transcription of the C++ (kept in the test file) on 20
+    random `D` matrices, including tie-heavy integer `D`;
+  - a query planted inside a random utterance is found at the right start and end;
+  - `M < 3` and `N = 1` edge cases;
+  - the fallback flag.
+- **Commit:** `exec: add subdtw lc2 kernel and path selection`
 
-### T3.3: Gaussian posteriorgram
-- **Files:** `src/qbestd/ml/posteriorgram.py`, tests
+### T5.3: Score normalisation
+- **Files:** `src/qbestd/search/score.py`, tests
 - **API:**
-  - `gaussian_posteriorgram(gmm, features) -> (T, K)`;
-  - `floor_and_renormalise(posteriorgram, floor=1e-10)`, for KL in Stage 5;
-  - `utterance_log_likelihood(gmm, features)`, the mean frame log-likelihood (Stage 4 VTLN
-    picks α by maximising it).
-- **Tests:** shape, row sums, floor effect, the likelihood ranks a matched GMM above a
-  mismatched one.
-- **Commit:** `exec: add gaussian posteriorgram`
+  - `znorm_scores(distances) -> -(d − mean)/std(ddof=1)`, raising on fewer than 2 values or
+    zero std;
+  - `rank_documents(distances) -> order`, stable.
+- **Tests:** a hand-worked example; ranking by z-score equals ranking by distance.
+- **Commit:** `exec: add score normalisation and ranking`
 
-### T3.4: Feature cache for TIMIT
-- **Files:** `src/qbestd/data/feature_cache.py`, tests
-- **Do:**
-  - `is_sa_sentence(tokens)` uses `normalize_transcript` and matches the two SA texts.
-  - `build_feature_cache(split, kind, profile, out_dir, exclude_sa=True)`:
-    - iterate `iter_timit_rows`, then `extract_features` with `get_profile(...)`, appending
-      Δ+ΔΔ to give 39 dims;
-    - write one `.npz` with the concatenated `features (float32)`, `offsets` and
-      `row_indices`, plus metadata (profile, kind, dataset revision, excluded SA count).
-  - `load_feature_cache(path) -> (features, offsets, row_indices, meta)`.
-  - The cache lives in `outputs/features/` (git-ignored). Never commit it.
-- **Tests:** a two-row synthetic parquet (reuse the A2 fixture) round-trips; SA rows are
-  excluded; offsets index correctly.
-- **Commit:** `exec: add timit feature cache`
-
-### T3.5: Train the baseline GMM and record it
-- **Files:** `src/qbestd/ml/train.py` (CLI: `python -m qbestd.ml.train --kind mfcc --profile
-  timit_matlab --components 64 --out outputs/models/`), a pixi task `train-gmm`, tests for
-  argument parsing
-- **Run:**
-  - MFCC with the `timit_matlab` profile, 64 components, then 128;
-  - training data is the HF train split without SA.
-- **Write `docs/gmm_notes.md`:**
-  - row and frame counts;
-  - LBG distortion history;
-  - EM log-likelihood per iteration (it must rise and flatten by iteration 10, as in thesis
-    Fig. `LthetaConverge`);
-  - smallest component weight;
-  - number of variance-floored dims;
-  - wall time;
-  - model SHA-256s.
-- Models stay in `outputs/models/` (git-ignored).
-- **Commit:** `exec: train baseline mfcc gmm and record notes`
-
-### T3.6: Stage 3 Gradio demo
-- **Files:** `demo/stage3_gmm_demo.py` (≤ 250 lines); pixi task `demo-stage3` in the `demo`
-  feature
-- **Inputs:**
-  - audio upload or mic;
-  - feature kind;
-  - a GMM picked from `outputs/models/*.npz`. If none exists, train a small GMM on the
-    uploaded clip, with the component count from a slider (4–64).
+### T7.3: TIMIT Q-20 evaluation runner
+- **Files:** `src/qbestd/eval/run_timit.py` (CLI), a pixi task `eval-timit`, tests for
+  argument parsing and the aggregation helpers
+- **CLI:** `python -m qbestd.eval.run_timit --kind mfcc --profile timit_matlab --gmm
+  <model.npz> --keywords q20 --out outputs/eval/<run_name>/`
+- **Steps:**
+  1. Load or build the test feature cache (`exclude_sa=True`, fingerprint-validated).
+  2. Cut the query clips from the train audio and extract their features.
+  3. Compute posteriorgrams for queries and documents.
+  4. For every query × document pair: KL matrix, then LC2, then utterance distance.
+  5. Rank, then p@N and AP per instance.
 - **Outputs:**
-  - posteriorgram heatmap (frames × components);
-  - top-component track;
-  - EM log-likelihood curve when it trained one;
-  - per-frame log-likelihood plot.
+  - `per_query.tsv` (keyword, instance row, p@N, AP, fallbacks);
+  - `summary.json`: instance-averaged and keyword-averaged p@N/MAP, counts, runtime, model
+    and feature fingerprints, git commit.
+- **Commit:** `exec: add timit q20 evaluation runner`
+
+### T7.4: Run and record the first numbers
+- **Run:** MFCC `timit_matlab` with GMM-64, then GMM-128, both LC2.
+- **Write `docs/results_timit_q20.md`:**
+  - a table of ours against the thesis (GMM-64 target 34.91 / 36.71);
+  - both averaging modes;
+  - per-keyword AP;
+  - the fallback count;
+  - runtime;
+  - the assumption list above;
+  - the speaker-overlap label.
+- The gap is explained with evidence, not tuned away. **Do not change any setting to chase
+  the target.**
+- **Commit:** `exec: record first timit q20 results`
+
+### T7.5: Stage 5 search demo
+- **Files:** `demo/stage5_search_demo.py` (≤ 250 lines); pixi task `demo-stage5` in the
+  `demo` feature
+- **Inputs:** either two audio clips (query and document) or a Q-20 keyword plus an
+  instance; a GMM selector.
+- **Outputs:**
+  - both posteriorgrams;
+  - KL matrix `D`, and `S` with the best path overlaid;
+  - the utterance distance;
+  - for a keyword: the top-10 ranked documents with relevance marks and p@N/AP.
 - Put a usage note at the top. Import from `qbestd` only.
-- **Commit:** `exec: add stage 3 gmm demo`
+- **Commit:** `exec: add stage 5 search demo`
 
-**Cycle 3 definition of done:**
-- C1–C9 and T3.1–T3.6 are on `main`, and `pixi run test` is green in the core env.
+**Cycle 4 definition of done:**
+- E1–E7, T7.1, T7.2, T5.1–T5.3 and T7.3–T7.5 are on `main`, and `pixi run test` is green in
+  the core env.
 - Every module is under 400 lines.
-- `docs/gmm_notes.md` shows a rising EM curve for MFCC GMM-64 and GMM-128.
-- The Reviewer writes `handoff_request.md` for cycle 3. It should cover:
-  - the open questions below;
-  - whether the C8 audit changed any tokens;
-  - the C9 audit numbers.
+- `docs/results_timit_q20.md` has the first MFCC GMM-64 and GMM-128 numbers.
+- The Reviewer writes `handoff_request.md` for cycle 4 with the open questions below.
 
-**Open questions for the Cycle 3 review:**
-- 17: Variance floor and the k-means stopping rule are assumptions. Is there any MATLAB or HTK
-  evidence (`HCompV`/`HERest` `-v`) for what the thesis used?
-- 18: SAD. The thesis SAD uses BUT phone posteriors (`ExpSetup.tex` lines 242–243), which we
-  don't have. Should TIMIT GMM training and search drop leading and trailing silence? If so,
-  how: energy-based, or by trimming to the aligner's first and last word?
-- 19: Should the GMM train on static+Δ+ΔΔ (39 dims), as we plan, or on the 13 statics?
+**Open questions for the cycle 4 review:**
+- 20: How did the thesis combine a keyword's several spoken instances (Inst. 3–15)? Was each
+  instance its own query, or were scores fused per keyword?
+- 21: Is "Occ." in `Table:TIMITdata` a document count or a token count? Did relevance include
+  morphological variants?
+- 22: Query features: from the cut clip (current) or sliced from the full-utterance features?
+- 23: Path validity: is the interval measured in test frames from `P` (current) or as the path
+  length `T`?
 
 ---
 
-## 10. Next cycle (preview)
+## 10. Next cycles (preview)
 
-The goal is to get the **first comparable number** before broadening any stage:
-1. Q-20 query list from thesis Table `Table:TIMITdata`, cut from the train split with the
-   alignment manifests (20 ms padding, collapsed-run segments excluded).
-2. Symmetric-KL local distance and subDTW-LC2, from `Fx_do_SDTW.m` and the algorithm boxes,
-   with the §5 errata fixed.
-3. Score normalisation, p@N and MAP, tested on the §2 metric test case.
-4. A run on MFCC GMM-64 against the target p@N ≈ 34.91 and MAP ≈ 36.71 (labelled
-   approximate).
-
-After that, PLP, MFCC-TMP, GMM-128, VTLN (Stage 4), mixture of GMMs, then LC1/LC3, DTW,
-fastDTW and indexing.
+1. **Gap analysis** of the first numbers, then PLP and MFCC-TMP on the same pipeline (§3
+   targets).
+2. **Stage 4:** iterative GMM-VTLN (5 iterations, 13 warps). Use the `extract_warped_bank`
+   caching that Codex deferred to here.
+3. LC1 and LC3, Q-84, and the optional SAD ablation (Codex Q12).
+4. Mixture of GMMs, then DTW and fastDTW, then indexing (STM, BoAW).
+5. SWS 2013 and QUESST 2014: path selection with 7 paths, z-norm, MTWV and Cnxe.
