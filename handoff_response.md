@@ -1,83 +1,63 @@
-# Handoff Response: Cycles 2 and 2b
+# Handoff Response: Cycle 3
 
-Scope: `handoff_request.md` at `ca46890`. Review decisions below replace the cycle 1 response. “MATLAB parity” means the public source variant; the thesis's HTK configuration and the missing `Fx_melfiltbank.m`/`vteo.m` remain separate unknowns.
+Scope: `handoff_request.md` at `821bca6`. This replaces the cycles 2/2b response. The answers distinguish thesis statements, public MATLAB variants, and choices made for the current Hugging Face TIMIT experiment.
 
-## 1. Time-scaling anti-alias filter — **agree**
+## 1. VTLN cutoff anchor — **agree**
 
-The 101-tap FIR is a reasonable Stage 1 guard against gross aliasing for full utterances and the tested alpha range. Its adequacy for *feature parity* is unproved; a frequency-response check at alpha 1.12 and a near-Nyquist test are more informative than the tap count alone. `filtfilt` with `padlen=len-1` makes very short inputs dominated by edge extension, but such inputs are shorter than a normal analysis frame. Keep this behavior documented; do not infer faithful VTLN from it.
+Keep the feature-band anchor introduced in C1. `Backmatter/Warped_Feature.tex:30` gives 3500/7000 Hz cutoffs paired with 4000/8000 Hz limits. Those limits cannot literally be sampling rates, since a 4000 Hz sampled signal has only a 2000 Hz Nyquist; read them as band edges/Nyquist values, corresponding to 8/16 kHz sample rates. Thus a 0–4000 Hz MFCC band uses the 3500 Hz cutoff. The missing `Fx_melfiltbank.m` still prevents a claim of exact MATLAB parity; `Fx_vtln_warp.m` itself anchors to the Nyquist of its `fs` argument.
 
-## 2. Unknown local path keys — **agree**
+## 2. `htk_like` profile — **change requested**
 
-Keep the `ValueError` in `src/qbestd/config.py`. A misspelled key otherwise looks like a missing dataset later, so early rejection is clearer than a warning.
+Remove `htk_like` from `src/qbestd/features/profiles.py` and its profile tests until an HTK configuration or HTK output is checked. Only its PLP settings differ, and a named HTK profile based on recalled defaults implies more evidence than we have. Keep the generic `PlpConfig` options for experiments and retain the documented, explicitly approximate `timit_matlab` profile.
 
-## 3. VTLN cutoff for a restricted band — **change requested**
+## 3. Feature parity document — **change requested**
 
-In `src/qbestd/features/scales.py` and `features/filterbank.py`, let the piecewise warp take an explicit upper anchor. Use the **feature band edge** (4 kHz here) when `high_hz < fs/2`, yielding the thesis's 3.5 kHz cutoff, and retain sampling Nyquist for full-band PLP. Test 16 kHz audio with a 4 kHz band at both extreme alphas: the upper anchor must map to itself and filter support must stay within the intended band. The thesis appendix describes 3.5/7 kHz cutoffs for 4/8 kHz upper bands (`Backmatter/Warped_Feature.tex`, line 30). `Fx_mfcc_vtmp_cep.m` defaults to 16 kHz and `fH=4000` (lines 27–36), but delegates warping to the **missing** `Fx_melfiltbank.m` (line 46), so this is a thesis-based choice, not proven MATLAB parity. With the current bin-warp convention, **alpha > 1**, not alpha < 1, moves a 4 kHz filter edge toward physical bins above 4 kHz.
+The per-feature summary in `docs/feature_parity.md` now tracks `Chapters/ExpSetup.tex:191–223`: MFCC has 26 filters, 0–4000 Hz and 13 coefficients; PLP has no stated count/band/c0/delta policy there; MFCC-TMP has 25/10 ms, 26 filters and 13 plus delta/delta-delta, with no band stated in that passage. HTK cells are marked unverified. Correct two remaining cells in that file: the `Fx_mfcc_lift.m` row places MATLAB's `Nlift=-20` in the **Thesis** column even though the thesis passage gives no lifter; and the **Thesis** cell for “Delta formula” says “same” although no regression formula appears in those lines. The DCT Type III wording and unresolved convention are appropriately flagged.
 
-## 4. Warp direction — **agree**
+## 4. LBG split and stop rule — **change requested**
 
-`Fx_vtln_warp.m` sets its lower-band slope to `2-alpha` (lines 12–30), and `Fx_PLPCC_htk.m` warps FFT bins before the bank (line 47; bank call at line 65). Therefore alpha > 1 maps a physical bin to a lower filter coordinate and moves a fixed filter peak to a **higher physical frequency**. The direction matches the implementation and the usual shorter-tract/higher-formant interpretation. The separate mel-scale formula in `Backmatter/Warped_Feature.tex` should not be silently treated as identical to this piecewise warp.
+Using `mu ± 0.2 sigma` per dimension for each cluster is a reasonable reading of the VQ flowchart caption (`Backmatter/Algorithm_LC.tex`, Fig. VQ), though the caption does not specify the refinement stop rule. In `src/qbestd/ml/vq.py`, change `kmeans_refine` to stop only when the relative distortion **decrease** is nonnegative and below `tol`; an increase after empty-cluster reseeding must continue until recovery or `max_iter`. Add a targeted reseed/increase test in `tests/ml/test_vq.py`. The logged baseline runs did not hit this path.
 
-## 5. c0 versus 13 coefficients — **agree**
+## 5. GMM variance and dead components — **agree**
 
-For a DCT indexed from zero, `include_c0=False` producing c1–c13 is the literal reading of the MFCC-TMP equation's `k=1..Nc`, with `Nc=13` (`Chapters/ExpSetup.tex`, lines 219–223). The MATLAB `Fx_mfcc_vtmp_cep.m` instead takes DCT rows `1:Nc` in MATLAB indexing, thus c0–c12 (lines 74–78). Keep both modes explicit; keep the lifter index aligned. The thesis equation and MATLAB implementation do not resolve which mode generated the reported numbers.
+Float64 sufficient statistics with `E[x²] - E[x]²` are adequate for this baseline: both logged models improve monotonically, no variance reaches the floor, and no component is dead. A centred accumulation would be safer for much larger offsets, but adds another pass or more state without a demonstrated problem here. Keeping a dead component's parameters with a tiny weight is an explicit fallback, not evidence of a current failure. Log any future dead components; if they occur, compare reseeding or a smaller K before trusting a result.
 
-## 6. Peak normalization — **agree**
+## 6. Feature-cache identity — **change requested**
 
-Keep `max|x|` for a stable generic extractor and for MFCC-TMP parity (`Fx_mfcc_vtmp_cep.m`, line 41). `Fx_mfcc.m` divides by `max(x)` after mean subtraction (line 29); for an asymmetric signal this changes an overall gain and primarily c0 before liftering/deltas. Record it as a parity difference, and use a dedicated MATLAB-mode setting only if numerical comparison requires it. Note that floors and downstream normalization can make the effect more than an exact c0 shift in edge cases.
+In `src/qbestd/data/feature_cache.py`, store a deterministic fingerprint of the full feature config (`get_profile(...).to_dict()`), dataset revision, `exclude_sa`, feature kind, and a manually bumped feature-algorithm/schema version. In `src/qbestd/ml/train.py`, pass the requested settings to a validating cache loader and rebuild or fail clearly on mismatch. Include a test that a changed config or `exclude_sa` cannot silently reuse a cache. A Git commit hash alone would invalidate it after unrelated documentation commits; the explicit algorithm version must be bumped whenever feature semantics change.
 
-## 7. PLP choices — **change requested**
+## 7. Training environment — **change requested**
 
-`Fx_PLPCC_htk.m` forward-warps the nominal filter centres for equal-loudness weighting (lines 54–62), so `features/plp.py` faithfully follows that public MATLAB code. It is not the physical inverse-warped centre; retain the behavior for MATLAB parity and document the distinction in `docs/feature_parity.md`. For a **MATLAB-parity profile**, set `lpc_order=8` and disable DC removal in `src/qbestd/features/plp.py`/the shared front end: MATLAB defaults to order 8 (line 35) and feeds `x*32768` directly into `myspectrogram` (line 69). Keep order 12 and any DC-removal choice available for an explicitly labeled HTK-like profile. The thesis says HTK produced PLP but supplies neither order nor DC option (`Chapters/ExpSetup.tex`, lines 193–198), so no profile can yet claim thesis parity.
+Add `huggingface_hub` to the core dependencies in `pixi.toml` and update `pixi.lock`, since the feature-cache builder and later TIMIT search need it without torch. Then `pixi run train-gmm` should work as advertised, and `src/qbestd/ml/train.py` should no longer claim a core command that actually requires the align environment. Keep GPU/transformers dependencies isolated in `align`.
 
-## 8. MFCC-TMP details — **unknown**
+## 8. Model hashes — **agree**
 
-`Fx_mfcc_vtmp_cep.m` mirrors weights (line 47), applies them to the full complex FFT, takes the **real** IFFT (lines 68–70), and sums `vteo` over that full `NFFT` vector (line 70). Its `m` and `p` options use `abs(y)` and `angle(y)` (lines 56–61), so the non-conjugate-symmetric phase-only case followed by real IFFT is faithful to that code. The exact lag/edge rule and possible normalization are **unknown** because `vteo.m` is absent. Keep `teager_energy_lagged` labeled approximate; do not present its edge replication or floored sums as verified parity.
+The parameter SHA-256 in `src/qbestd/ml/gmm.py` identifies the exact weight/mean/variance bytes, while the file SHA-256 identifies the particular `.npz` artifact. Recording both plus the model metadata is sufficient. Different zip timestamps explain a file-hash change without a parameter change; bitwise parameter identity across GPU/BLAS environments is not guaranteed either. Deterministic zip writing or multiple `.npy` files adds complexity with no present benefit.
 
-## 9. Unified extraction API and repeated work — **change requested**
+## 9. HF speaker overlap — **change requested**
 
-In `src/qbestd/features/extract.py`, default the optional `warp_factor` argument to `None`; when absent use `config.warp_factor`, and when supplied override it. Test both paths. The current default silently discards a non-default factor in the config. Recomputing frames and FFT 13 times is a genuine Stage 4 cost, but defer caching until Stage 4 profiles it: MFCC, PLP, and MFCC-TMP use different intermediate data, and premature shared cache code would complicate the extractors.
+The unequal SA1/SA2 train counts (488/501) prove the HF split is **not strictly speaker-independent**, assuming each of TIMIT's 630 speakers has both SA sentences: at least 13 speakers' SA utterances cross the split. Those counts alone do **not** prove a random split or that *most* speakers overlap. In `docs/data_notes.md`, `docs/alignment_notes.md` and the Stage 7 result notes, state this narrower finding and label HF results “speaker overlap present; approximate versus the thesis.” Do not infer speaker IDs from audio and silently re-split: the parquet rows lack identifiers, and an inferred split would not restore the official 3696/1344 non-SA partition or its query counts. If a reliable speaker manifest appears later, run a separately named speaker-disjoint sensitivity experiment.
 
-## 10. Feature parity table — **change requested**
+## 10. SA rows in search documents — **change requested**
 
-In `docs/feature_parity.md`, replace broad thesis-column claims with what `Chapters/ExpSetup.tex` actually states. Line 191 specifies **MFCC**: 26 filters, 0–4000 Hz, 13 DCT coefficients, and HTK. Lines 193–194 give **no PLP** filter count, band, c0 choice, or delta configuration. Lines 198–223 specify **MFCC-TMP**: 25/10 ms, 26 filters, 13 coefficients plus delta/delta-delta, and a formula indexed `k=1..13`; they do **not explicitly state its frequency band** in that passage. The same passage says HTK extracted MFCC/PLP, not MFCC-TMP. The table's blanket “thesis 26,” “thesis 0–4000,” “thesis 39 dimensions,” and HTK-default memory entries need those per-feature qualifications. Also label the thesis's “Type III” DCT wording at line 191 separately from the MATLAB/NumPy DCT-II implementation; do not call the mismatch resolved without a convention check.
+Exclude both SA sentence texts from **test documents** in the Stage 7 TIMIT loader/search manifest, using `normalize_transcript` and the existing `is_sa_sentence` logic in `src/qbestd/data/feature_cache.py`. Test the 271-row exclusion and retain row-index mapping for evaluation. `Chapters/ExpSetup.tex:73–75` says `/sa/` sentences are neglected, so leaving repeated SA documents would distort rankings and keyword counts.
 
-## 11. Other Stage 2 issues — **change requested**
+## 11. Variance-floor and stopping evidence — **unknown**
 
-In `tests/features/test_mfcc_tmp.py`, replace `0 <= floor_hits <= energies.size`, which cannot fail, with a meaningful seeded-noise assertion such as `floor_hits < energies.size`, while keeping the exact count as diagnostic output. Avoid an arbitrary upper percentage until measured across environments. The Stage 2 demos' long lines and the unrelated line-wrap fixes in the LPC commit are style/process cleanup, not correctness blockers. I found no other specific failure that warrants a new task from the listed code.
+The [HTK Book's HCompV example](https://labrosa.ee.columbia.edu/doc/HTKBook21/node28.html) uses `-f 0.01` to create a per-dimension floor of 1% of global variance; [HERest's `-v`](https://www.ee.columbia.edu/~dpwe/LabROSA/doc/HTKBook21/node166.html) instead sets an absolute minimum variance. These show that the chosen ratio is HTK-like, **not** that this thesis's standalone LBG-initialized GMM used it. `Chapters/ExpSetup.tex:229–238` and `Backmatter/Algorithm_LC.tex` do not state a variance floor or k-means tolerance, and the public `research_qbestd` tree contains matching code rather than a GMM training configuration. Keep both parameters marked unverified in `src/qbestd/ml/gmm.py`, `vq.py`, and `docs/gmm_notes.md`.
 
-## 12. TIMIT sample rate and feature ceilings — **unknown**
+## 12. Speech activity detection — **change requested**
 
-All 6300 HF rows are observed at 16 kHz (`docs/alignment_notes.md`, “Sample rate”). The thesis states the MFCC band is 0–4000 Hz but does not say TIMIT was downsampled (`Chapters/ExpSetup.tex`, line 191). For the next **TIMIT reference run**, use `(16 kHz, 4 kHz)` for MFCC and MFCC-TMP, matching the data rate and `Fx_mfcc_vtmp_cep.m` defaults (lines 27–36); use `(16 kHz, 8 kHz)` for the public MATLAB PLP variant (`Fx_PLPCC_htk.m`, lines 30–39). In `src/qbestd/features/mfcc.py`, `mfcc_tmp.py`, and `plp.py`, expose these as an explicitly named TIMIT/MATLAB profile rather than silently changing generic defaults. Whether the thesis's HTK pipeline resampled remains unknown; only its configuration or scripts can settle it.
+Do not silently trim GMM training or search to the forced aligner's first/last word: that alignment is approximate, word boundaries can cut weak consonants, and it would entangle the search baseline with alignment errors. Keep the current all-frame baseline. In the Stage 7 evaluation pipeline, add an **optional** energy-based SAD or padded edge trim as a named ablation, preserve original frame-to-time indices, and compare p@N/MAP before enabling it. The thesis used BUT CZ/HU/RU nonspeech phone posteriors (`Chapters/ExpSetup.tex:241–243`), which is a different detector; neither simple replacement should be called thesis parity.
 
-## 13. Missing mel-bank definition — **unknown**
+## 13. GMM input dimensions and c0 — **agree**
 
-The thesis names mel filters and a band (`Chapters/ExpSetup.tex`, line 191) and describes a warped mel scale/cutoff (`Backmatter/Warped_Feature.tex`, lines 11–30), but does not pin down triangle area normalization or exact FFT-bin edge placement. `Fx_mfcc.m` and `Fx_mfcc_vtmp_cep.m` call the unavailable `Fx_melfiltbank.m`; rastamat/HTK bank routines are useful comparison implementations, not evidence of this missing function's behavior. Keep the unit-peak, equally spaced triangles identified as an assumption in `docs/feature_parity.md` until source or numerical reference output is found.
+Keep 39-dimensional MFCC (13 statics including c0, plus delta and delta-delta) for the baseline. `Chapters/Unsupervised.tex:113` explicitly describes 13 coefficients plus both derivatives for MFCC and PLP, and `Chapters/ExpSetup.tex:198` does so for MFCC-TMP. The thesis passages do not settle c0 versus log-energy for the reported HTK features, but the public `Fx_mfcc.m` retains DCT row 1 (c0). Record the current c0 choice and, once Stage 7 works, compare 13-static and c0-omitted variants as labeled ablations rather than changing the baseline now.
 
-## 14. Collapsed word runs — **change requested**
+## 14. Ten EM iterations — **change requested**
 
-In `src/qbestd/alignment/manifest.py`, make `check_segments` flag **equal consecutive starts** as a distinct collapsed-run warning, with a test using two words whose durations exceed 20 ms. This catches a pattern the current duration threshold can miss. Do not automatically drop every such row: a shared rounded start could occur at timestamp resolution. In Stage 7, exclude or manually review affected **query segments** using this flag plus duration and overlap evidence. Keep the nondecreasing-start and positive-duration checks for malformed imported manifests even though the pinned aligner clamps its own output.
+Keep `n_iter=10` as the fixed baseline for reproducibility, but correct the evidence in `src/qbestd/ml/gmm.py` and `docs/gmm_notes.md`: `Chapters/Representation.tex:1089` states ten iterations for the **mixture-of-GMMs** experiment; the apparent ten-iteration sentence at `Representation.tex:196` is commented out in the source and does not establish the baseline GMM's count. The positive final-step gain means ten iterations are not full convergence. Label ten as an experimental choice informed by a related thesis setup, and optionally run a longer convergence sensitivity check without replacing the ten-iteration model.
 
-## 15. Transcript units — **change requested**
+## 15. Other correctness and coverage issues — **agree**
 
-In `src/qbestd/data/timit_hf.py`, apply Unicode NFC before lowercasing/tokenizing and add tests for equivalent composed/decomposed text; Stage 7 must reuse this function. Before altering hyphen/apostrophe tokenization, audit the pinned corpus for those tokens and compare them with the pinned aligner's `words_of` behavior. Since the aligner receives an explicit word list, its tokenizer is bypassed, and equal output/input word counts do not establish correct compound boundaries. A tokenization change after manifest generation requires rerunning alignment and updating the documented hashes.
-
-## 16. Overlapping word cuts — **agree**
-
-For Stage 7 query clips, initially use the aligner's `[start, end]` with a small, explicit pad (the 20 ms used in the review is a reasonable starting point), clip to utterance bounds, and retain overlap statistics/flags. Midpoint-clipping a third of adjacent pairs could remove phonetic evidence; dropping all overlaps would discard too much data. Exclude the clearly collapsed/very short query segments, then compare padded-cut retrieval performance and a sampled listening/ASR audit before choosing any overlap threshold.
-
-## 17. Alignment accuracy and leakage — **change requested**
-
-In `docs/alignment_notes.md`, say explicitly that the model card's 10.7 ms figure was measured on its own TIMIT test setup and is **not a measured error for these HF manifests**. Training-speaker overlap with the redrawn HF split is plausible but unverified without IDs. It may make alignment accuracy look better; independently, speaker overlap between HF query/train and document/test sets may also inflate later QbE scores. The alignment-only role does not remove that evaluation concern.
-
-## 18. Stronger sanity check — **change requested**
-
-The Reviewer's 300-word independent-ASR comparison is stronger evidence than the energy check because true cuts beat both shifted controls, but its 0.653 hit rate depends on Whisper-base, padding, word normalization, and short-clip behavior. Add an **optional**, reproducible content-word audit to `src/qbestd/alignment/sanity.py` or a separate alignment QA script: fixed seed, words of at least 3 letters, true and ±0.25 s shifted cuts, same scorer, hit rates and sample counts saved to `outputs/alignment/`. Document the model/revision. Do not make a 3× ratio a hard alignment gate from this one run; retain it as comparative diagnostic, and inspect failures on a stratified sample. A time-shift equivariance test with the same aligner alone is weaker because it can reproduce its own errors.
-
-## 19. Manifest hashes — **agree**
-
-Keep the SHA-256s: they identify the exact files used in an experiment even if bf16 GPU reruns differ by a millisecond. Record model/dataset revisions, environment lock, precision, seed where applicable, and per-split counts/quantiles alongside them (`docs/alignment_notes.md` already has most of these). A hash mismatch prompts comparison, not automatic rejection; a tolerance-based statistical summary supplements but cannot replace file identity.
-
-## 20. Other alignment and environment issues — **change requested**
-
-In `src/qbestd/alignment/word_aligner.py`, check that `align_batch` returns exactly one outcome per input row before `zip`; otherwise `align_rows_detailed` silently loses rows. Add a fake-aligner test returning too few outcomes. In `src/qbestd/alignment/manifest.py`, reject or flag non-finite start/end times, which currently pass most comparisons; add focused tests. The pinned revision, reviewed `align.py` hash, safetensors-only snapshot patterns, and lazy torch import are sound for this workflow. `pytorch-gpu="*"` with CUDA 12 is acceptable with the committed `pixi.lock` on the tested Windows GPU; record that platform and do not imply the lock guarantees a working GPU on other machines.
+The main additional risk is the cache provenance mismatch in Q6; address it before Stage 7 so a model cannot be attributed to feature settings it did not use. `tests/ml/test_train.py` already checks that the parameter hash is deterministic and changes between distinct trained models. I found no further specific PEP 8, security, or test-coverage blocker in the listed commits. The reported 366 passing tests and the independent alignment audit support the completed scope, but do not establish thesis-level numerical parity.
