@@ -2,7 +2,11 @@ import numpy as np
 import pytest
 
 from qbestd.search.distance import symmetric_kl_matrix
-from qbestd.search.subdtw import best_utterance_distance, subdtw_lc2
+from qbestd.search.subdtw import (
+    backtrace_path,
+    best_utterance_distance,
+    subdtw_lc2,
+)
 
 
 def cpp_transcription(D):
@@ -135,3 +139,19 @@ def test_normalisation_by_path_length_is_used():
     P = np.array([[0], [1]])
     dist, _, end, _ = best_utterance_distance(S, T, P, 0.5, 2.0)
     assert (dist, end) == (1.0, 1)
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_backtrace_is_consistent_with_the_accumulation(seed):
+    rng = np.random.default_rng(seed)
+    D = rng.integers(0, 4, size=(25, 6)).astype(float)  # tie-heavy
+    S, T, P = subdtw_lc2(D)
+    for end in (5, 12, 24):
+        path = backtrace_path(D, S, end)
+        assert [n for _, n in path] == list(range(6))
+        assert path[-1] == (end, 5)
+        assert path[0][0] == P[end, 5]
+        steps = np.diff([m for m, _ in path])
+        assert set(steps) <= {0, 1, 2}
+        assert sum(D[m, n] for m, n in path) == pytest.approx(S[end, 5])
+        assert len(path) == T[end, 5]

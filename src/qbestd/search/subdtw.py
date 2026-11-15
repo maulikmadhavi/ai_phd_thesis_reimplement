@@ -99,3 +99,30 @@ def best_utterance_distance(accumulated, length, start, min_ratio=0.5,
                                                            np.inf)
     end = int(np.argmin(candidates))
     return (float(normalised[end]), int(start[end, -1]), end, used_fallback)
+
+
+def backtrace_path(local_distance, accumulated, end_frame):
+    """Best path ending at test frame ``end_frame`` in the last column.
+
+    Re-derives each predecessor with the kernel's rules and tie order, so it
+    agrees with :func:`subdtw_lc2`. Returns a list of ``(test_frame,
+    query_frame)`` pairs from query frame 0 to N - 1 (used by the demo).
+    """
+    distance = np.asarray(local_distance, dtype="float64")
+    path = [(int(end_frame), distance.shape[1] - 1)]
+    m = int(end_frame)
+    for n in range(distance.shape[1] - 1, 0, -1):
+        if m >= 2:
+            here = distance[m, n]
+            horizontal = here + accumulated[m, n - 1]
+            diagonal = here + accumulated[m - 1, n - 1]
+            skip = here + accumulated[m - 2, n - 1]
+            if horizontal <= skip and horizontal <= diagonal:
+                step = 0
+            elif diagonal <= skip and diagonal <= horizontal:
+                step = 1
+            else:
+                step = 2
+            m -= step
+        path.append((m, n - 1))
+    return path[::-1]

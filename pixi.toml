@@ -28,6 +28,7 @@ matplotlib = "*"
 demo-stage1 = "python demo/stage1_audio_demo.py"
 demo-stage2 = "python demo/stage2_features_demo.py"
 demo-stage3 = "python demo/stage3_gmm_demo.py"
+demo-stage5 = "python demo/stage5_search_demo.py"
 
 # Forced alignment of TIMIT words (GPU model). Torch stays out of core/demo.
 [feature.align.system-requirements]
