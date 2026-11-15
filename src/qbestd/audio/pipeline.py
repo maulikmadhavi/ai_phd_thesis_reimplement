@@ -26,6 +26,7 @@ class AudioFrontEndConfig:
     preemphasis: float = DEFAULT_PREEMPHASIS_COEFFICIENT  # unverified default
     window: str = DEFAULT_WINDOW_NAME  # unverified default
     n_fft: int | None = None  # unverified default; None = next power of two
+    remove_dc: bool = True  # whole-utterance mean removal; PLP MATLAB: none
 
     def to_dict(self):
         return asdict(self)
@@ -47,7 +48,8 @@ def prepare_frames(samples, sample_rate, config):
     """
     target_rate = config.sample_rate or sample_rate
     samples = resample_audio(samples, sample_rate, target_rate)
-    samples = remove_dc_offset(samples)
+    if config.remove_dc:
+        samples = remove_dc_offset(samples)
     samples = apply_preemphasis(samples, config.preemphasis)
     frames = frame_signal(samples, target_rate, config.frame_ms, config.shift_ms)
     return apply_window(frames, make_window(config.window, frames.shape[1]))
