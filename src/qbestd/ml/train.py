@@ -4,11 +4,17 @@ Usage (core environment, which includes ``huggingface_hub`` for the
 dataset download)::
 
     pixi run train-gmm --kind mfcc --profile timit_matlab --components 64
+    pixi run train-gmm --components 64 --split-manifest <manifest.tsv>
 
 Builds (or reuses) the feature cache of the HF train split without the two SA
 sentences in ``outputs/features/``, runs LBG + 10 EM iterations and writes
 ``<out>/<kind>_<profile>_gmm<K>.npz`` plus a ``.json`` training log. Models
 and features are git-ignored and never committed.
+
+With ``--split-manifest`` the training rows are the train side of the
+manifest, taken from the caches of both HF splits; ``split_id`` comes from
+the manifest and the model goes to ``<out>/<rule name>/`` unless ``--out``
+is given.
 """
 
 import argparse
@@ -27,6 +33,8 @@ from qbestd.data.feature_cache import (
     hf_split_id,
     load_feature_cache,
 )
+from qbestd.data.split_selection import gather_utterances, manifest_selection
+from qbestd.data.text_split import read_split_manifest
 from qbestd.ml.gmm import (
     count_floored,
     gmm_content_sha256,
@@ -50,6 +58,8 @@ def parse_args(argv=None):
     parser.add_argument("--epsilon", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--split", default="train")
+    parser.add_argument("--split-manifest", type=Path, default=None,
+                        help="train on the train side of this manifest")
     parser.add_argument("--split-id", default=hf_split_id(),
                         help="identity of the training rows, stored in the "
                         "model (default: the HF split without SA)")
@@ -70,22 +80,52 @@ def file_sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def get_features(args):
-    """Features of the training split, from the cache (built on demand).
+def load_split_cache(args, hf_split):
+    """Cache of one HF split (built on demand), fingerprint checked.
 
     A missing cache is built; one whose fingerprint does not match the
     requested settings is only replaced with ``--rebuild-cache``.
     """
-    path = cache_path(args.features_dir, args.split, args.kind, args.profile)
+    path = cache_path(args.features_dir, hf_split, args.kind, args.profile)
     if args.rebuild_cache or not path.is_file():
         LOGGER.info("building feature cache %s", path)
-        path, _ = build_feature_cache(args.split, args.kind, args.profile,
+        path, _ = build_feature_cache(hf_split, args.kind, args.profile,
                                       args.features_dir)
     expected = feature_fingerprint(args.kind, args.profile, exclude_sa=True)
     try:
         return load_feature_cache(path, expected=expected)
     except CacheMismatchError as error:
         raise SystemExit(f"{error}; rerun with --rebuild-cache") from error
+
+
+def get_features(args):
+    """Features of the training split, from the cache (built on demand)."""
+    return load_split_cache(args, args.split)
+
+
+def get_manifest_features(args):
+    """``(features, None, keys, meta)`` of the manifest's train side.
+
+    Rows come from the caches of both HF splits; ``keys`` are the
+    ``(hf_split, row_index)`` pairs in training order.
+    """
+    selection = manifest_selection(args.split_manifest)
+    caches = {}
+
+    def load(hf_split):
+        if hf_split not in caches:
+            caches[hf_split] = load_split_cache(args, hf_split)
+        return caches[hf_split]
+
+    utterances, keys = gather_utterances(selection, "train", load)
+    meta = {"n_rows": len(keys),
+            "dataset_revision": next(iter(caches.values()))[3][
+                "dataset_revision"],
+            "excluded_sa_rows": sum(c[3]["excluded_sa_rows"]
+                                    for c in caches.values()),
+            "fingerprint": feature_fingerprint(args.kind, args.profile,
+                                               exclude_sa=True)}
+    return np.concatenate(utterances), None, keys, meta
 
 
 def train_from_features(features, meta, args):
@@ -127,7 +167,14 @@ def main(argv=None):
     args = parse_args(argv)
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
-    features, _, _, meta = get_features(args)
+    if args.split_manifest:
+        args.split_id = manifest_selection(args.split_manifest).split_id
+        if args.out == DEFAULT_MODELS_DIR:
+            args.out = DEFAULT_MODELS_DIR / read_split_manifest(
+                args.split_manifest).rule
+        features, _, _, meta = get_manifest_features(args)
+    else:
+        features, _, _, meta = get_features(args)
     log = train_from_features(np.asarray(features), meta, args)
     LOGGER.info("%s: LL %.3f -> %.3f in %.0f s, sha256 %s", log["name"],
                 log["ll_history"][0], log["ll_history"][-1],

@@ -140,6 +140,36 @@ def test_rebuild_cache_replaces_a_mismatched_cache(tmp_path, monkeypatch):
     assert calls == ["train"]
 
 
+def test_manifest_training_uses_rows_of_both_hf_splits(tmp_path,
+                                                       monkeypatch):
+    monkeypatch.setattr("qbestd.data.text_split.TEST_QUOTA",
+                        {"multi": 1, "single": 1})
+    import qbestd.ml.train as train
+    from qbestd.data.text_split import (
+        build_text_split,
+        split_id,
+        write_split_manifest,
+    )
+    rows = [("train", 0, "alpha beta"), ("train", 1, "gamma delta"),
+            ("test", 0, "alpha beta"), ("test", 1, "epsilon zeta")]
+    write_split_manifest(tmp_path / "m.tsv", build_text_split(rows, []))
+    caches = {}
+    for hf_split, value in (("train", 1.0), ("test", 5.0)):
+        features = np.full((4, 3), value, np.float32)
+        meta = {"dataset_revision": "d" * 40, "excluded_sa_rows": 1}
+        caches[hf_split] = (features, np.array([0, 2, 4]), np.array([0, 1]),
+                            meta)
+    monkeypatch.setattr(train, "load_split_cache",
+                        lambda args, hf_split: caches[hf_split])
+    args = parse_args(["--split-manifest", str(tmp_path / "m.tsv")])
+    features, _, keys, meta = train.get_manifest_features(args)
+    assert meta["n_rows"] == len(keys) and len(keys) >= 1
+    assert meta["excluded_sa_rows"] >= 1
+    assert features.shape == (2 * len(keys), 3)
+    assert {k[0] for k in keys} <= {"train", "test"}
+    assert split_id(tmp_path / "m.tsv").startswith("textdisjoint_q20_v1-")
+
+
 def test_split_id_option_is_stored_in_the_model(tmp_path):
     args = parse_args(["--components", "2", "--n-iter", "1", "--split-id",
                        "textdisjoint_q20_v1-abc", "--out", str(tmp_path)])

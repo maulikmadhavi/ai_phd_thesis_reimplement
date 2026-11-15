@@ -48,6 +48,7 @@ class QueryExample:
     word_index: int
     start_s: float
     end_s: float
+    hf_split: str = "train"  # HF split that ``row_index`` refers to
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,7 @@ class SkippedInstance:
     row_index: int
     word_index: int
     reason: str  # "flagged"
+    hf_split: str = "train"
 
 
 @dataclass(frozen=True)

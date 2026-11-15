@@ -25,6 +25,7 @@ def test_defaults_and_required_model():
         "mfcc", "timit_matlab", "q20")
     assert args.gmm == Path("m.npz")
     assert args.out is None and args.limit_queries is None
+    assert args.split_manifest is None
 
 
 def test_model_is_required():
@@ -89,10 +90,11 @@ def test_aggregate_instance_and_keyword_averages_differ():
 
 
 def test_write_per_query_has_the_documented_columns(tmp_path):
-    rows = [{"keyword": "love", "row_index": 3, "word_index": 1,
+    rows = [{"keyword": "love", "hf_split": "train", "row_index": 3,
+             "word_index": 1,
              "n_relevant": 2, "p_at_n": 50.0, "ap": 0.75, "nonmatches": 4}]
     write_per_query(tmp_path / "sub" / "per_query.tsv", rows)
     lines = (tmp_path / "sub" / "per_query.tsv").read_text().splitlines()
     assert lines[0].split("\t") == list(PER_QUERY_HEADER)
-    assert lines[1].split("\t") == ["love", "3", "1", "2", "50.0000",
-                                    "0.7500", "4"]
+    assert lines[1].split("\t") == ["love", "train", "3", "1", "2",
+                                    "50.0000", "0.7500", "4"]

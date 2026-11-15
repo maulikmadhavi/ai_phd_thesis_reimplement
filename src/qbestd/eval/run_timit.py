@@ -3,10 +3,17 @@
 Usage::
 
     pixi run eval-timit --gmm outputs/models/mfcc_timit_matlab_gmm64.npz
+    pixi run eval-timit --gmm <model> --split-manifest <manifest.tsv>
 
-Steps: (1) load or build the test feature cache (SA excluded, fingerprint
-checked); (2) cut each query clip from the train audio and extract its
-features; (3) posteriorgrams of queries and documents; (4) for every query
+Without ``--split-manifest`` the Hugging Face split is used (train rows give
+queries, test rows give documents). With it, the train side of the manifest
+(rows of either HF split, each with its own word alignments) gives queries
+and the test side gives documents and relevance; the model must have been
+trained on the same split (``split_id`` is checked).
+
+Steps: (1) load or build the feature caches (SA excluded, fingerprint
+checked) and select the test-side documents; (2) cut each query clip from its
+audio and extract its features; (3) posteriorgrams of queries and documents; (4) for every query
 and document: symmetric-KL matrix, LC2 accumulation and the utterance
 distance; (5) rank documents, then p@N and AP per query instance.
 
@@ -33,20 +40,27 @@ from qbestd.data.feature_cache import (
     build_feature_cache,
     cache_path,
     feature_fingerprint,
-    hf_split_id,
     load_feature_cache,
-    utterance_slice,
 )
-from qbestd.data.timit_hf import download_timit_parquet, iter_timit_rows
+from qbestd.data.split_selection import (
+    HF_SPLITS,
+    gather_utterances,
+    hf_selection,
+    manifest_selection,
+)
+from qbestd.data.timit_hf import (
+    download_timit_parquet,
+    iter_timit_rows,
+    read_sentences,
+)
 from qbestd.eval.bootstrap import cluster_bootstrap
 from qbestd.eval.metrics import average_precision, precision_at_n, summarise
 from qbestd.eval.model_guard import check_model
-from qbestd.eval.timit_queries import (
-    Q20_KEYWORDS,
-    build_query_examples,
-    cut_clip,
-    read_relevance,
+from qbestd.eval.selection_data import (
+    selection_examples,
+    selection_relevance,
 )
+from qbestd.eval.timit_queries import Q20_KEYWORDS, cut_clip
 from qbestd.features.extract import extract_features
 from qbestd.features.profiles import get_profile
 from qbestd.ml.gmm import gmm_content_sha256, load_gmm
@@ -58,7 +72,7 @@ from qbestd.search.distance import symmetric_kl_matrix
 from qbestd.search.score import rank_documents
 from qbestd.search.subdtw import best_utterance_distance, subdtw_lc2
 
-PER_QUERY_HEADER = ("keyword", "row_index", "word_index", "n_relevant",
+PER_QUERY_HEADER = ("keyword", "hf_split", "row_index", "word_index", "n_relevant",
                     "p_at_n", "ap", "nonmatches")
 
 
@@ -76,9 +90,8 @@ def parse_args(argv=None):
                         default=Path("outputs/features"))
     parser.add_argument("--alignment-dir", type=Path,
                         default=Path("outputs/alignment"))
-    parser.add_argument("--relevance", type=Path,
-                        default=Path("outputs/eval/relevance_test.tsv"),
-                        help="written by qbestd.eval.q20_counts")
+    parser.add_argument("--split-manifest", type=Path, default=None,
+                        help="text-disjoint manifest (default: HF split)")
     parser.add_argument("--limit-queries", type=int, default=None,
                         help="use only the first N queries (smoke tests)")
     return parser.parse_args(argv)
@@ -155,49 +168,63 @@ def git_commit():
         return None
 
 
-def load_documents(args):
-    """Posterior-ready test features: ``(feature list, row indices, meta)``."""
-    path = cache_path(args.features_dir, "test", args.kind, args.profile)
+def load_split_cache(args, hf_split):
+    """Feature cache of one HF split, built on demand, fingerprint checked."""
+    path = cache_path(args.features_dir, hf_split, args.kind, args.profile)
     if not path.is_file():
-        build_feature_cache("test", args.kind, args.profile,
+        build_feature_cache(hf_split, args.kind, args.profile,
                             args.features_dir)
     expected = feature_fingerprint(args.kind, args.profile, exclude_sa=True)
-    features, offsets, rows, meta = load_feature_cache(path, expected)
-    utterances = [utterance_slice(features, offsets, i)
-                  for i in range(len(rows))]
-    return utterances, [int(r) for r in rows], meta
+    return load_feature_cache(path, expected)
 
 
 def query_features(args, examples):
     """Features of every query clip (extracted from the cut audio)."""
-    wanted = {e.row_index for e in examples}
+    wanted = {(e.hf_split, e.row_index) for e in examples}
     config = get_profile(args.profile, args.kind)
-    audio = {row.row_index: row for row in iter_timit_rows(
-        download_timit_parquet("train"), "train") if row.row_index in wanted}
+    audio = {}
+    for hf_split in sorted({split for split, _ in wanted}):
+        for row in iter_timit_rows(download_timit_parquet(hf_split),
+                                   hf_split):
+            if (hf_split, row.row_index) in wanted:
+                audio[(hf_split, row.row_index)] = row
     out = []
     for example in examples:
-        row = audio[example.row_index]
+        row = audio[(example.hf_split, example.row_index)]
         clip = cut_clip(row.audio, row.sample_rate, example)
         out.append(extract_features(clip, row.sample_rate, args.kind,
                                     config=config))
     return out
 
 
+def load_inputs(args, selection):
+    """``(documents, document keys, relevance, examples)`` of a selection."""
+    utterances, keys = gather_utterances(
+        selection, "test", lambda split: load_split_cache(args, split))
+    sentences = {split: read_sentences(download_timit_parquet(split))
+                 for split in HF_SPLITS if selection.uses("test", split)}
+    relevance = selection_relevance(keys, sentences, Q20_KEYWORDS)
+    examples, _ = selection_examples(
+        selection, Q20_KEYWORDS,
+        lambda split: read_manifest(
+            args.alignment_dir / f"timit_hf_words_{split}.tsv")[0],
+        lambda split: iter_timit_rows(download_timit_parquet(split), split))
+    return (utterances, keys, relevance,
+            [e for e in examples if relevance[e.keyword]])
+
+
 def main(argv=None):
     args = parse_args(argv)
     started = time.time()
     gmm, info = load_gmm(args.gmm)
-    split_id = hf_split_id()
-    check_model(info, args.kind, args.profile, split_id,
-                feature_fingerprint(args.kind, args.profile, exclude_sa=True))
+    selection = (manifest_selection(args.split_manifest)
+                 if args.split_manifest else hf_selection())
+    split_id = selection.split_id
+    fingerprint = feature_fingerprint(args.kind, args.profile,
+                                      exclude_sa=True)
+    check_model(info, args.kind, args.profile, split_id, fingerprint)
     out = args.out or Path("outputs/eval") / args.gmm.stem
-    utterances, doc_rows, doc_meta = load_documents(args)
-    relevance = read_relevance(args.relevance)
-    words, _ = read_manifest(args.alignment_dir / "timit_hf_words_train.tsv")
-    rows = iter_timit_rows(download_timit_parquet("train"), "train")
-    examples = [e for e in build_query_examples(words, rows, Q20_KEYWORDS)
-                if relevance.get(e.keyword) and
-                set(relevance[e.keyword]) & set(doc_rows)]
+    utterances, doc_rows, relevance, examples = load_inputs(args, selection)
     if args.limit_queries:
         examples = examples[:args.limit_queries]
     clips = query_features(args, examples)
@@ -218,10 +245,10 @@ def main(argv=None):
         p_at_n, ap = score_query(distances, doc_rows,
                                  relevance[example.keyword])
         per_query.append({
-            "keyword": example.keyword, "row_index": example.row_index,
+            "keyword": example.keyword, "hf_split": example.hf_split,
+            "row_index": example.row_index,
             "word_index": example.word_index,
-            "n_relevant": len(set(relevance[example.keyword])
-                              & set(doc_rows)),
+            "n_relevant": len(relevance[example.keyword]),
             "p_at_n": p_at_n, "ap": ap,
             "nonmatches": int(nonmatches.sum())})
     write_per_query(out / "per_query.tsv", per_query)
@@ -230,13 +257,20 @@ def main(argv=None):
         "model": args.gmm.name,
         "model_content_sha256": gmm_content_sha256(gmm),
         "model_info": info, "split_id": split_id,
-        "feature_fingerprint": doc_meta["fingerprint"],
+        "feature_fingerprint": fingerprint,
+        "split_manifest": (str(args.split_manifest)
+                           if args.split_manifest else None),
         "n_documents": len(doc_rows), "n_queries": len(per_query),
         "queries_without_frames": skipped_short,
         "total_nonmatches": int(sum(q["nonmatches"] for q in per_query)),
         "runtime_s": round(time.time() - started, 1),
         "git_commit": git_commit(),
-        "label": "speaker overlap present; approximate versus the thesis"}
+        "label": ("closer to the thesis on sentence context; not an "
+                  "official TIMIT reconstruction; speaker overlap present"
+                  if args.split_manifest else
+                  "sentence-text overlap between queries and documents "
+                  "(HF split); speaker overlap present; approximate "
+                  "versus the thesis")}
     (out / "summary.json").write_text(json.dumps(summary, indent=2),
                                       encoding="utf-8")
     print(json.dumps({k: summary[k] for k in
