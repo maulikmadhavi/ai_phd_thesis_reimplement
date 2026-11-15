@@ -1,14 +1,13 @@
 # Execution Plan: QbE-STD Thesis Reimplementation
 
-- **Cycle:** 6 (Orchestrator)
-- **Handoff input:** `handoff_response.md` at `ba99a8a` (Codex review of cycle 5, Q1–Q6)
-- **Stage status:** Stages 0–3, TIMIT word alignment, the thesis endpoint rule, keyword-cluster
-  statistics, text-disjoint splits v1 and v2, and cycle 6 part A (C1–C6) are done. Part B is
-  in progress (§9 status). 563 passed, 1 skipped at `baa3bc3` (full suite, re-run by the
-  Orchestrator on 2026-11-16).
-- **This cycle:** provenance fixes and a corrected text-disjoint split `textdisjoint_q20_v2`
-  that keeps SX transcript variants together (part A, §8), then PLP and MFCC-TMP on v2
-  (part B, §9)
+- **Cycle:** 7 (Orchestrator)
+- **Handoff input:** `handoff_response.md` at `0cb6983` (Handoff_feedback review of cycle 6,
+  Q1–Q8), plus user decision D2 (2026-11-16)
+- **Stage status:** Stages 0–3, TIMIT word alignment, the thesis scorer, split v2, and MFCC,
+  PLP and MFCC-TMP on v2 are done. 563 passed, 1 skipped at `ec565b5`.
+- **This cycle:** the review fix-ups (part A, §8), then front-end parity (a level-handling
+  check and the `htk_described` reference profile) and the Stage 4 GMM-VTLN code, with no
+  VTLN score yet (part B, §9)
 - **Review agent:** from the cycle 6 review on, `handoff_response.md` comes from the
   Claude Code session Handoff_feedback, not Codex (protocol in `requirements.md`)
 - **Source of truth:** thesis `D:\Storage\career_phd_daiict_work\Thesis` (`Chapters/*.tex`,
@@ -137,6 +136,7 @@ comparable, until the split matches (§8 C5, split v2).
 | 23 | Path validity measure? | **Resolved** (Codex Q5): `wr = (i − P(i,N))/N` in test frames; min `S/T` over valid endpoints. |
 | 24 | Step 2 tie-break? | **Resolved** (Codex `ba99a8a` Q4): keep hash order; disclose minimum-cost assignment counts per component (§8 C4). |
 | 25 | Next suspect for the gap? | **None identified** (Codex Q2): fix v2, then PLP / MFCC-TMP / VTLN on v2. Revisit a front-end or aggregation hypothesis only with a parity test or new provenance. |
+| D2 | **User decision:** the HTK settings for the thesis MFCC/PLP | **Resolved 2026-11-16 (author):** `NUMCHANS = 40` for both, 16 kHz, band 0–3400 Hz; 25/10 ms and 13 + Δ/ΔΔ as in the thesis. The level check is approved; `htk_described` becomes the MFCC/PLP reference (§9). |
 | 26 | Carry the HF baseline forward? | **No** (Codex Q3): v2 is the primary Q-20 comparison; HF v2 and text-disjoint v1 are one-off references. |
 
 Codex decisions adopted:
@@ -253,271 +253,272 @@ Codex decisions adopted:
 - **Protocol change** (`1286fad`, `0f513f4`): Codex is retired. The Claude Code session
   Handoff_feedback writes `handoff_response.md`; every role hands on by SendMessage
   (`requirements.md`, "Agentic handoff").
+- **Cycle 6 part B done** (`5145ced..ec565b5`, 563 tests). On v2, p@N / MAP, instance
+  average:
+  - PLP `timit_matlab`: GMM-64 33.22 / 33.55, GMM-128 31.91 / 32.26;
+  - MFCC-TMP: GMM-64 39.17 / 41.15, GMM-128 41.94 / 43.88; 0 TEO floor hits;
+  - paired PLP − MFCC excludes 0 *against* the thesis's direction. MFCC-TMP does not
+    reproduce the thesis's +5 over MFCC.
+- Handoff_feedback reviewed cycle 6 in `handoff_response.md` at `0cb6983` (Q1–Q8).
+
+**Decisions adopted from `0cb6983` and the user (2026-11-16):**
+- Q1, Q2: keep v2 with all 20 links; no v3. Document the two-token variants, the corpus
+  count and the unmeasured split-draw variation (§8 F1).
+- Q3: keep the manual `ROW_SELECTION_VERSION` and pin the row-loop source digest in a test
+  (§8 F2). No module move now; fold it into the next change that invalidates the caches.
+- Q4, Q5: front-end parity comes before any VTLN score.
+  - **User decision D2:** the HTK configuration used `NUMCHANS = 40` for both MFCC and PLP,
+    a 16 kHz sample rate and a 0–3400 Hz band. The user approved the level-handling check,
+    and chose an `htk_described` profile as the new comparison reference for MFCC and PLP
+    (§9 L1, H1, H2).
+- Q6: MFCC above the thesis stays **unknown**. The front end is the leading hypothesis,
+  tested by L1 and H2. Speaker overlap cannot be checked.
+- Q7, Q8: wording and test fixes (§8 F4, F5). New run rule: no commits during a background
+  run (§8).
+- The user also approved building Stage 4 code now, with no VTLN score until parity is
+  reviewed (§9 V1–V3).
 
 ---
 
-## 8. Cycle 6, part A: provenance fixes and split v2 (Codex `ba99a8a` Q1, Q3–Q6)
+## 8. Cycle 7, part A: review fix-ups (Handoff_feedback `0cb6983` Q1–Q3, Q7, Q8)
 
-**Order matters.** C1 → C2 → C3 → C4 → C5 → C6, each its own commit.
-- C2 changes the feature fingerprint, so the A3 guard rejects every existing model. C3
-  rebuilds and re-checks the HF models **before** any v2 model is trained, or the v2 models
-  would be stale on arrival.
-- C5's split doc (the rule, the reason and the manifest hash) is committed **before** any
-  v2 GMM is trained or scored.
-- The v1 models are **not** retrained. The guard will reject them from C2 on; their scored
-  outputs stay as historical results.
+These change no reported number, and none of them rebuilds a cache or retrains a model.
 
-### C1: Results-doc corrections (Codex Q5, Q1)
-- **File:** `docs/results_timit_q20.md` (docs only, no new numbers)
-- **Do:**
-  - Line 212: replace "The text-disjoint split removes this, and its scores are **not**
-    lower …" and the causal conclusion after it. HF vs text-disjoint is **descriptive
-    only**: queries, documents, relevance and GMM training rows all change, and v1 still has
-    8 crossed SX variants. No unpaired test, and no claim that removing overlap raised,
-    lowered or failed to explain the scores.
-  - Line 223: the claim that **all** paired 128 − 64 intervals contain 0 is wrong. For v1,
-    the instance-averaged MAP difference is **+2.95, 95 % keyword-cluster interval
-    0.2–5.7**. Say that this positive MAP result is *in the thesis's direction* (thesis
-    +1.63 MAP), while the p@N interval and the keyword-averaged MAP interval include 0.
-    It describes the fixed v1 experiment. No numerical-parity claim.
-  - Label the text-disjoint v1 section: *"8 SX sentence variants crossed sides; government
-    affected; not fully sentence-disjoint"*. Keep its numbers as they are.
-- **Commit:** `exec: correct results wording per cycle 5 review`
+**Run rule, new from this cycle (Q8, provenance).** Never commit while a background
+training or evaluation run is going. Either wait for it, or start the run from a fixed
+commit in a separate worktree (`git worktree add ../qbestd_run <hash>`). Every
+`summary.json` and training log records the commit the run **started** from.
 
-### C2: Row-selection identity and import closure (Codex Q6)
-- **Files:** `src/qbestd/data/feature_cache.py`, `tests/data/test_feature_cache.py`
-- **Fingerprint.** Changes to row selection and decoding can change the cached rows or
-  samples without changing the feature-source digest. Close that gap, but do **not** hash
-  `feature_cache.py` itself, because then every edit to the fingerprint code would
-  invalidate the caches. Add three entries to the `feature_fingerprint` payload:
-  - `row_source_digest`: `feature_source_digest` over `ROW_SOURCE_FILES =
-    ("data/timit_hf.py",)`, with the same CRLF → LF normalisation. This covers row
-    iteration, decoding, the sample-rate check and `normalize_transcript`.
-  - `sa_tokens`: the value of `SA_TOKENS` as a list.
-  - `row_selection_version`: a new constant `ROW_SELECTION_VERSION = 1` covering the
-    selection loop inside `build_feature_cache` (SA skip, row order, offsets). Its comment
-    says to bump it whenever that logic changes.
-  - Update the docstring to list everything the fingerprint covers.
-- **Import-closure test:**
-  - Factor the AST walk into a helper that takes a root directory, so a fixture can run it
-    on a temporary tree.
-  - Resolve **relative** `ImportFrom` nodes (`level > 0`) against the importing module's
-    package.
-  - Fixture: copy `src/qbestd/audio` and `src/qbestd/features` into `tmp_path`, add a new
-    helper module, and import it from the copied `features/extract.py`. The closure helper
-    must report the helper as missing from `FEATURE_SOURCE_FILES`. Run the case once with an
-    absolute import and once with a relative one.
-  - Docstring: the check still misses dynamic imports and code outside the two packages.
-- **Invalidation tests:** each of these changes the fingerprint:
-  - the bytes of a temporary copy of `data/timit_hf.py`;
-  - a monkeypatched `SA_TOKENS`;
-  - a monkeypatched `ROW_SELECTION_VERSION`.
-
-  CRLF and LF copies of `timit_hf.py` give the same digest.
-- **Commit:** `exec: fingerprint row selection and resolve relative imports`
-
-### C3: Rebuild caches and retrain HF GMMs (regression check)
-- Rebuild both HF MFCC `timit_matlab` caches. Then retrain GMM-64 and GMM-128 on the HF train
-  side with the HF `split_id`.
-- **Check:** the parameter hashes must still be `80a5b016…` (64) and `c0e38a61…` (128). If
-  either differs, **stop and report**: no code that decides rows or features was supposed
-  to change.
-- Add one line to `docs/gmm_notes.md`: the new fingerprint, and "parameter hashes unchanged".
-- **Commit:** `exec: retrain hf gmms under row selection fingerprint`
-
-### C4: Count minimum-cost assignments (Codex Q4)
-- **Files:** `src/qbestd/data/text_split.py`, `tests/data/test_text_split.py`
-- **Do:**
-  - While `_choose` enumerates a component's assignments, count how many reach the minimum
-    summed cost. Keep the existing tie-break exactly.
-  - The count is **per connected keyword component**, never per keyword. For example,
-    birth and organizations are one component with one count.
-  - `report["components"]` becomes a list of
-    `{"keywords", "n_groups", "cost", "n_min_assignments"}`.
-- **Tests:**
-  - a synthetic component with exactly two cost-0 assignments reports 2;
-  - a two-keyword shared-group component reports one count, not two;
-  - the tie-break result is unchanged.
-- **v1 check:** re-run `python -m qbestd.data.text_split` into a scratch path. The manifest
-  sha256 must still start with `ee27b531237a`. Note the v1 counts for C5's doc.
-- **Commit:** `exec: count minimum cost assignments per component`
-
-### C5: Split v2 rule, links, manifest and doc (Codex Q1, Q3)
-- **Files:** `src/qbestd/data/text_split.py`, `tests/data/test_text_split.py`,
-  `docs/split_textdisjoint.md`
-- **Rule `textdisjoint_q20_v2`:** v1's rule plus a merge step 1b. Everything else is
-  unchanged, including the 120 / 504 test quotas.
-  - **1b. Merge verified variant links.** `V2_VARIANT_LINKS` is an explicit, sorted tuple of
-    `(hash_a, hash_b)` pairs of v1 group hashes, committed in code. Its units are the
-    connected components of those explicit links only, with no general one-edit rule.
-  - **Hashes:** the group-hash prefix stays `qbestd-textsplit-v1\n`, so the links refer to
-    existing v1 hashes and v1 and v2 differ only where they must. A merged unit's key is its
-    **smallest member hash**.
-  - Steps 2 and 3 and the manifest work on **units**. A unit is `multi` when it holds more
-    than one row. The tie-break, the step 3 hash order and the manifest `group_hash` column
-    all use the unit key. As a result, B2's "queries and documents never share a text group"
-    check covers variants automatically.
-  - The header is `# rule=textdisjoint_q20_v2`. The output is
-    `outputs/splits/textdisjoint_q20_v2.tsv`, and `split_id` is
-    `textdisjoint_q20_v2-<12 hex>`.
-  - **API:** keep `build_text_split(rows, keywords)` byte-identical for v1, and add
-    `rule=` / `links=` parameters (or a v2 entry point). Add `--rule v1|v2` to `main`. If
-    `text_split.py` would pass about 330 lines, move the links and the candidate finder
-    into `src/qbestd/data/text_variants.py`.
-- **Finding and verifying the links.** Do this on transcripts only, before any v2 score.
-  - `find_variant_candidates(groups)` proposes a pair when:
-    - the two token sequences differ by exactly one substitution, insertion or deletion;
-    - at least one of the two groups is multi-read;
-    - the combined row count is ≤ 7, since an SX text is read by 7 speakers.
-
-    The finder only proposes; the committed list is what verification keeps.
-  - Verify every candidate against the full normalised transcripts and the row counts. If a
-    group pairs with two different multi-read groups, or a unit would exceed 7 rows,
-    **exclude it and list it as rejected with the reason**. Never guess.
-  - The list must contain all 8 reviewer pairs:
-    - 6 + 1 will ↔ would (government);
-    - 6 + 1 shimmered ↔ simmered;
-    - 4 + 2 ± "the";
-    - five 6 + 1 pairs with ± "a" / "the" / "at".
-
-    If any of the 8 is not found, **stop and report**.
-  - It must also contain every other verified pair (§7 Q27), including shellfish 5 + 2.
-- **Tests:**
-  - linked variants never cross sides, in a synthetic case where v1's rule would split
+### F1: Split doc additions (Q1, Q2)
+- **File:** `docs/split_textdisjoint.md` (docs only)
+- **Under "What v2 does not do":**
+  - two SX texts keep an unmerged **two-token** variant:
+    - unit `675129c68a2c` (6 rows) with single `b180942ceff1`, a contraction written as two
+      words;
+    - unit `6d86e94d8394` (6 rows) with single `4c952c3a51e1`, one word moved.
+  - Both variants are on the train side with their unit, so nothing crosses. That is by
+    placement, not by rule. No v3 (Orchestrator decision: nothing crosses, and a v3 would
+    change the manifest hash for no change in content).
+  - **Corpus-count evidence for the links:** the v2 units are 448 × 7 rows, 2 × 6 rows and
+    1892 singles. TIMIT has 450 SX texts × 7 readers and 1890 SI texts, which is 5040 rows.
+    The two 6-row units account for the 2 extra singles. A wrong link would break this count.
+- **Per-component section:**
+  - the product of the counts is 2,488,320 equal-cost keyword assignments, and v2 is one of
     them;
-  - the manifest is byte-identical under shuffled row order **and** shuffled link order;
-  - `links=()` reproduces v1's output on a synthetic universe;
-  - the unit key is the smallest member hash;
-  - a link that names an unknown hash raises;
-  - the finder detects substitution, insertion and deletion, and rejects two-token edits,
-    pairs of single-read groups and combined counts over 7.
-- **`docs/split_textdisjoint.md`**, new section "v2". Commit it in the same commit as the
-  code, **before C6**. Include no sentence text.
-  - the reason, verbatim: *"variant groups split SX texts across sides (found in review)"*;
-  - the v2 rule (v1 plus step 1b, the unit key and the unchanged prefix);
-  - **link evidence:** one row per link, with both hashes (12 hex), the row counts, the
-    edit type, the differing token only, the keyword if any, the v1 sides, and whether the
-    reviewer named it;
-  - rejected candidates and why;
-  - the manifest sha256 and `split_id`;
-  - per component: the cost and `n_min_assignments` for v2, with v1 alongside for
-    reference;
-  - per keyword: train and test tokens against the thesis Inst./Occ., marking every change
-    from v1 and **any nonzero cost**;
-  - rows per side, units per stratum, the quota report, and how many rows changed side
-    relative to v1 and to the HF split;
-  - **post-build scan:** run the finder on the final v2 manifest and report how many
-    one-edit candidate pairs cross sides. The target is 0; list and explain any that
-    remain;
-  - the v1 labels still apply: closer to the thesis on sentence context, not an official
-    TIMIT reconstruction, speaker overlap present.
-- **Gate:** a nonzero step 2 cost is reported, not fixed. If v2 loses keyword coverage
-  (any keyword with no test document or no train instance), commit the doc, then **stop
-  before C6 and report**. Choosing a replacement protocol is the Orchestrator's decision
-  (Codex Q3).
-- **Commit:** `exec: declare text disjoint split v2 with variant links`
+  - for a component with a count above 1, *which* utterances are that keyword's queries and
+    documents depends on the fixed choice; the Inst./Occ. counts do not;
+  - the keyword-cluster intervals do not measure this split-draw variation, which stays
+    unmeasured. Do **not** score alternative assignments.
+- **Commit:** `exec: record split v2 limits and corpus evidence`
 
-### C6: Train and evaluate on `textdisjoint_q20_v2`
-- Train MFCC `timit_matlab` GMM-64 and GMM-128 on the v2 train side
-  (`--split-manifest`). Then run `eval-timit` with LC2, clip query features and the A1
-  scorer.
-- **`docs/results_timit_q20.md`:** add a section **"Text-disjoint split v2"**:
-  - query instances and relevant pairs per keyword against the thesis table, marking any
-    change from v1;
-  - p@N / MAP for both averages, keyword-cluster intervals, the paired 128 − 64 interval,
-    nonmatches, `split_id`, model hashes and the commit;
-  - **direction check, made afresh on v2:** say "in the thesis's direction" only for a
-    metric whose paired interval excludes 0, and never claim numerical parity;
-  - the historical table gains a v2 row next to thesis, HF v2 and text-disjoint v1. It is
-    descriptive, with no unpaired test;
-  - state that later result docs compare on v2 and point to this table for HF v2 and v1.
-- **Do not tune anything** and do not change v2 after seeing scores.
-- **Commit:** `exec: evaluate q20 on text disjoint split v2`
+### F2: Row-loop digest guard (Q3)
+- **Files:** `src/qbestd/data/feature_cache.py` (one constant), `tests/data/test_feature_cache.py`
+- **Do:**
+  - Next to `ROW_SELECTION_VERSION`, add `ROW_LOOP_SOURCE_SHA256`: the sha256 of
+    `inspect.getsource(build_feature_cache)` with CRLF turned into LF.
+  - Add a test that recomputes the digest and compares it with the constant. On a mismatch
+    it fails with: *"the row loop changed: bump `ROW_SELECTION_VERSION` if rows, order,
+    offsets or skips changed, then update the pinned digest"*.
+  - No fingerprint change and no cache rebuild. The constant is **not** part of the
+    fingerprint.
+- **Commit:** `exec: pin row loop digest in a test`
+
+### F3: Feature-parity doc correction (Q4)
+- **File:** `docs/feature_parity.md` (docs only)
+- **Do:**
+  - Correct the PLP row and the "What the thesis says" table: both MFCC and PLP were
+    extracted with **HTK**, 25 ms / 10 ms, **26 subband filters** in the thesis text,
+    13 coefficients + Δ/ΔΔ (`Unsupervised.tex` line 113; `ExpSetup.tex` lines 191, 194, 198).
+  - Add a row **"Author statement, 2026-11-16 (user decision D2)"**: the HTK configuration
+    used `NUMCHANS = 40` for **both** MFCC and PLP (so the thesis's "26" is inaccurate for
+    them), a 16 kHz sample rate and a **0–3400 Hz** band. MFCC-TMP is unaffected: it came from
+    the MATLAB script, which uses 26 filters.
+  - Add the table from Handoff_feedback Q4 showing how `timit_matlab` MFCC and PLP differ
+    (tool, filters, band, pre-emphasis, LPC order, level handling).
+- **Commit:** `exec: correct feature parity with thesis and author htk values`
+
+### F4: Feature-results wording (Q7)
+- **File:** `docs/results_timit_q20_features.md` (docs only)
+- **Do:**
+  - Do **not** say "PLP is near its thesis value". Add a small descriptive table of
+    per-feature gaps to the thesis at both sizes (for example PLP 64: −2.28 / −4.03;
+    PLP 128: −5.39 / −7.92; MFCC 128: +6.13 / +6.62), with no cause attached.
+  - **Sources:** MFCC and PLP come from `Tab:ExpResultTIMIT`. MFCC-TMP 40.03 / 41.50 comes
+    from `Tab:TIMITVTLNPerformance1` (`Representation.tex` line 270). Name both tables.
+  - Under "Feature minus MFCC", add: *"PLP and MFCC differ here in band, filter count,
+    pre-emphasis and level handling, so 'against the thesis's direction' describes this
+    profile, not PLP as such."*
+  - State that the paired tables hold 28 unadjusted 95 % intervals. Add that the single
+    marginal one (MFCC-TMP − MFCC, keyword p@N, −2.8 to −0.1) should not be read on its own.
+  - Write the thesis values with two decimals: 35.50, 41.50, 37.30.
+- **Commit:** `exec: correct feature comparison wording`
+
+### F5: Small code and test gaps (Q8)
+- **Files:** `tests/data/test_feature_cache.py`, `src/qbestd/data/text_variants.py`,
+  `tests/data/test_text_variants.py`, `src/qbestd/data/text_split.py`,
+  `tests/data/test_text_split.py`, `docs/gmm_notes.md`
+- **Do:**
+  - **Import closure:** add a fixture case with `from ..audio import newhelper`. In the
+    helper's docstring, add the two known limits: `from qbestd import features` followed by
+    attribute access, and names re-exported through an `__init__.py`.
+  - **Finder:** add a test with a 4-row group that has a 1-row and a 2-row partner; both
+    candidates come out in a fixed order. Put a three-variant unit into
+    `test_v2_manifest_is_identical_under_shuffled_rows_and_links`.
+  - **`_merge_units` with `links=()`:** skip the 7-row cap when there are no links, so the
+    v1 rule gains no new failure mode. The v1 manifest must stay byte-identical
+    (`ee27b531237a…`); test it on a synthetic group of 8 rows.
+  - **`gmm_notes.md`:** add the PLP variances at the floor (4 of 2496 at 64, 7 of 4992 at
+    128), as the MFCC section does.
+- **Commit:** `exec: close import closure finder and merge test gaps`
 
 ---
 
-## 9. Cycle 6, part B: PLP and MFCC-TMP on split v2 (Codex Q2)
+## 9. Cycle 7, part B: front-end parity (Q4, Q5, user decision D2) and Stage 4 code
 
-**Gate:** start only after C6 is on `main` and C5 kept full keyword coverage. Same v2
-manifest, LC2, clip features, A1 scorer and bootstrap. **No VTLN yet** (Stage 4 is not
-built). No tuning towards §3.
+### L1: Level-handling check (Q4 items 1–2, Q5; user approved)
+- **Declare first.** Commit a new section in `docs/results_timit_q20_features.md`,
+  "Level-handling check (declared)", **before** the runs:
+  - setting: MFCC `timit_matlab` with `normalize_peak=False`, and PLP `timit_matlab` with
+    `normalize_peak=True`; nothing else changes;
+  - scope: GMM-64 only, split v2, LC2, clip query features, A1 scorer;
+  - rule: both results are reported, the primary rows stay unchanged whatever the outcome,
+    and no tuning follows from it;
+  - commit `exec: declare level handling check`.
+- **Code:** add a named ablation profile `timit_matlab_levelflip` in
+  `src/qbestd/features/profiles.py`. For `mfcc` it is `timit_matlab` with
+  `normalize_peak=False`; for `plp` it is `timit_matlab` with `normalize_peak=True`; it
+  raises for `mfcc_tmp`. Add tests, then commit `exec: add level flip ablation profile`.
+- **Run:** build the caches for the two HF splits, train GMM-64 on the v2 train side, and
+  evaluate. This is 2 caches, 2 models and 2 evals.
+- **Report** in the same doc section:
+  - p@N / MAP for both averages, with intervals;
+  - paired differences against the primary GMM-64 row of the same feature (same queries);
+  - PLP − MFCC under the flip.
 
-**Status at 2026-11-16 01:25 (Orchestrator check).** The gate is met: C6 is on `main` and
-C5 kept coverage.
-- `baa3bc3` (P2 preparation, done): `build_feature_cache` counts TEO floor hits into the
-  cache metadata (`teo_floor_hits`, `teo_values`) and raises on non-finite features. The
-  full suite was green after it.
-- The Executor's background chain `outputs/pb_chain.sh` (git-ignored) is running:
-  - PLP GMM-64 and GMM-128 are trained (LL rising 25.32 → 27.68 and 26.50 → 28.79);
-  - PLP GMM-64 is evaluated;
-  - it then evaluates PLP GMM-128, and then trains and evaluates MFCC-TMP 64 and 128.
-  - It writes `outputs/pb_done` when it finishes, or `outputs/pb_fail` on an error.
-- **Nothing from part B is committed yet.** Do not restart the chain or re-run finished
-  steps. Wait for `pb_done`; if `pb_fail` appears, **stop and report**.
+  No cause is claimed beyond what the paired intervals show.
+- **Commit:** `exec: run level handling check`
 
-**Next atomic tasks, in order:**
-1. **P1:** when the PLP evals are done, record the hashes and EM curves in
-   `docs/gmm_notes.md`, then commit P1. The numbers go into P3's doc, not
-   `docs/results_timit_q20.md`.
-2. **P2:** when the MFCC-TMP evals are done, read `teo_floor_hits` / `teo_values` from both
-   MFCC-TMP cache metadata files and report them in `docs/gmm_notes.md` together with the
-   hashes and curves. A non-finite feature would have raised and written `pb_fail`. Commit
-   P2.
-3. **P3:** the feature comparison doc as specified below.
-4. Then hand off to the Reviewer (cycle 6 `handoff_request.md`), which includes open
-   questions 27–30.
+### H1: `htk_described` profile (user decision D2)
+- **File:** `src/qbestd/features/profiles.py` (plus `plp.py` and `filterbank.py` if an
+  option is missing), tests
+- **Name and status:** `htk_described`. Every value carries its source in the docstring:
+  - **author-stated (2026-11-16):** `NUMCHANS = 40` for MFCC and PLP, 16 kHz, band
+    **0–3400 Hz**. The band was stated for the HTK configuration and applied to both
+    features; the thesis text says 0–4000 Hz for MFCC, and this conflict is recorded;
+  - **thesis-stated:** 25 ms Hamming / 10 ms, 13 coefficients + Δ/ΔΔ, 39 dimensions;
+  - **HTK defaults, recalled and unverified:**
+    - pre-emphasis 0.97;
+    - cepstral lifter 22;
+    - LPC order 12 for PLP;
+    - PLP compression 0.33 with equal-loudness weighting;
+    - c0 kept, no energy term (the thesis labels PLP `PLP_D_A_0`, `Unsupervised.tex`
+      line 610);
+    - delta window 2;
+    - no DC removal and no peak normalisation (`ZMEANSOURCE` off);
+    - MFCC on the magnitude spectrum, PLP on the power spectrum.
+- **PLP filterbank:** HTK PLP uses a **mel**-spaced filterbank of `NUMCHANS` channels.
+  - If `PlpConfig` only builds Bark spacing, add `filter_scale: "bark" | "mel"`, defaulting
+    to `"bark"` so `timit_matlab` is unchanged.
+  - Use the existing `mel_filterbank` with `low_hz` / `high_hz`.
+- **MFCC log:** if HTK's log of the mel-weighted magnitude differs from our
+  `log((M·|X|)²)` only by a factor 2, note that in the docstring and keep the code.
+- **Tests:**
+  - a `timit_matlab` regression: features byte-identical before and after;
+  - `htk_described` gives 39 dimensions, 40 channels, and a top edge of 3400 Hz;
+  - `mfcc_tmp` under `htk_described` raises: MFCC-TMP stays `timit_matlab` (MATLAB script,
+    26 filters).
+- **Commit:** `exec: add htk described profile for mfcc and plp`
 
-### P1: PLP, GMM-64 and GMM-128
-- `timit_matlab` profile (16 kHz, 8 kHz band, §4 Q14). Build the per-HF-split caches, then
-  train on the v2 train side and evaluate.
-- Check that the EM log-likelihood curve rises monotonically, and add the hashes and curves
-  to `docs/gmm_notes.md`.
-- **Commit:** `exec: evaluate plp on text disjoint split v2`
+### H2: Run `htk_described` and make it the reference (user decision D2)
+- **Run:** MFCC and PLP, GMM-64 and GMM-128, on split v2: 4 caches, 4 models and 4 evals.
+  Record the EM curves, floor counts and hashes in `docs/gmm_notes.md`.
+- **Report** in `docs/results_timit_q20_features.md`, new section "HTK-described profile
+  (reference from cycle 7)":
+  - both averages with intervals, and gaps to the thesis;
+  - paired PLP − MFCC, plus 128 − 64 per feature;
+  - paired `htk_described` − `timit_matlab` per feature and size.
+  - Same wording rule as C6.
+- From here on, `htk_described` is the comparison reference for MFCC and PLP (user decision
+  D2). MFCC-TMP stays `timit_matlab`. The `timit_matlab` rows stay as a labelled earlier
+  reference. **Do not tune** anything towards §3.
+- **Commit:** `exec: evaluate htk described profile on split v2`
 
-### P2: MFCC-TMP, GMM-64 and GMM-128
-- `timit_matlab` profile (16 kHz, 4 kHz band). Log the count of TEO floor hits per cache
-  build (§6 risk) and report it. A non-finite feature stops the run.
-- **Commit:** `exec: evaluate mfcc tmp on text disjoint split v2`
+### V1–V3: Stage 4 GMM-VTLN code (no VTLN scoring this cycle)
+Thesis: `Representation.tex` lines 100–138 and Algorithm `pseudocode_vtlnwarping`
+(lines 140–171). Use **`k < N_iter`** (erratum §5). The warps are 13 values,
+0.88, 0.90, …, 1.12. `N_iter = 5` (`Representation.tex` line 229: gains saturate at 4–5).
+Build on the existing `warp_factor` support and `extract_warped_bank`.
 
-### P3: Feature comparison doc
-- **File:** new `docs/results_timit_q20_features.md`. It points to the historical table in
-  `docs/results_timit_q20.md` and does not repeat HF v2 or v1 rows.
-- **Tables:** feature × NG (64, 128), with p@N / MAP for both averages, keyword-cluster
-  intervals and the thesis targets:
-  - PLP: 64 is 35.50 / 37.58 and 128 is 37.30 / 40.18;
-  - MFCC-TMP: 64 is 40.03 / 41.50. The thesis gives **no** 128 target for MFCC-TMP; say so.
-- **Paired keyword bootstrap**, valid here because the queries, documents and relevance are
-  identical: PLP − MFCC and MFCC-TMP − MFCC per NG, plus 128 − 64 per feature.
-  - Thesis directions at 64: PLP − MFCC is +0.59 / +0.87, and MFCC-TMP − MFCC is
-    +5.12 / +4.79.
-  - Same wording rule as C6: say "in the thesis's direction" only when the interval
-    excludes 0.
-- **Commit:** `exec: compare features on text disjoint split v2`
+**Memory:** the machine is short of memory (background shells were killed). Never hold more
+than **one** warp's features for a whole split in memory at once.
 
-**Cycle 6 definition of done:**
-- C1–C6 are on `main` in that order, with the C5 doc before any v2 model. Part B is done
-  too, or the report says which gate stopped it.
+- **V1: warp estimation.** File `src/qbestd/ml/vtln.py`, with tests.
+  - `WARP_FACTORS`, the 13 values.
+  - `utterance_log_likelihoods(features, offsets, gmm) -> (n_utt,)`: the summed frame
+    log-likelihood per utterance.
+  - `estimate_warp_factors(ll_matrix) -> alphas`: argmax over the warps, `ll_matrix` shape
+    `(n_utt, 13)`. Ties go to the warp closest to 1.0, then the smaller one. Frame counts do
+    not depend on α, so sum and mean give the same argmax.
+  - Tests: a synthetic case where one warp is planted; the tie rule; shape checks.
+  - **Commit:** `exec: add vtln warp factor estimation`
+- **V2: per-warp caches.** Files `src/qbestd/data/warped_cache.py`, tests.
+  - `build_warped_caches(split, kind, profile, out_dir, warps=WARP_FACTORS)` writes **one
+    file per warp**, `<split>_<kind>_<profile>_a<α×100>.npz`, using the
+    `build_feature_cache` row selection and fingerprint, with the warp added to the
+    fingerprint.
+  - `ll_matrix_from_caches(paths, gmm, rows)` streams one warp at a time.
+  - `select_warped_features(paths, alphas, rows)` assembles X^α̂, one warp file at a time.
+  - Tests: a tiny parquet in `tmp_path`, 3 warps; streaming gives the same matrix as the
+    in-memory version; α = 1.0 equals the plain cache.
+  - **Commit:** `exec: add per warp feature caches`
+- **V3: iterative GMM-VTLN training.** File `src/qbestd/ml/vtln_train.py` (CLI, pixi task
+  `train-vtln`), with tests.
+  1. λ_init is the plain GMM, α = 1.
+  2. For k = 0 … N_iter − 1:
+     - estimate α̂ for every train utterance with λ_init;
+     - build λ_r on X^α̂ with the **same LBG + EM recipe** (fresh initialisation; the thesis
+       says "build", which is an assumption to record);
+     - set λ_init ← λ_r.
+  3. Write per iteration: the α̂ histogram, the mean log-likelihood on X^α̂, and the model
+     hash. Then save the final λ_r with metadata (`kind`, `profile`, `split_id`,
+     `n_iter`, warps, fingerprint).
+  - Test-side estimation (α̂ per document with λ_r) and the posteriorgram go in
+    `estimate_test_warps(...)`. **Do not wire them into `run_timit` this cycle.**
+  - **Query warps (assumption):** estimate α̂ on the query clip itself with λ_r, as for a
+    separate file. Record this as an open question.
+  - Tests: a synthetic two-iteration run on tiny data; the log-likelihood on X^α̂ does not
+    fall from iteration to iteration (`Representation.tex` line 138); the metadata round
+    trip.
+  - **Commit:** `exec: add iterative gmm vtln training`
+- **STOP before scoring:** no VTLN p@N/MAP this cycle. A smoke run of `train-vtln` with
+  N_iter = 1 on GMM-64 `htk_described` MFCC is allowed, to check runtime and memory. Report
+  its runtime and peak memory, not a score.
+
+**Cycle 7 definition of done:**
+- F1–F5, L1, H1, H2 and V1–V3 are on `main` in that order, with L1's declaration before
+  L1's runs.
 - `pixi run test` is green in the core env. Every module is under 400 lines, no line is
   over 79 characters, and every new function has tests. No derived data is committed.
-- The Reviewer writes `handoff_request.md` for cycle 6 with the questions below.
+- No commit was made while a background run was going.
+- The Reviewer writes `handoff_request.md` for cycle 7 with the questions below.
 
-**Open questions for the cycle 6 review:**
-- 27: Is linking every verified variant pair, rather than only the 8 that crossed in v1,
-  the right reading of Codex Q1? Are the rejected candidates handled correctly?
-- 28: Do the v2 tie counts show a component that is badly underdetermined, and if so,
-  what should the doc say?
-- 29: Is the row-selection identity (the `timit_hf.py` digest, `SA_TOKENS` and
-  `ROW_SELECTION_VERSION`) the right scope, or should `build_feature_cache` move into its
-  own hashed module?
-- 30: Where PLP or MFCC-TMP moves against the thesis direction, is a front-end parity check
-  warranted before Stage 4 VTLN, or should VTLN go ahead on the same v2 setup?
+**Open questions for the cycle 7 review:**
+- 31: What does the level check show? Does it explain MFCC above the thesis and PLP below
+  it, and should level handling change for MFCC-TMP?
+- 32: Are the recalled HTK defaults in `htk_described` right, especially MFCC log
+  magnitude vs log power, the DCT normalisation and the PLP mel filterbank? Should MFCC use
+  the author's 0–3400 Hz band or the thesis text's 0–4000 Hz?
+- 33: Stage 4: fresh LBG + EM per VTLN iteration, or warm start from λ_init? Should query
+  clips get their own α̂ or inherit the train utterance's α̂ from the last iteration?
+- 34: Is the per-warp cache design (13 files per split and kind, streamed) acceptable for
+  disk and runtime, given the smoke-run numbers?
 
 ---
 
 ## 10. Next cycles (preview)
 
-1. **Stage 4:** iterative GMM-VTLN (5 iterations, 13 warps) for MFCC, PLP and MFCC-TMP on
-   the v2 split. Use the `extract_warped_bank` caching that Codex deferred to here.
-2. LC1 and LC3 (§3 has their TIMIT targets), Q-84, and the optional SAD ablation (Codex Q12).
+1. **Stage 4 scoring:** GMM-VTLN for MFCC and PLP (`htk_described`) and MFCC-TMP
+   (`timit_matlab`) on v2, against `Tab:TIMITVTLNPerformance1` (§3).
+2. LC1 and LC3 (§3 has their TIMIT targets), Q-84, and the optional SAD ablation.
 3. Mixture of GMMs (§3 targets), then DTW and fastDTW, then indexing (STM, BoAW).
 4. SWS 2013 and QUESST 2014: path selection with 7 paths, z-norm, MTWV and Cnxe.
