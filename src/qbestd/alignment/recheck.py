@@ -10,6 +10,7 @@ Reads ``timit_hf_words_<split>.tsv`` and ``timit_hf_rows_<split>.tsv`` from
 
 import argparse
 import json
+from collections import Counter
 from itertools import groupby
 from pathlib import Path
 
@@ -52,6 +53,29 @@ def recheck_split(segments, rows):
             "counts": counts, "rows_by_category": row_lists}
 
 
+def is_special_token(token):
+    """True for a token with a hyphen, an apostrophe or a non-ASCII letter."""
+    return "-" in token or "'" in token or not token.isascii()
+
+
+def audit_tokens(segments, rows):
+    """Compare manifest words with a fresh ``normalize_transcript`` run.
+
+    Returns the Counter of special tokens (hyphen, apostrophe, non-ASCII)
+    over the transcripts, and the rows whose manifest words differ from the
+    current normalisation (empty means the manifests need no re-alignment).
+    """
+    by_row = {index: [s.word for s in group] for index, group in
+              groupby(segments, key=lambda s: s.row_index)}
+    special, mismatched = Counter(), []
+    for index, (_, sentence) in rows.items():
+        tokens = normalize_transcript(sentence)
+        special.update(token for token in tokens if is_special_token(token))
+        if by_row.get(index, []) != tokens:
+            mismatched.append(index)
+    return special, mismatched
+
+
 def recheck_all(out_dir):
     out_dir = Path(out_dir)
     report = {}
@@ -59,6 +83,9 @@ def recheck_all(out_dir):
         segments, _ = read_manifest(out_dir / f"timit_hf_words_{split}.tsv")
         rows = read_rows_file(out_dir / f"timit_hf_rows_{split}.tsv")
         report[split] = recheck_split(segments, rows)
+        special, mismatched = audit_tokens(segments, rows)
+        report[split]["special_tokens"] = dict(special.most_common())
+        report[split]["token_mismatch_rows"] = mismatched
     (out_dir / "recheck.json").write_text(json.dumps(report, indent=2),
                                           encoding="utf-8")
     return report
@@ -71,6 +98,9 @@ def main(argv=None):
     report = recheck_all(args.out)
     for split, result in report.items():
         print(split, result["rows"], result["counts"])
+        print("  special tokens:", result["special_tokens"])
+        print("  rows whose manifest tokens differ:",
+              result["token_mismatch_rows"])
 
 
 if __name__ == "__main__":

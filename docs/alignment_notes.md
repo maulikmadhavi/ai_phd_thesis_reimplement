@@ -145,6 +145,28 @@ so the five collapsed rows are a subset of the violation rows; the other
 violating rows (train 1241, 4300, 4769; test 885) are single short function
 words. No row has missing segments or a word-count mismatch.
 
+## Token audit and NFC normalisation (C8)
+
+`normalize_transcript` now applies Unicode NFC before lowercasing, so composed
+and decomposed accents give the same tokens. The audit
+(`audit_tokens` in `qbestd.alignment.recheck`, run by the same command) lists
+tokens with a hyphen, an apostrophe or a non-ASCII character and re-normalises
+every sentence, comparing it with the words in the manifests.
+
+- **Hyphens: none. Non-ASCII characters: none.** Only apostrophes occur
+  (contractions and possessives), as expected for TIMIT.
+- **Manifest tokens versus current normalisation: identical for all 5040 train
+  and 1260 test rows.** The NFC change alters no token, so **no re-alignment
+  is needed** and the manifest hashes above stay valid.
+- Odd transcription artefacts that stay as one token: `what'shisname` (train),
+  `oneo'clock` (train), `cap'n`, `o'clock`, `c'mon`, `y'all`.
+- Distinct tokens with an apostrophe: 119 in train (1021
+  occurrences), 64 in test (271).
+
+Train: `don't` 531, `it's` 42, `didn't` 25, `we'll` 13, `you'll` 10, `i'd` 10, `they're` 9, `you're` 9, `couldn't` 9, `she'd` 8, `haven't` 8, `one's` 8, `man's` 8, `cat's` 7, `won't` 7, `today's` 7, `rachel's` 7, `charlie's` 7, `jennifer's` 7, `thursday's` 7, `roger's` 6, `company's` 6, `general's` 6, `serpent's` 6, `there's` 6, `i'll` 6, `john's` 6, `nan's` 6, `lamb's` 6, `tenant's` 6, `year's` 6, `ron's` 6, `alice's` 6, `jeff's` 6, `ocean's` 6, `brother's` 5, `wasn't` 5, `ship's` 5, `baboon's` 5, `anyone's` 5, `nancy's` 5, `nora's` 5, `daphne's` 5, `experiment's` 5, `irving's` 5, `cliff's` 5, `we're` 5, `ain't` 5, `phil's` 5, `doesn't` 5, `otto's` 5, `you've` 4, `let's` 4, `lori's` 4, `herb's` 4, `jim's` 4, `bride's` 4, `he'll` 4, `barb's` 4, `i'm` 3, `how's` 3, `nevada's` 3, `singer's` 3, `they'll` 2, `what's` 2, `you'd` 2, `he'd` 2, `we'd` 2, `aren't` 2, `can't` 2, `that's` 2, `they'd` 2, `he's` 2, `mother's` 2, `we've` 2, `detective's` 1, `cobbler's` 1, `lady's` 1, `marine's` 1, `kid's` 1, `sheriff's` 1, `y'all` 1, `car's` 1, `mare's` 1, `what'shisname` 1, `could've` 1, `isn't` 1, `she's` 1, `husband's` 1, `ambassador's` 1, `andrei's` 1, `what're` 1, `cap'n` 1, `boy's` 1, `master's` 1, `scout's` 1, `they've` 1, `i've` 1, `today'll` 1, `world's` 1, `here's` 1, `roulette's` 1, `father's` 1, `nobody's` 1, `cowboy's` 1, `where're` 1, `author's` 1, `o'clock` 1, `drug's` 1, `baseball's` 1, `earth's` 1, `that'll` 1, `heat's` 1, `oneo'clock` 1, `patient's` 1, `weren't` 1, `clerk's` 1, `boat's` 1, `self's` 1.
+
+Test: `don't` 137, `it's` 12, `we'll` 8, `didn't` 7, `you're` 4, `i'd` 4, `nevada's` 4, `singer's` 4, `barb's` 3, `jim's` 3, `he'd` 3, `herb's` 3, `he's` 3, `lori's` 3, `one's` 3, `you'll` 3, `they'll` 3, `bride's` 3, `nancy's` 2, `nora's` 2, `otto's` 2, `baboon's` 2, `brother's` 2, `we've` 2, `they're` 2, `irving's` 2, `ma'am` 2, `anyone's` 2, `cliff's` 2, `experiment's` 2, `daphne's` 2, `ship's` 2, `phil's` 2, `c'mon` 1, `it'd` 1, `i'll` 1, `alice's` 1, `drug's` 1, `you've` 1, `ron's` 1, `couldn't` 1, `farmer's` 1, `what's` 1, `wasn't` 1, `weren't` 1, `somebody'll` 1, `man's` 1, `serpent's` 1, `nan's` 1, `lamb's` 1, `that's` 1, `tenant's` 1, `year's` 1, `jeff's` 1, `won't` 1, `ocean's` 1, `company's` 1, `y'all` 1, `john's` 1, `general's` 1, `father's` 1, `roger's` 1, `you'd` 1, `would've` 1.
+
 ## Other observations
 
 - Neighbouring words overlap: 12732 of 38197 adjacent pairs in train (3254 of

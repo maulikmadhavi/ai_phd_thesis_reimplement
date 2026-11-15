@@ -6,6 +6,7 @@ Rows are read in batches with pyarrow; every row must be 16 kHz.
 """
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
@@ -73,11 +74,11 @@ def iter_timit_rows(parquet_paths, split, batch_size=64):
 
 
 def normalize_transcript(sentence):
-    """Words of a TIMIT sentence: lowercase, edge punctuation stripped.
+    """Words of a TIMIT sentence: NFC, lowercase, edge punctuation stripped.
 
     Inner apostrophes are kept ("don't"); empty tokens are dropped. Stage 7
     keyword matching must use this same function.
     """
-    words = (_EDGE_PUNCTUATION.sub("", token)
-             for token in sentence.lower().split())
+    text = unicodedata.normalize("NFC", sentence).lower()
+    words = (_EDGE_PUNCTUATION.sub("", token) for token in text.split())
     return [word for word in words if word]

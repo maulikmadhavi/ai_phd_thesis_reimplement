@@ -1,5 +1,11 @@
 from qbestd.alignment.manifest import WordSegment, write_manifest
-from qbestd.alignment.recheck import category_of, recheck_all, recheck_split
+from qbestd.alignment.recheck import (
+    audit_tokens,
+    category_of,
+    is_special_token,
+    recheck_all,
+    recheck_split,
+)
 
 
 def seg(row, index, word, start, end):
@@ -44,3 +50,24 @@ def test_recheck_all_writes_json(tmp_path):
     report = recheck_all(tmp_path)
     assert set(report) == {"train", "test"}
     assert (tmp_path / "recheck.json").is_file()
+
+
+def test_is_special_token():
+    assert is_special_token("don't")
+    assert is_special_token("rock-n-roll")
+    assert is_special_token("café")
+    assert not is_special_token("plain")
+
+
+def test_audit_tokens_counts_special_tokens_and_finds_mismatch():
+    segments = [seg(0, 0, "don't", 0.1, 0.3), seg(0, 1, "go", 0.3, 0.6),
+                seg(1, 0, "wrong", 0.1, 0.3)]
+    rows = {0: (1.0, "Don't go!"), 1: (1.0, "right"), 2: (1.0, "gap")}
+    special, mismatched = audit_tokens(segments, rows)
+    assert dict(special) == {"don't": 1}
+    assert mismatched == [1, 2]
+
+
+def test_audit_tokens_identical_means_no_mismatch():
+    segments = [seg(0, 0, "a", 0.1, 0.3)]
+    assert audit_tokens(segments, {0: (1.0, "A.")})[1] == []

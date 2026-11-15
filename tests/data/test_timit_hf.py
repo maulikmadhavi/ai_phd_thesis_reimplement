@@ -67,3 +67,11 @@ def test_pinned_revision_is_a_full_sha():
     assert len(timit_hf.TIMIT_HF_REVISION) == 40
     assert timit_hf.SPLIT_FILES["test"] == (
         "data/test-00000-of-00001.parquet",)
+
+
+def test_composed_and_decomposed_accents_give_same_tokens():
+    composed = "Café naïve"
+    decomposed = "Café naïve"
+    assert composed != decomposed
+    assert normalize_transcript(composed) == normalize_transcript(decomposed)
+    assert normalize_transcript(decomposed) == ["café", "naïve"]
