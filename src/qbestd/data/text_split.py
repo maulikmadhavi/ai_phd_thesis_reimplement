@@ -19,6 +19,9 @@ becomes a new name with a written reason):
    keywords of ``|test tokens - Occ| + |train tokens - Inst|``. The minimum
    cost wins; ties go to the lexicographically smallest sorted tuple of the
    test-side hashes over the component's groups. The winner is fixed.
+   The report counts, per component, how many assignments reach the
+   minimum cost (``n_min_assignments``); a count above 1 means the winner
+   was picked by the tie-break alone.
    (A first draft decided one keyword at a time; it left "tomorrow" at
    cost 8 because "meeting" fixed their shared group first.)
 3. *Quotas*: the test side holds 120 multi-read and 504 single-read groups.
@@ -122,13 +125,19 @@ def _components(keywords, groups):
 
 
 def _choose(component, hashes, groups, side):
-    """Step 2 for one component; updates ``side``; returns cost per keyword."""
+    """Step 2 for one component; updates ``side``.
+
+    Returns ``(cost per keyword, n_min)``: ``n_min`` is how many of the
+    component's assignments reach the minimum summed cost (one count per
+    component, not per keyword). The winner is chosen by the tie-break
+    alone.
+    """
     free = sorted(hashes)
     if len(free) > MAX_FREE_GROUPS:
         names = ", ".join(name for name, _, _ in component)
         raise ValueError(f"{names}: {len(free)} groups is too many to "
                          f"enumerate (limit {MAX_FREE_GROUPS})")
-    best = None
+    best, min_cost, n_min = None, None, 0
     for choice in product(("train", "test"), repeat=len(free)):
         trial = dict(zip(free, choice))
         costs = {}
@@ -139,11 +148,16 @@ def _choose(component, hashes, groups, side):
                         if trial[h] == "train")
             costs[name] = abs(test - occ) + abs(train - inst)
         ties = tuple(h for h in free if trial[h] == "test")
-        key = (sum(costs.values()), ties)
+        total = sum(costs.values())
+        if min_cost is None or total < min_cost:
+            min_cost, n_min = total, 1
+        elif total == min_cost:
+            n_min += 1
+        key = (total, ties)
         if best is None or key < best[0]:
             best = (key, trial, costs)
     side.update(best[1])
-    return best[2]
+    return best[2], n_min
 
 
 def _fill_quotas(groups, side):
@@ -179,8 +193,12 @@ def build_text_split(rows, keywords):
     groups = _build_groups(rows)
     side, costs, components = {}, {}, []
     for component, hashes in _components(keywords, groups):
-        costs.update(_choose(component, hashes, groups, side))
-        components.append([name for name, _, _ in component])
+        found, n_min = _choose(component, hashes, groups, side)
+        costs.update(found)
+        components.append({"keywords": [name for name, _, _ in component],
+                           "n_groups": len(hashes),
+                           "cost": sum(found.values()),
+                           "n_min_assignments": n_min})
     quotas = _fill_quotas(groups, side)
     manifest_rows = sorted(
         ManifestRow(split, index, side[h], h)

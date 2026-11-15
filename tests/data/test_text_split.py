@@ -118,7 +118,8 @@ def test_joint_components_solve_what_one_keyword_at_a_time_cannot():
     test_alone = {r.group_hash for r in alone.rows if r.side == "test"}
     assert group_hash(other_meeting) in test_alone  # the sequential choice
     joint = build_text_split(rows, [("meeting", 2, 2), ("tomorrow", 1, 2)])
-    assert joint.report["components"] == [["meeting", "tomorrow"]]
+    assert [c["keywords"] for c in joint.report["components"]] == [
+        ["meeting", "tomorrow"]]
     assert joint.report["costs"] == {"meeting": 0, "tomorrow": 0}
     test_joint = {r.group_hash for r in joint.rows if r.side == "test"}
     assert group_hash(shared) in test_joint
@@ -131,7 +132,52 @@ def test_components_follow_table_order_of_their_first_keyword():
     keywords = [("blue", 1, 0), ("love", 1, 0), ("red", 0, 1),
                 ("hill", 0, 0)]
     report = build_text_split(rows, keywords).report
-    assert report["components"] == [["blue"], ["love", "red"], ["hill"]]
+    assert [c["keywords"] for c in report["components"]] == [
+        ["blue"], ["love", "red"], ["hill"]]
+
+
+def single_quota(monkeypatch):
+    monkeypatch.setattr(text_split, "TEST_QUOTA", {"multi": 0, "single": 1})
+
+
+def test_two_cost_zero_assignments_are_counted_and_tie_break_kept(
+        monkeypatch):
+    single_quota(monkeypatch)
+    rows, _ = make_rows([("red cup", 1, 0), ("red hat", 1, 0)])
+    manifest = build_text_split(rows, [("red", 1, 1)])
+    [component] = manifest.report["components"]
+    assert component == {"keywords": ["red"], "n_groups": 2, "cost": 0,
+                         "n_min_assignments": 2}
+    test_side = {r.group_hash for r in manifest.rows if r.side == "test"}
+    assert test_side == {min(group_hash("red cup"), group_hash("red hat"))}
+
+
+def test_a_shared_group_component_has_one_count_not_one_per_keyword(
+        monkeypatch):
+    single_quota(monkeypatch)
+    rows, _ = make_rows([("red cup", 1, 0), ("red hat", 1, 0),
+                         ("cup mug", 1, 0)])
+    keywords = [("red", 1, 1), ("cup", 1, 1)]
+    report = build_text_split(rows, keywords).report
+    [component] = report["components"]
+    assert component["keywords"] == ["red", "cup"]
+    assert component["n_groups"] == 3 and component["cost"] == 0
+    # A on test with B, C on train; or B, C on test with A on train
+    assert component["n_min_assignments"] == 2
+
+
+def test_a_unique_minimum_counts_one_and_a_nonzero_cost_is_reported(
+        monkeypatch):
+    single_quota(monkeypatch)
+    rows, _ = make_rows([("red cup", 1, 0)])
+    [component] = build_text_split(rows, [("red", 3, 3)]).report[
+        "components"]
+    assert component["n_min_assignments"] == 2  # either side: cost 5 each
+    assert component["cost"] == 5
+    rows, _ = make_rows([("red cup", 1, 0), ("red hat", 2, 0)])
+    [component] = build_text_split(rows, [("red", 2, 1)]).report[
+        "components"]
+    assert component["cost"] == 0 and component["n_min_assignments"] == 1
 
 
 def test_quotas_are_met_in_hash_order(monkeypatch):
