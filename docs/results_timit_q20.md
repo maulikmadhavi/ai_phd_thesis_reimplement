@@ -14,12 +14,12 @@ audio; documents are the non-SA test-side utterances.
 
 ## Denominators (do not compare the raw counts)
 
-| | Thesis | Ours, HF split |
-|---|---|---|
-| Query instances | 145 (`Table:TIMITdata`, Inst. column) | 221 (251 usable train instances; 30 belong to the keywords "simple" and "youngsters", which have no relevant test document) |
-| Relevant items | 160 tokens (Occ. column) | 52 relevant document-keyword pairs |
-| Searched documents | 1344 | 989 non-SA test rows |
-| Keywords scored | 20 | 18 |
+| | Thesis | Ours, HF split | Ours, text-disjoint |
+|---|---|---|---|
+| Query instances | 145 (`Table:TIMITdata`, Inst. column) | 221 (251 usable train instances; 30 belong to the keywords "simple" and "youngsters", which have no relevant test document) | 145 (equal to Inst. for all 20 keywords) |
+| Relevant items | 160 tokens (Occ. column) | 52 relevant document-keyword pairs | 160 relevant document-keyword pairs (equal to Occ. per keyword) |
+| Searched documents | 1344 | 989 non-SA test rows | 1336 non-SA test-side rows |
+| Keywords scored | 20 | 18 | 20 |
 
 Relevance is binary per document in both setups. The thesis Occ. is a
 **token** count; ours counts documents, so one document with two tokens of a
@@ -98,9 +98,89 @@ Per keyword (v2):
 TIMIT and are left out (18 of 20 keywords are evaluated). Four keywords have
 exactly one relevant document, so p@N is 0 or 100 for each of their queries.
 
-## How to read the gap (HF split)
+## Text-disjoint split (`textdisjoint_q20_v1`)
 
-The numbers sit above the thesis targets for both GMM sizes. Evidence that
+**Labels: closer to the thesis on sentence context; not an official TIMIT
+reconstruction; speaker overlap present (amount unknown, likely larger than on
+the HF split).** Rule, manifest hash and per-keyword thesis counts:
+`docs/split_textdisjoint.md` (declared before any score was computed). Same
+features, GMM recipe, LC2 scorer and clip query features as HF v2; only the
+rows of the two sides differ. Nothing was tuned.
+
+| Model | p@N, instance avg (95% CI) | MAP, instance avg (95% CI) | p@N, keyword avg (95% CI) | MAP, keyword avg (95% CI) | Queries | Non-matches |
+|---|---|---|---|---|---|---|
+| ours, GMM-64 | 38.45 (28.2-50.0) | 40.61 (29.5-52.9) | 36.98 (27.5-47.0) | 38.44 (28.7-48.7) | 145 | 0 |
+| ours, GMM-128 | 40.60 (30.3-51.1) | 43.57 (32.3-55.5) | 37.26 (28.1-46.7) | 40.37 (30.5-50.4) | 145 | 0 |
+
+Intervals: keyword-cluster bootstrap, 10000 resamples, seed 0. Paired
+difference GMM-128 minus GMM-64 (same queries, paired keyword-cluster
+bootstrap, 95 %):
+
+| Average | p@N | MAP |
+|---|---|---|
+| instance average | 2.15 (-1.5-5.5) | 2.95 (0.2-5.7) |
+| keyword average | 0.28 (-2.9-3.5) | 1.93 (-0.3-4.4) |
+
+Provenance:
+
+| | GMM-64 | GMM-128 |
+|---|---|---|
+| `split_id` | `textdisjoint_q20_v1-ee27b531237a` | `textdisjoint_q20_v1-ee27b531237a` |
+| Parameter SHA-256 | `c78c19859f4b9081...` | `ba421ceff32cc6c1...` |
+| Documents / queries | 1336 / 145 | 1336 / 145 |
+| Non-matches | 0 | 0 |
+| Runtime | 669 s | 726 s |
+| Git commit | `78361a7` | `78361a7` |
+
+Query instances and relevant documents per keyword, against the thesis table
+(thesis Occ. is a token count, ours counts documents; instances are usable
+aligned instances after flagged ones are dropped):
+
+| Keyword | Thesis Inst. | Our instances | Thesis Occ. | Our relevant documents | GMM-64 p@N | GMM-64 MAP | GMM-128 p@N | GMM-128 MAP |
+|---|---|---|---|---|---|---|---|---|
+| artists | 7 | 7 | 7 | 7 | 26.5 | 23.6 | 18.4 | 22.9 |
+| beautiful | 3 | 3 | 8 | 8 | 50.0 | 53.5 | 45.8 | 53.1 |
+| birth | 4 | 4 | 7 | 7 | 14.3 | 18.9 | 7.1 | 13.0 |
+| destroy | 9 | 9 | 7 | 7 | 25.4 | 30.1 | 31.7 | 32.9 |
+| development | 9 | 9 | 8 | 8 | 45.8 | 54.8 | 55.6 | 59.3 |
+| garbage | 8 | 8 | 7 | 7 | 26.8 | 23.8 | 37.5 | 40.5 |
+| government | 14 | 14 | 8 | 8 | 16.1 | 18.6 | 20.5 | 20.5 |
+| intelligence | 8 | 8 | 7 | 7 | 76.8 | 78.9 | 80.4 | 83.1 |
+| love | 4 | 4 | 16 | 16 | 4.7 | 3.4 | 9.4 | 7.4 |
+| marriage | 3 | 3 | 7 | 7 | 42.9 | 44.1 | 33.3 | 43.5 |
+| meeting | 7 | 7 | 7 | 7 | 32.7 | 34.7 | 28.6 | 28.9 |
+| morning | 15 | 15 | 14 | 14 | 28.6 | 30.5 | 43.3 | 42.7 |
+| ocean | 7 | 7 | 7 | 7 | 12.2 | 12.7 | 12.2 | 14.0 |
+| organizations | 7 | 7 | 7 | 7 | 75.5 | 78.8 | 69.4 | 74.7 |
+| problems | 5 | 5 | 7 | 7 | 40.0 | 41.0 | 45.7 | 49.2 |
+| shellfish | 14 | 14 | 7 | 7 | 75.5 | 82.2 | 74.5 | 84.1 |
+| simple | 8 | 8 | 8 | 8 | 39.1 | 39.2 | 34.4 | 36.3 |
+| surface | 3 | 3 | 7 | 7 | 61.9 | 51.7 | 47.6 | 48.2 |
+| tomorrow | 3 | 3 | 7 | 7 | 0.0 | 1.9 | 4.8 | 3.3 |
+| youngsters | 7 | 7 | 7 | 7 | 44.9 | 46.4 | 44.9 | 49.5 |
+
+### Three-row comparison: thesis, HF split v2, text-disjoint
+
+*Instance* columns average every query instance; *keyword* columns average
+per keyword first. Labels as above; the HF rows carry sentence-text overlap
+between queries and documents and speaker overlap, the text-disjoint rows
+carry speaker overlap only. The thesis uses 145 query instances (ours: HF 221,
+text-disjoint 145) and 160 Occ. tokens (ours: relevant document
+pairs).
+
+| Row | p@N, instance | MAP, instance | p@N, keyword | MAP, keyword | Queries |
+|---|---|---|---|---|---|
+| thesis, GMM-64 | 34.91 | 36.71 | not stated | not stated | 145 |
+| HF split v2, GMM-64 | 36.95 (25.1-49.2) | 41.25 (28.8-54.2) | 36.52 (25.7-47.8) | 41.56 (29.8-53.5) | 221 |
+| text-disjoint v1, GMM-64 | 38.45 (28.2-50.0) | 40.61 (29.5-52.9) | 36.98 (27.5-47.0) | 38.44 (28.7-48.7) | 145 |
+| thesis, GMM-128 | 36.81 | 38.34 | not stated | not stated | 145 |
+| HF split v2, GMM-128 | 39.36 (28.7-50.6) | 44.21 (32.8-56.3) | 39.14 (29.6-49.0) | 44.10 (33.7-54.8) | 221 |
+| text-disjoint v1, GMM-128 | 40.60 (30.3-51.1) | 43.57 (32.3-55.5) | 37.26 (28.1-46.7) | 40.37 (30.5-50.4) | 145 |
+
+
+## How to read the gap
+
+The numbers sit above the thesis targets for both GMM sizes on both splits (the keyword-cluster intervals contain the thesis figures). Evidence that
 bears on the comparison, none of it tested by changing a setting:
 
 - **Sentence-text overlap.** 42 of the 52 relevant test documents (81 %) have
@@ -108,12 +188,15 @@ bears on the comparison, none of it tested by changing a setting:
   the 989 test rows also occur in train (Reviewer count, cycle 4). In the
   official TIMIT split no non-SA text crosses between train and test. A query
   cut from a train utterance can therefore have a document with the *same
-  sentence* in the search set. The text-disjoint split below removes this.
+  sentence* in the search set. The text-disjoint split removes this, and its scores are **not** lower (text-disjoint section above): GMM-64 p@N 38.45 against 36.95 on the HF split, MAP 40.61 against 41.25, differences far inside the intervals. So sentence overlap does not explain the distance to the thesis figures in this data. Speaker overlap on that split is probably larger, so the two effects are not separated here.
 - **Speaker overlap.** The HF split is per utterance, not per speaker
   (`docs/data_notes.md`). The amount of overlap is unknown.
-- **Different setups.** The keyword counts, query set and document set all
-  differ from the thesis (see the denominators).
-- **Coarse metric.** With 1 to 8 relevant documents per keyword, one document
+- **Different setups.** On the HF split the keyword counts, query set and
+  document set all differ from the thesis (see the denominators). The
+  text-disjoint split was built to match the thesis Inst. and Occ. per
+  keyword, and does (145 queries, 160 relevant pairs, 20 keywords), but its
+  documents and queries are still not the thesis ones.
+- **Coarse metric.** With 1 to 8 relevant documents per keyword (HF split; 7 to 16 on the text-disjoint split), one document
   moving in the ranking changes a keyword's p@N by 12 to 100 points. The
   keyword-cluster intervals are about 24 points wide and contain the thesis
   figures, and the paired 128 minus 64 intervals contain 0: this data cannot
@@ -133,7 +216,6 @@ for v2.
 |---|---|---|---|---|---|---|
 | GMM-64 | 36.89 (32.4-41.8) | 41.20 (36.6-46.1) | 36.49 | 41.50 | 221 | 0 |
 | GMM-128 | 39.58 (35.1-44.3) | 44.23 (39.8-48.8) | 39.36 | 44.12 | 221 | 0 |
-
 
 ## Assumptions (thesis silent or unverified)
 
@@ -161,6 +243,12 @@ pixi run train-gmm --components 64
 pixi run train-gmm --components 128
 pixi run eval-timit --gmm outputs/models/mfcc_timit_matlab_gmm64.npz --out outputs/eval/hf_v2_gmm64
 pixi run eval-timit --gmm outputs/models/mfcc_timit_matlab_gmm128.npz --out outputs/eval/hf_v2_gmm128
+pixi run python -m qbestd.data.text_split
+pixi run train-gmm --components 64 --split-manifest outputs/splits/textdisjoint_q20_v1.tsv
+pixi run train-gmm --components 128 --split-manifest outputs/splits/textdisjoint_q20_v1.tsv
+pixi run eval-timit --gmm outputs/models/textdisjoint_q20_v1/mfcc_timit_matlab_gmm64.npz --split-manifest outputs/splits/textdisjoint_q20_v1.tsv --out outputs/eval/td_gmm64
+pixi run eval-timit --gmm outputs/models/textdisjoint_q20_v1/mfcc_timit_matlab_gmm128.npz --split-manifest outputs/splits/textdisjoint_q20_v1.tsv --out outputs/eval/td_gmm128
+pixi run eval-timit --gmm outputs/models/textdisjoint_q20_v1/mfcc_timit_matlab_gmm64.npz --split-manifest outputs/splits/textdisjoint_q20_v1.tsv --query-features slice --out outputs/eval/td_gmm64_slice
 ```
 
 Outputs (`per_query.tsv`, `summary.json`) go to git-ignored `outputs/eval/`;
