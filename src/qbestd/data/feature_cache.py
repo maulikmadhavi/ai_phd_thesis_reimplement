@@ -61,6 +61,12 @@ class CacheMismatchError(ValueError):
     """A cache file was built with different settings than requested."""
 
 
+def hf_split_id(dataset_revision=TIMIT_HF_REVISION):
+    """Identity of the Hugging Face split without SA rows: ``hf-<12 hex of
+    the dataset revision>-nonsa``. A manifest split has its own id."""
+    return f"hf-{dataset_revision[:12]}-nonsa"
+
+
 def feature_source_digest(root=None, files=FEATURE_SOURCE_FILES):
     """SHA-256 over the feature source files: each relative path, then its
     bytes with CRLF turned into LF (so git autocrlf does not change it)."""

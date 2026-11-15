@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from qbestd.data.feature_cache import build_feature_cache
+from qbestd.data.feature_cache import build_feature_cache, hf_split_id
 from qbestd.ml.gmm import (
     gmm_content_sha256,
     load_gmm,
@@ -30,6 +30,7 @@ def test_defaults():
     assert args.out == Path("outputs/models")
     assert args.features_dir == Path("outputs/features")
     assert args.rebuild_cache is False
+    assert args.split_id == hf_split_id()
 
 
 def test_options():
@@ -67,6 +68,7 @@ def test_train_from_features_writes_model_and_log(tmp_path):
     gmm, info = load_gmm(tmp_path / "mfcc_timit_matlab_gmm2.npz")
     assert gmm.n_components == 2
     assert info["training_rows"] == 12
+    assert info["split_id"] == hf_split_id()
     assert info["training_frames"] == 600
     on_disk = json.loads(
         (tmp_path / "mfcc_timit_matlab_gmm2.json").read_text())
@@ -136,3 +138,17 @@ def test_rebuild_cache_replaces_a_mismatched_cache(tmp_path, monkeypatch):
     args = parse_args(["--features-dir", str(tmp_path), "--rebuild-cache"])
     assert get_features(args)[0].shape[1] == 39
     assert calls == ["train"]
+
+
+def test_split_id_option_is_stored_in_the_model(tmp_path):
+    args = parse_args(["--components", "2", "--n-iter", "1", "--split-id",
+                       "textdisjoint_q20_v1-abc", "--out", str(tmp_path)])
+    meta = {"n_rows": 1, "dataset_revision": "d" * 40,
+            "excluded_sa_rows": 0}
+    train_from_features(small_features(), meta, args)
+    info = load_gmm(tmp_path / "mfcc_timit_matlab_gmm2.npz")[1]
+    assert info["split_id"] == "textdisjoint_q20_v1-abc"
+
+
+def test_hf_split_id_uses_twelve_hex_of_the_revision():
+    assert hf_split_id("0123456789abcdef" * 2 + "01234567") ==         "hf-0123456789ab-nonsa"

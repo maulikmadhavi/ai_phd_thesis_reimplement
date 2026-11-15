@@ -33,11 +33,13 @@ from qbestd.data.feature_cache import (
     build_feature_cache,
     cache_path,
     feature_fingerprint,
+    hf_split_id,
     load_feature_cache,
     utterance_slice,
 )
 from qbestd.data.timit_hf import download_timit_parquet, iter_timit_rows
 from qbestd.eval.metrics import average_precision, precision_at_n, summarise
+from qbestd.eval.model_guard import check_model
 from qbestd.eval.timit_queries import (
     Q20_KEYWORDS,
     build_query_examples,
@@ -184,6 +186,9 @@ def main(argv=None):
     args = parse_args(argv)
     started = time.time()
     gmm, info = load_gmm(args.gmm)
+    split_id = hf_split_id()
+    check_model(info, args.kind, args.profile, split_id,
+                feature_fingerprint(args.kind, args.profile, exclude_sa=True))
     out = args.out or Path("outputs/eval") / args.gmm.stem
     utterances, doc_rows, doc_meta = load_documents(args)
     relevance = read_relevance(args.relevance)
@@ -222,7 +227,8 @@ def main(argv=None):
     summary = {
         **aggregate(per_query), "model": args.gmm.name,
         "model_content_sha256": gmm_content_sha256(gmm),
-        "model_info": info, "feature_fingerprint": doc_meta["fingerprint"],
+        "model_info": info, "split_id": split_id,
+        "feature_fingerprint": doc_meta["fingerprint"],
         "n_documents": len(doc_rows), "n_queries": len(per_query),
         "queries_without_frames": skipped_short,
         "total_nonmatches": int(sum(q["nonmatches"] for q in per_query)),

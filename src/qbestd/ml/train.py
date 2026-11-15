@@ -24,6 +24,7 @@ from qbestd.data.feature_cache import (
     build_feature_cache,
     cache_path,
     feature_fingerprint,
+    hf_split_id,
     load_feature_cache,
 )
 from qbestd.ml.gmm import (
@@ -49,6 +50,9 @@ def parse_args(argv=None):
     parser.add_argument("--epsilon", type=float, default=0.2)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--split", default="train")
+    parser.add_argument("--split-id", default=hf_split_id(),
+                        help="identity of the training rows, stored in the "
+                        "model (default: the HF split without SA)")
     parser.add_argument("--out", type=Path, default=DEFAULT_MODELS_DIR)
     parser.add_argument("--features-dir", type=Path,
                         default=DEFAULT_FEATURES_DIR)
@@ -95,7 +99,7 @@ def train_from_features(features, meta, args):
     npz_path = Path(args.out) / f"{name}.npz"
     npz_path.parent.mkdir(parents=True, exist_ok=True)
     info = {"kind": args.kind, "profile": args.profile,
-            "dims": int(features.shape[1]), "n_iter": args.n_iter,
+            "split_id": args.split_id, "dims": int(features.shape[1]), "n_iter": args.n_iter,
             "components": args.components, "epsilon": args.epsilon,
             "var_floor_ratio": args.var_floor_ratio, "seed": args.seed,
             "training_rows": meta["n_rows"],
