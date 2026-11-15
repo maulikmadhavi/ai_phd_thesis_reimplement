@@ -98,7 +98,7 @@ Per keyword (v2):
 TIMIT and are left out (18 of 20 keywords are evaluated). Four keywords have
 exactly one relevant document, so p@N is 0 or 100 for each of their queries.
 
-## Text-disjoint split (`textdisjoint_q20_v1`)
+## Text-disjoint split v1 (`textdisjoint_q20_v1`), historical
 
 **Labels: closer to the thesis on sentence context; not an official TIMIT
 reconstruction; speaker overlap present (amount unknown, likely larger than on
@@ -160,7 +160,7 @@ aligned instances after flagged ones are dropped):
 | tomorrow | 3 | 3 | 7 | 7 | 0.0 | 1.9 | 4.8 | 3.3 |
 | youngsters | 7 | 7 | 7 | 7 | 44.9 | 46.4 | 44.9 | 49.5 |
 
-### Three-row comparison: thesis, HF split v2, text-disjoint
+### Historical comparison: thesis, HF split v2, text-disjoint v1 and v2
 
 *Instance* columns average every query instance; *keyword* columns average
 per keyword first. Labels as above; the HF rows carry sentence-text overlap
@@ -174,11 +174,95 @@ pairs).
 | thesis, GMM-64 | 34.91 | 36.71 | not stated | not stated | 145 |
 | HF split v2, GMM-64 | 36.95 (25.1-49.2) | 41.25 (28.8-54.2) | 36.52 (25.7-47.8) | 41.56 (29.8-53.5) | 221 |
 | text-disjoint v1, GMM-64 | 38.45 (28.2-50.0) | 40.61 (29.5-52.9) | 36.98 (27.5-47.0) | 38.44 (28.7-48.7) | 145 |
+| text-disjoint v2, GMM-64 | 40.02 (30.8-49.7) | 42.23 (31.5-53.6) | 36.92 (28.1-45.9) | 39.09 (29.3-49.2) | 145 |
 | thesis, GMM-128 | 36.81 | 38.34 | not stated | not stated | 145 |
 | HF split v2, GMM-128 | 39.36 (28.7-50.6) | 44.21 (32.8-56.3) | 39.14 (29.6-49.0) | 44.10 (33.7-54.8) | 221 |
 | text-disjoint v1, GMM-128 | 40.60 (30.3-51.1) | 43.57 (32.3-55.5) | 37.26 (28.1-46.7) | 40.37 (30.5-50.4) | 145 |
+| text-disjoint v2, GMM-128 | 42.94 (32.8-54.1) | 44.96 (34.2-56.7) | 40.19 (31.3-49.5) | 42.38 (32.9-52.3) | 145 |
 
-## Sensitivity: query features, clip vs slice (GMM-64, text-disjoint)
+## Text-disjoint split v2 (`textdisjoint_q20_v2`)
+
+**Labels: closer to the thesis on sentence context (no one-edit variant pair
+crosses sides, `docs/split_textdisjoint.md`); not an official TIMIT
+reconstruction; speaker overlap present (amount unknown).** This is the split
+that later result docs compare on. Rule, links, manifest hash and per-keyword
+counts were declared in `docs/split_textdisjoint.md` (commit `4e95d7e`)
+before any v2 model was trained. Same features, GMM recipe, LC2 scorer, clip
+query features and bootstrap as HF v2 and v1; only the rows of the two sides
+differ. Nothing was tuned, and v2 was not changed after seeing scores.
+
+| Model | p@N, instance avg (95% CI) | MAP, instance avg (95% CI) | p@N, keyword avg (95% CI) | MAP, keyword avg (95% CI) | Queries | Non-matches |
+|---|---|---|---|---|---|---|
+| thesis, GMM-64 | 34.91 | 36.71 | not stated | not stated | 145 | n/a |
+| thesis, GMM-128 | 36.81 | 38.34 | not stated | not stated | 145 | n/a |
+| ours v2, GMM-64 | 40.02 (30.8-49.7) | 42.23 (31.5-53.6) | 36.92 (28.1-45.9) | 39.09 (29.3-49.2) | 145 | 0 |
+| ours v2, GMM-128 | 42.94 (32.8-54.1) | 44.96 (34.2-56.7) | 40.19 (31.3-49.5) | 42.38 (32.9-52.3) | 145 | 1 |
+
+Intervals: keyword-cluster bootstrap, 10000 resamples, seed 0. The GMM-128 run
+has 1 non-match (a document with no valid path
+endpoint ranks last with distance +inf; it is counted, not dropped).
+
+Paired difference GMM-128 minus GMM-64 (same queries, paired keyword-cluster
+bootstrap, 95 %):
+
+| Average | p@N | MAP |
+|---|---|---|
+| instance average | 2.92 (0.5-5.6) | 2.73 (0.7-5.1) |
+| keyword average | 3.27 (0.8-5.7) | 3.30 (0.8-6.0) |
+
+**Direction check, made afresh on v2.** The thesis gain 128 minus 64 is
++1.9 p@N and +1.63 MAP. "In the thesis's
+direction" is said only where the paired interval excludes 0; this is no claim
+of numerical parity.
+
+- GMM-128 minus GMM-64, instance average, p@N: +2.92 (+0.5 to +5.6): in the thesis's direction (interval excludes 0).
+- GMM-128 minus GMM-64, instance average, MAP: +2.73 (+0.7 to +5.1): in the thesis's direction (interval excludes 0).
+- GMM-128 minus GMM-64, keyword average, p@N: +3.27 (+0.8 to +5.7): in the thesis's direction (interval excludes 0).
+- GMM-128 minus GMM-64, keyword average, MAP: +3.30 (+0.8 to +6.0): in the thesis's direction (interval excludes 0).
+
+Provenance:
+
+| | GMM-64 | GMM-128 |
+|---|---|---|
+| `split_id` | `textdisjoint_q20_v2-0e913c50aae7` | `textdisjoint_q20_v2-0e913c50aae7` |
+| Parameter SHA-256 | `a029dbfa60b9e632...` | `0f05ea082f748240...` |
+| Feature fingerprint | `200751d44f47885a...` | `200751d44f47885a...` |
+| Documents / queries | 1344 / 145 | 1344 / 145 |
+| Non-matches | 0 | 1 |
+| Runtime | 307 s | 378 s |
+| Git commit | `4e95d7e` | `4e95d7e` |
+
+Query instances and relevant documents per keyword, against the thesis table
+(thesis Occ. is a token count, ours counts documents), with a mark where v2
+differs from v1:
+
+| Keyword | Thesis Inst. | Our instances | Thesis Occ. | Our relevant documents | Counts changed from v1 | GMM-64 p@N | GMM-64 MAP | GMM-128 p@N | GMM-128 MAP |
+|---|---|---|---|---|---|---|---|---|---|
+| artists | 7 | 7 | 7 | 7 | no | 18.4 | 13.6 | 28.6 | 27.2 |
+| beautiful | 3 | 3 | 8 | 8 | no | 45.8 | 46.7 | 50.0 | 56.9 |
+| birth | 4 | 4 | 7 | 7 | no | 10.7 | 13.2 | 14.3 | 13.0 |
+| destroy | 9 | 9 | 7 | 7 | no | 31.7 | 32.2 | 31.7 | 31.3 |
+| development | 9 | 9 | 8 | 8 | no | 52.8 | 55.9 | 59.7 | 62.4 |
+| garbage | 8 | 8 | 7 | 7 | no | 28.6 | 31.5 | 42.9 | 40.4 |
+| government | 14 | 14 | 8 | 8 | no | 30.4 | 31.7 | 29.5 | 31.1 |
+| intelligence | 8 | 8 | 7 | 7 | no | 73.2 | 81.6 | 78.6 | 81.3 |
+| love | 4 | 4 | 16 | 16 | no | 6.2 | 5.2 | 9.4 | 4.9 |
+| marriage | 3 | 3 | 7 | 7 | no | 38.1 | 45.6 | 33.3 | 41.8 |
+| meeting | 7 | 7 | 7 | 7 | no | 32.7 | 31.5 | 26.5 | 30.1 |
+| morning | 15 | 15 | 14 | 14 | no | 33.3 | 31.9 | 32.4 | 32.7 |
+| ocean | 7 | 7 | 7 | 7 | no | 14.3 | 14.7 | 14.3 | 16.2 |
+| organizations | 7 | 7 | 7 | 7 | no | 69.4 | 77.4 | 75.5 | 76.0 |
+| problems | 5 | 5 | 7 | 7 | no | 45.7 | 46.4 | 48.6 | 61.8 |
+| shellfish | 14 | 14 | 7 | 7 | no | 73.5 | 80.9 | 80.6 | 86.1 |
+| simple | 8 | 8 | 8 | 8 | no | 39.1 | 38.5 | 34.4 | 39.3 |
+| surface | 3 | 3 | 7 | 7 | no | 47.6 | 48.7 | 52.4 | 51.7 |
+| tomorrow | 3 | 3 | 7 | 7 | no | 0.0 | 2.2 | 14.3 | 16.7 |
+| youngsters | 7 | 7 | 7 | 7 | no | 46.9 | 52.1 | 46.9 | 46.9 |
+
+Later result docs (`docs/results_timit_q20_features.md`) compare on this split.
+For the HF split and v1, use the historical table below.
+
+## Sensitivity: query features, clip vs slice (GMM-64, text-disjoint v1)
 
 *Sensitivity, not a thesis-mandated correction.* Same GMM-64, alignments,
 relevance and documents on `textdisjoint_q20_v1`; only the query features
@@ -282,7 +366,16 @@ pixi run train-gmm --components 128 --split-manifest outputs/splits/textdisjoint
 pixi run eval-timit --gmm outputs/models/textdisjoint_q20_v1/mfcc_timit_matlab_gmm64.npz --split-manifest outputs/splits/textdisjoint_q20_v1.tsv --out outputs/eval/td_gmm64
 pixi run eval-timit --gmm outputs/models/textdisjoint_q20_v1/mfcc_timit_matlab_gmm128.npz --split-manifest outputs/splits/textdisjoint_q20_v1.tsv --out outputs/eval/td_gmm128
 pixi run eval-timit --gmm outputs/models/textdisjoint_q20_v1/mfcc_timit_matlab_gmm64.npz --split-manifest outputs/splits/textdisjoint_q20_v1.tsv --query-features slice --out outputs/eval/td_gmm64_slice
+pixi run python -m qbestd.data.text_split --rule v2
+pixi run train-gmm --components 64 --split-manifest outputs/splits/textdisjoint_q20_v2.tsv
+pixi run train-gmm --components 128 --split-manifest outputs/splits/textdisjoint_q20_v2.tsv
+pixi run eval-timit --gmm outputs/models/textdisjoint_q20_v2/mfcc_timit_matlab_gmm64.npz --split-manifest outputs/splits/textdisjoint_q20_v2.tsv --out outputs/eval/td2_gmm64
+pixi run eval-timit --gmm outputs/models/textdisjoint_q20_v2/mfcc_timit_matlab_gmm128.npz --split-manifest outputs/splits/textdisjoint_q20_v2.tsv --out outputs/eval/td2_gmm128
 ```
+
+The v1 models were not retrained after the cycle 6 fingerprint change, so
+the model guard rejects them; their scored outputs stay as historical
+results.
 
 Outputs (`per_query.tsv`, `summary.json`) go to git-ignored `outputs/eval/`;
 only this summary is committed.
