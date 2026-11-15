@@ -21,7 +21,8 @@ def test_scores_have_zero_mean_and_unit_sample_std():
 
 
 @pytest.mark.parametrize("bad", [[1.0], [], [2.0, 2.0, 2.0],
-                                 [1.0, np.nan], [1.0, np.inf]])
+                                 [1.0, np.nan], [1.0, -np.inf],
+                                 [1.0, np.inf], [1.0, 2.0, np.nan]])
 def test_degenerate_input_raises(bad):
     with pytest.raises(ValueError):
         znorm_scores(bad)
@@ -37,3 +38,15 @@ def test_ranking_by_zscore_equals_ranking_by_distance():
 def test_ranking_is_ascending_and_stable_on_ties():
     order = rank_documents([0.5, 0.1, 0.5, 0.1, 0.3])
     assert order.tolist() == [1, 3, 4, 0, 2]
+
+
+def test_znorm_uses_finite_values_only_and_gives_inf_the_lowest_score():
+    scores = znorm_scores([1.0, np.inf, 2.0, 3.0])
+    assert not np.isnan(scores).any()
+    assert np.allclose(scores[[0, 2, 3]], [1.0, 0.0, -1.0])
+    assert scores[1] == -np.inf
+
+
+def test_ranking_puts_inf_last_in_document_order():
+    order = rank_documents([np.inf, 0.4, np.inf, 0.2])
+    assert order.tolist() == [3, 1, 0, 2]

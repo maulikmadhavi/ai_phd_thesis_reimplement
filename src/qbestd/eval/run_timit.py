@@ -56,7 +56,7 @@ from qbestd.search.score import rank_documents
 from qbestd.search.subdtw import best_utterance_distance, subdtw_lc2
 
 PER_QUERY_HEADER = ("keyword", "row_index", "word_index", "n_relevant",
-                    "p_at_n", "ap", "fallbacks")
+                    "p_at_n", "ap", "nonmatches")
 
 
 def parse_args(argv=None):
@@ -82,20 +82,21 @@ def parse_args(argv=None):
 
 
 def utterance_distances(query_post, document_posts):
-    """Utterance distance and fallback flag of one query to every document.
+    """Utterance distance and non-match flag of one query to each document.
 
     ``query_post`` is (N, K); ``document_posts`` a list of (M_i, K) arrays,
-    already floored and renormalised.
+    already floored and renormalised. A document with no valid end frame
+    gets distance ``inf`` and ``nonmatch`` True; it never raises.
     """
     distances = np.empty(len(document_posts))
-    fallbacks = np.zeros(len(document_posts), dtype=bool)
+    nonmatches = np.zeros(len(document_posts), dtype=bool)
     for position, document in enumerate(document_posts):
         local = symmetric_kl_matrix(document, query_post)
         accumulated, length, start = subdtw_lc2(local)
-        distance, _, _, fallbacks[position] = best_utterance_distance(
+        distance, _, _, nonmatches[position] = best_utterance_distance(
             accumulated, length, start)
         distances[position] = distance
-    return distances, fallbacks
+    return distances, nonmatches
 
 
 def score_query(distances, document_rows, relevant_rows):
@@ -206,8 +207,8 @@ def main(argv=None):
             continue
         query_post = floor_and_renormalise(
             gaussian_posteriorgram(gmm, features))
-        distances, fallbacks = utterance_distances(query_post,
-                                                   document_posts)
+        distances, nonmatches = utterance_distances(
+            query_post, document_posts)
         p_at_n, ap = score_query(distances, doc_rows,
                                  relevance[example.keyword])
         per_query.append({
@@ -215,7 +216,8 @@ def main(argv=None):
             "word_index": example.word_index,
             "n_relevant": len(set(relevance[example.keyword])
                               & set(doc_rows)),
-            "p_at_n": p_at_n, "ap": ap, "fallbacks": int(fallbacks.sum())})
+            "p_at_n": p_at_n, "ap": ap,
+            "nonmatches": int(nonmatches.sum())})
     write_per_query(out / "per_query.tsv", per_query)
     summary = {
         **aggregate(per_query), "model": args.gmm.name,
@@ -223,7 +225,7 @@ def main(argv=None):
         "model_info": info, "feature_fingerprint": doc_meta["fingerprint"],
         "n_documents": len(doc_rows), "n_queries": len(per_query),
         "queries_without_frames": skipped_short,
-        "total_fallbacks": int(sum(q["fallbacks"] for q in per_query)),
+        "total_nonmatches": int(sum(q["nonmatches"] for q in per_query)),
         "runtime_s": round(time.time() - started, 1),
         "git_commit": git_commit(),
         "label": "speaker overlap present; approximate versus the thesis"}
@@ -231,7 +233,7 @@ def main(argv=None):
                                       encoding="utf-8")
     print(json.dumps({k: summary[k] for k in
                       ("instance_average", "keyword_average", "n_queries",
-                       "total_fallbacks", "runtime_s")}, indent=2))
+                       "total_nonmatches", "runtime_s")}, indent=2))
 
 
 if __name__ == "__main__":

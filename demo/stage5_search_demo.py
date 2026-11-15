@@ -103,10 +103,10 @@ def align_pair(query_post, document_post):
     """D, S, the best path and the utterance distance of one pair."""
     local = symmetric_kl_matrix(document_post, query_post)
     accumulated, length, start = subdtw_lc2(local)
-    distance, first, last, fallback = best_utterance_distance(
+    distance, first, last, nonmatch = best_utterance_distance(
         accumulated, length, start)
-    path = backtrace_path(local, accumulated, last)
-    return local, accumulated, path, distance, (first, last, fallback)
+    path = None if nonmatch else backtrace_path(local, accumulated, last)
+    return local, accumulated, path, distance, (first, last, nonmatch)
 
 
 def search_two_clips(model_name, query_audio, document_audio):
@@ -115,13 +115,14 @@ def search_two_clips(model_name, query_audio, document_audio):
     gmm, _ = load_gmm(MODELS_DIR / model_name)
     query = posteriors(gmm, *load_audio(query_audio))
     document = posteriors(gmm, *load_audio(document_audio))
-    local, accumulated, path, distance, (first, last, fallback) = (
+    local, accumulated, path, distance, (first, last, nonmatch) = (
         align_pair(query, document))
-    note = (f"utterance distance **{distance:.3f}**; best match at test "
+    note = ("**non-match**: no end frame has a test-frame displacement of "
+            "0.5 to 2 times the query length, so the distance is infinite"
+            if nonmatch else
+            f"utterance distance **{distance:.3f}**; best match at test "
             f"frames {first}-{last} ({first * SHIFT_S:.2f}-"
-            f"{(last + 1) * SHIFT_S:.2f} s)"
-            + ("; no end frame passed the 0.5-2x length check, so the "
-               "fallback minimum was used" if fallback else ""))
+            f"{(last + 1) * SHIFT_S:.2f} s)")
     return (posteriorgram_plot(query, "Query posteriorgram"),
             posteriorgram_plot(document, "Document posteriorgram"),
             heatmap(local, "Local distance D (symmetric KL)"),

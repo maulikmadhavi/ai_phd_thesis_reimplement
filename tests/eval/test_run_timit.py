@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from qbestd.search.score import rank_documents
 from qbestd.eval.run_timit import (
     PER_QUERY_HEADER,
     aggregate,
@@ -37,10 +38,21 @@ def test_planted_query_ranks_its_document_first():
     documents = [peaked(40, 6, rng) for _ in range(5)]
     documents[3] = np.concatenate([peaked(8, 6, rng), query,
                                    peaked(12, 6, rng)])
-    distances, fallbacks = utterance_distances(query, documents)
+    distances, nonmatches = utterance_distances(query, documents)
     assert int(np.argmin(distances)) == 3
     assert distances[3] == pytest.approx(0.0, abs=1e-9)
-    assert fallbacks.dtype == bool and fallbacks.shape == (5,)
+    assert nonmatches.dtype == bool and nonmatches.shape == (5,)
+    assert not nonmatches.any()
+
+
+def test_short_document_is_a_nonmatch_and_ranks_last_without_raising():
+    rng = np.random.default_rng(1)
+    query = peaked(20, 6, rng)
+    documents = [peaked(5, 6, rng), np.concatenate([peaked(4, 6, rng), query])]
+    distances, nonmatches = utterance_distances(query, documents)
+    assert nonmatches.tolist() == [True, False]
+    assert distances[0] == np.inf
+    assert rank_documents(distances).tolist() == [1, 0]
 
 
 def test_score_query_perfect_and_worst_ranking():
@@ -78,7 +90,7 @@ def test_aggregate_instance_and_keyword_averages_differ():
 
 def test_write_per_query_has_the_documented_columns(tmp_path):
     rows = [{"keyword": "love", "row_index": 3, "word_index": 1,
-             "n_relevant": 2, "p_at_n": 50.0, "ap": 0.75, "fallbacks": 4}]
+             "n_relevant": 2, "p_at_n": 50.0, "ap": 0.75, "nonmatches": 4}]
     write_per_query(tmp_path / "sub" / "per_query.tsv", rows)
     lines = (tmp_path / "sub" / "per_query.tsv").read_text().splitlines()
     assert lines[0].split("\t") == list(PER_QUERY_HEADER)

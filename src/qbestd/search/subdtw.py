@@ -17,10 +17,10 @@ does. Every predecessor lies in column n-1, so a whole column is computed at
 once, vectorised over m. ``P`` is 0-based here (the C++ stores m + 1).
 
 The C++ takes the end frame with the smallest ``S`` in the last column and
-reports ``S/T`` there. The thesis (``ExpSetup.tex`` line 442) reports
-``S(i, N)/T(i, N)``; the path-validity interval below is the plan's reading
-of the thesis (open question 23) and the choice of ``min S/T`` over valid end
-frames is likewise a documented assumption, not the C++ behaviour.
+reports ``S/T`` there. The thesis (``ExpSetup.tex`` lines 442-448 and
+467-469) reports the minimum ``S(i, N)/T(i, N)`` over end frames with
+``0.5 <= wr <= 2``; that rule is used below. It is not the C++ behaviour,
+which takes the smallest ``S`` unconditionally.
 """
 
 import numpy as np
@@ -80,25 +80,24 @@ def best_utterance_distance(accumulated, length, start, min_ratio=0.5,
                             max_ratio=2.0):
     """Utterance distance: the minimum ``S/T`` over valid end frames.
 
-    An end frame ``i`` of the last query column is valid when the matched
-    test interval ``i - P + 1`` is between ``min_ratio`` and ``max_ratio``
-    times the query length N.
+    Thesis (``ExpSetup.tex`` lines 442-448): ``wr(i) = (i - P(i, N)) / N``
+    with zero-based frames, and an end frame is valid when
+    ``min_ratio <= wr <= max_ratio``. ``T`` only normalises the cost.
 
     Returns:
-        ``(distance, start_frame, end_frame, used_fallback)``. If no end
-        frame is valid the minimum over all of them is used and
-        ``used_fallback`` is True.
+        ``(distance, start_frame, end_frame, nonmatch)``. When no end frame
+        is valid (for example a document much shorter than the query) the
+        result is ``(inf, -1, -1, True)``; it never raises.
     """
     cols = accumulated.shape[1]
     ends = np.arange(accumulated.shape[0])
     normalised = accumulated[:, -1] / length[:, -1]
-    ratio = (ends - start[:, -1] + 1) / cols
+    ratio = (ends - start[:, -1]) / cols
     valid = (ratio >= min_ratio) & (ratio <= max_ratio)
-    used_fallback = not valid.any()
-    candidates = normalised if used_fallback else np.where(valid, normalised,
-                                                           np.inf)
-    end = int(np.argmin(candidates))
-    return (float(normalised[end]), int(start[end, -1]), end, used_fallback)
+    if not valid.any():
+        return (float("inf"), -1, -1, True)
+    end = int(np.argmin(np.where(valid, normalised, np.inf)))
+    return (float(normalised[end]), int(start[end, -1]), end, False)
 
 
 def backtrace_path(local_distance, accumulated, end_frame):

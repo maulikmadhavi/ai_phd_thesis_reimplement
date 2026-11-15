@@ -104,40 +104,64 @@ def test_planted_query_is_found_at_the_right_place():
     query, document, first, last = planted_case()
     D = symmetric_kl_matrix(document, query)
     S, T, P = subdtw_lc2(D)
-    distance, start, end, fallback = best_utterance_distance(S, T, P)
+    distance, start, end, nonmatch = best_utterance_distance(S, T, P)
     assert (start, end) == (first, last)
     assert distance == pytest.approx(0.0, abs=1e-9)
-    assert not fallback
+    assert not nonmatch
 
 
-def test_best_utterance_distance_respects_the_validity_interval():
-    # N = 4 query frames; only the last column matters for the selection.
-    S = np.zeros((6, 4))
-    T = np.ones((6, 4))
-    P = np.zeros((6, 4), dtype=int)
-    S[:, -1] = [1.0, 9.0, 9.0, 8.0, 4.0, 3.0]
-    P[:, -1] = [0, 0, 0, 0, 1, 2]
-    # path lengths i - P + 1 = 1, 2, 3, 4, 4, 4 -> ratios .25, .5, ... 1
-    # end frame 0 is cheapest (1.0) but too short, so it is rejected
-    dist, start, end, fallback = best_utterance_distance(S, T, P)
-    assert (dist, start, end, fallback) == (3.0, 2, 5, False)
+def last_column(costs, starts, cols=4):
+    """(S, T, P) whose last column holds ``costs`` and ``starts``."""
+    S = np.zeros((len(costs), cols))
+    S[:, -1] = costs
+    P = np.zeros((len(costs), cols), dtype=int)
+    P[:, -1] = starts
+    return S, np.ones_like(S), P
 
 
-def test_fallback_when_no_end_frame_is_valid():
+def test_validity_uses_the_zero_based_displacement_without_plus_one():
+    # N = 4, so wr = (end - P) / 4. Displacements 1, 2, 3, 4, 8, 9.
+    S, T, P = last_column([1.0, 9.0, 9.0, 8.0, 4.0, 3.0], [0] * 6)
+    P[:, -1] = [0, 0, 0, 0, -4, -4]
+    ends = np.arange(6)
+    wr = (ends - P[:, -1]) / 4
+    assert wr.tolist() == [0.0, 0.25, 0.5, 0.75, 2.0, 2.25]
+    dist, start, end, nonmatch = best_utterance_distance(S, T, P)
+    # valid ends are 2, 3, 4 (wr 0.5, 0.75, 2.0); the cheapest is end 4
+    assert (dist, start, end, nonmatch) == (4.0, -4, 4, False)
+
+
+@pytest.mark.parametrize("displacement, valid", [
+    (1, False), (2, True), (3, True), (8, True), (9, False)])
+def test_wr_bounds_are_inclusive_at_half_and_double(displacement, valid):
+    # N = 4: wr = displacement / 4, so 2 -> 0.5 and 8 -> 2.0 exactly.
+    S, T, P = last_column([5.0], [0])
+    P[0, -1] = -displacement  # end 0, so end - P = displacement
+    dist, _, _, nonmatch = best_utterance_distance(S, T, P)
+    assert nonmatch is (not valid)
+    assert (dist == 5.0) if valid else (dist == float("inf"))
+
+
+def test_no_valid_end_frame_is_a_nonmatch_not_an_error():
     S = np.array([[5.0, 6.0], [4.0, 3.0]])
     T = np.ones((2, 2))
-    P = np.array([[0, 0], [1, 1]])  # both paths are one frame long
-    dist, start, end, fallback = best_utterance_distance(
-        S, T, P, min_ratio=2.0, max_ratio=3.0)
-    assert fallback is True
-    assert (dist, end) == (3.0, 1)
+    P = np.array([[0, 0], [1, 1]])  # displacement 0 < 0.5 * N everywhere
+    result = best_utterance_distance(S, T, P)
+    assert result == (float("inf"), -1, -1, True)
+
+
+def test_document_shorter_than_half_the_query_is_a_nonmatch():
+    rng = np.random.default_rng(0)
+    D = rng.random((3, 20))  # 3 test frames, N = 20, needs wr >= 0.5
+    S, T, P = subdtw_lc2(D)
+    assert best_utterance_distance(S, T, P)[3] is True
 
 
 def test_normalisation_by_path_length_is_used():
     S = np.array([[4.0], [6.0]])
     T = np.array([[2.0], [6.0]])
     P = np.array([[0], [1]])
-    dist, _, end, _ = best_utterance_distance(S, T, P, 0.5, 2.0)
+    dist, _, end, _ = best_utterance_distance(S, T, P, 0.0, 2.0)
     assert (dist, end) == (1.0, 1)
 
 
