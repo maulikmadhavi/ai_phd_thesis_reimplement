@@ -90,6 +90,28 @@ def _collapsed_runs(segments):
         run_start = index
 
 
+def flagged_word_indices(segments):
+    """``word_index`` values of one utterance that should not be cut out.
+
+    A word is flagged when its times are not finite, its duration is under
+    20 ms, or it belongs to a ``collapsed_run`` (consecutive words with the
+    same start). Segments must be in word order.
+    """
+    flagged = set()
+    finite = []
+    for segment in segments:
+        if not (math.isfinite(segment.start_s)
+                and math.isfinite(segment.end_s)):
+            flagged.add(segment.word_index)
+        else:
+            finite.append(segment)
+            if segment.end_s - segment.start_s < MIN_WORD_S:
+                flagged.add(segment.word_index)
+    for first, last in _collapsed_runs(finite):
+        flagged.update(range(first.word_index, last.word_index + 1))
+    return flagged
+
+
 def check_segments(segments, duration_s, expected_words=None):
     """List the problems of one utterance's segments (empty = fine).
 

@@ -4,6 +4,7 @@ from qbestd.alignment.manifest import (
     FailedRow,
     WordSegment,
     check_segments,
+    flagged_word_indices,
     read_manifest,
     write_failures,
     write_manifest,
@@ -113,3 +114,19 @@ def test_non_finite_word_does_not_hide_other_problems():
 def test_exactly_20_ms_and_2_s_are_allowed():
     segments = [seg(0, "a", 0.0, 0.02), seg(1, "b", 0.5, 2.5)]
     assert check_segments(segments, 3.0) == []
+
+
+def test_flagged_word_indices_finds_short_words_and_collapsed_runs():
+    segments = [seg(0, "a", 0.10, 0.30), seg(1, "b", 0.30, 0.31),
+                seg(2, "c", 0.50, 0.70), seg(3, "d", 0.50, 0.90),
+                seg(4, "e", 0.50, 1.00), seg(5, "f", 1.00, 1.30)]
+    assert flagged_word_indices(segments) == {1, 2, 3, 4}
+
+
+def test_flagged_word_indices_empty_for_clean_segments():
+    assert flagged_word_indices(GOOD) == set()
+
+
+def test_flagged_word_indices_includes_non_finite():
+    segments = [seg(0, "a", 0.1, 0.3), seg(1, "b", float("nan"), 0.5)]
+    assert flagged_word_indices(segments) == {1}
