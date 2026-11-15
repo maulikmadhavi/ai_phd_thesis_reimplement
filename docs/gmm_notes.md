@@ -152,6 +152,12 @@ for both sizes (11 values: the LBG start and 10 iterations):
 - GMM-64: 25.324, 26.263, 26.792, 27.117, 27.306, 27.425, 27.511, 27.574, 27.619, 27.654, 27.681
 - GMM-128: 26.500, 27.538, 28.051, 28.328, 28.474, 28.564, 28.634, 28.688, 28.729, 28.764, 28.793
 
+Variances at the floor (0.01 times the global per-dimension variance, from the
+training logs): **4 of 2496** at GMM-64 and **7 of 4992** at GMM-128. The MFCC
+models have 0 of 2496 and 0 of 4992 (see the model summary above), so PLP has a
+few components with a variance pinned at the floor in some dimension. Nothing
+was changed because of it.
+
 Retrieval numbers are in `docs/results_timit_q20_features.md`.
 
 ## MFCC-TMP on `textdisjoint_q20_v2` (cycle 6, P2)

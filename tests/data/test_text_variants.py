@@ -107,3 +107,14 @@ def test_committed_links_are_sorted_distinct_pairs():
     for first, second in V2_VARIANT_LINKS:
         assert first < second
         assert len(first) == len(second) == 64
+
+
+def test_a_group_with_two_partners_gives_both_pairs_in_a_fixed_order():
+    groups = {"h3": group("a x c d", 2), "h1": group("a b c d", 4),
+              "h2": group("a b c", 1)}
+    found = find_variant_candidates(groups)
+    assert [(c.hash_a, c.hash_b) for c in found] == [("h1", "h2"),
+                                                    ("h1", "h3")]
+    assert [(c.hash_a, c.hash_b) for c in find_variant_candidates(
+        dict(reversed(list(groups.items()))))] == [("h1", "h2"),
+                                                  ("h1", "h3")]

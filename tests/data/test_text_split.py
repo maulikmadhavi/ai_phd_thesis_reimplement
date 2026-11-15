@@ -295,12 +295,16 @@ def test_no_links_reproduce_v1_rows_on_a_synthetic_universe():
 
 def test_v2_manifest_is_identical_under_shuffled_rows_and_links():
     spec = VARIANT_ROWS + [("we run fast", 2, 0), ("we run very fast", 1, 0),
+                           ("we run very very fast", 1, 0),
                            ("see you tomorrow", 2, 1)]
+    # the second pair shares a member with the third: a unit of 3 variants
     links = [linked("we love tea", "we love the tea"),
-             linked("we run fast", "we run very fast")]
+             linked("we run fast", "we run very fast"),
+             linked("we run very fast", "we run very very fast")]
+    run_key = min(links[1] + links[2])
     reference = None
     for seed in range(4):
-        rows, _ = make_rows(spec)
+        rows, lookup = make_rows(spec)
         random.Random(seed).shuffle(rows)
         random.Random(seed).shuffle(links)
         manifest = build_text_split(rows, [("tomorrow", 2, 1)],
@@ -310,6 +314,9 @@ def test_v2_manifest_is_identical_under_shuffled_rows_and_links():
         reference = reference or data
         assert data == reference
     assert reference.decode().startswith("# rule=textdisjoint_q20_v2\n")
+    unit_keys = {r.group_hash for r in manifest.rows
+                 if lookup[(r.hf_split, r.row_index)].startswith("we run")}
+    assert unit_keys == {run_key}  # one unit key
 
 
 def test_keyword_counts_sum_over_the_variants_of_a_unit():
@@ -354,3 +361,15 @@ def test_v2_defaults_to_the_committed_links(monkeypatch):
     manifest = build_text_split(rows, [], rule=text_split.RULE_V2)
     assert manifest.report["n_links"] == 1
     assert build_text_split(rows, []).report["n_links"] == 0
+
+
+def test_no_links_means_no_row_cap_so_v1_has_no_new_failure_mode():
+    rows, _ = make_rows([("one two", 8, 0), ("three four", 1, 0)])
+    manifest = build_text_split(rows, [])  # v1: links=()
+    assert manifest.rule == "textdisjoint_q20_v1"
+    assert manifest.report["n_groups"] == 2
+    assert len([r for r in manifest.rows if r.group_hash == group_hash(
+        "one two")]) == 8
+    with pytest.raises(ValueError, match="more than 7"):
+        build_text_split(rows, [], rule=text_split.RULE_V2,
+                         links=(linked("one two", "three four"),))

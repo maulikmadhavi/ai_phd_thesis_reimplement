@@ -113,7 +113,8 @@ def _merge_units(groups, links):
     Raises:
         ValueError: for a link that is not a sorted pair, that names an
             unknown hash, or that makes a unit of more than
-            ``MAX_UNIT_ROWS`` rows.
+            ``MAX_UNIT_ROWS`` rows. The cap applies only when there are
+            links, so the v1 rule (``links=()``) has no new failure mode.
     """
     parent = {h: h for h in groups}
 
@@ -138,7 +139,7 @@ def _merge_units(groups, links):
     for found in members.values():
         key = min(found)
         rows = sorted(r for h in found for r in groups[h]["rows"])
-        if len(rows) > MAX_UNIT_ROWS:
+        if links and len(rows) > MAX_UNIT_ROWS:
             raise ValueError(f"unit {key[:12]} has {len(rows)} rows, more "
                              f"than {MAX_UNIT_ROWS}")
         units[key] = {"tokens": groups[key]["tokens"], "rows": rows,

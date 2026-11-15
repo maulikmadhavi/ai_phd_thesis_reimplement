@@ -183,7 +183,11 @@ def transitive_feature_imports(root=PACKAGE, start="features/extract.py"):
     """Files under ``audio/`` and ``features/`` of the package at ``root``
     reached from ``start`` by ``qbestd`` imports, absolute or relative,
     found by parsing the source (``__init__`` skipped). It misses dynamic
-    imports and code outside those two packages."""
+    imports and code outside those two packages. Two more known limits:
+    ``from qbestd import features`` followed by attribute access
+    (``features.helper.f()``) names no module, and a name re-exported
+    through an ``__init__.py`` is not followed to the file that defines it.
+    """
     seen, todo = set(), [start]
     while todo:
         name = todo.pop()
@@ -211,6 +215,7 @@ def test_source_files_are_the_transitive_feature_imports():
     "from .newhelper import value",
     "from . import newhelper",
     "import qbestd.features.newhelper",
+    "from ..audio import newhelper",
 ])
 def test_closure_finds_a_new_helper_imported_by_extract(tmp_path,
                                                         import_line):
@@ -218,12 +223,13 @@ def test_closure_finds_a_new_helper_imported_by_extract(tmp_path,
     for package in ("audio", "features"):
         shutil.copytree(PACKAGE / package, root / package,
                         ignore=shutil.ignore_patterns("__pycache__"))
-    (root / "features" / "newhelper.py").write_text("value = 1\n", "utf-8")
+    package = "audio" if "audio" in import_line else "features"
+    (root / package / "newhelper.py").write_text("value = 1\n", "utf-8")
     extract = root / "features" / "extract.py"
     extract.write_text(import_line + "\n" + extract.read_text("utf-8"),
                        "utf-8")
     missing = transitive_feature_imports(root) - set(FEATURE_SOURCE_FILES)
-    assert missing == {"features/newhelper.py"}
+    assert missing == {f"{package}/newhelper.py"}
 
 
 def copy_sources(target):
