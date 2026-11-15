@@ -12,7 +12,8 @@ from qbestd.features.lpc import (
 def test_levinson_matches_toeplitz_solution():
     rng = np.random.default_rng(0)
     signal = rng.normal(size=400)
-    autocorr = np.array([signal[:400 - lag] @ signal[lag:] for lag in range(11)])
+    autocorr = np.array(
+        [signal[:400 - lag] @ signal[lag:] for lag in range(11)])
     coeffs, error = levinson_durbin(autocorr, 8)
     expected = solve_toeplitz(autocorr[:8], -autocorr[1:9])
     assert coeffs.shape == (1, 9)
@@ -23,7 +24,8 @@ def test_levinson_matches_toeplitz_solution():
 
 def test_levinson_batch_matches_single():
     rng = np.random.default_rng(1)
-    autocorr = np.abs(rng.normal(size=(3, 10))) * np.array([1.0, .5, .2, .1, .05, 0, 0, 0, 0, 0])
+    decay = np.array([1.0, .5, .2, .1, .05, 0, 0, 0, 0, 0])
+    autocorr = np.abs(rng.normal(size=(3, 10))) * decay
     autocorr[:, 0] += 5.0
     batch, _ = levinson_durbin(autocorr, 4)
     for row in range(3):
@@ -58,7 +60,8 @@ def test_cepstrum_longer_than_order_uses_recursion():
     impulse = np.zeros(200)
     impulse[0] = 1
     for n in range(1, 200):
-        impulse[n] = 0.5 * impulse[n - 1] - 0.2 * (impulse[n - 2] if n >= 2 else 0)
+        older = impulse[n - 2] if n >= 2 else 0
+        impulse[n] = 0.5 * impulse[n - 1] - 0.2 * older
     spectrum = np.fft.fft(impulse, 4096)
     reference = np.real(np.fft.ifft(np.log(spectrum)))[:6]
     assert np.allclose(cepstrum[0, 1:], reference[1:], atol=1e-6)

@@ -1,4 +1,4 @@
-"""Stage 1 demo: audio front end (resample, pre-emphasis, framing, window, spectrum).
+"""Stage 1 demo: audio front end (resample, pre-emphasis, framing, spectrum).
 
 Usage:  pixi run -e demo demo-stage1
 Upload or record audio, adjust the sliders, and press Run. The page shows the
@@ -38,7 +38,8 @@ def plot_spectrogram(frames, config, sample_rate, shift_ms):
     log_power = np.log10(np.maximum(power, LOG_POWER_FLOOR)).T
     duration = len(frames) * shift_ms / 1000.0
     axes.imshow(log_power, origin="lower", aspect="auto",
-                extent=[0, duration, 0, fft_bin_frequencies(n_fft, sample_rate)[-1]])
+                extent=[0, duration, 0,
+                        fft_bin_frequencies(n_fft, sample_rate)[-1]])
     axes.set(xlabel="time (s)", ylabel="frequency (Hz)",
              title="Log power spectrogram")
     figure.tight_layout()
@@ -59,14 +60,15 @@ def plot_energy_curves(frames, shift_ms):
     return figure
 
 
-def run_front_end(audio_path, frame_ms, shift_ms, preemphasis, window, target_rate):
+def run_front_end(audio_path, frame_ms, shift_ms, preemphasis, window,
+                  target_rate):
     """Run the Stage 1 pipeline and return plots plus a frame-count message."""
     if audio_path is None:
         raise gr.Error("Please upload or record some audio first.")
     samples, source_rate = load_audio(audio_path)
-    config = AudioFrontEndConfig(sample_rate=int(target_rate), frame_ms=frame_ms,
-                                 shift_ms=shift_ms, preemphasis=preemphasis,
-                                 window=window)
+    config = AudioFrontEndConfig(
+        sample_rate=int(target_rate), frame_ms=frame_ms, shift_ms=shift_ms,
+        preemphasis=preemphasis, window=window)
     frames = prepare_frames(samples, source_rate, config)
     if len(frames) == 0:
         raise gr.Error("Audio is shorter than one frame; use a longer clip.")

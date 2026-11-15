@@ -26,8 +26,8 @@ def test_tone_peaks_at_expected_bin():
     sample_rate, n_fft = 8000, 256
     bin_index = 32  # 1000 Hz exactly
     time = np.arange(n_fft) / sample_rate
-    frame = np.sin(2 * np.pi * fft_bin_frequencies(n_fft, sample_rate)[bin_index]
-                   * time)
+    bin_hz = fft_bin_frequencies(n_fft, sample_rate)[bin_index]
+    frame = np.sin(2 * np.pi * bin_hz * time)
     spectrum = power_spectrum(frame[None, :], n_fft)[0]
     assert np.argmax(spectrum) == bin_index
 

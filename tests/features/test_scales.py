@@ -23,12 +23,14 @@ def test_warp_factor_grid_has_13_values():
 
 
 def test_mel_round_trip_and_reference_value():
-    assert np.allclose(mel_to_hz(hz_to_mel(FREQUENCIES)), FREQUENCIES, atol=1e-9)
+    assert np.allclose(mel_to_hz(hz_to_mel(FREQUENCIES)), FREQUENCIES,
+                       atol=1e-9)
     assert hz_to_mel(1000.0) == pytest.approx(1000.0, abs=0.1)
 
 
 def test_bark_round_trip():
-    assert np.allclose(bark_to_hz(hz_to_bark(FREQUENCIES)), FREQUENCIES, atol=1e-9)
+    assert np.allclose(bark_to_hz(hz_to_bark(FREQUENCIES)), FREQUENCIES,
+                       atol=1e-9)
     assert hz_to_bark(4000.0) == pytest.approx(6 * np.arcsinh(4000 / 600))
 
 
@@ -68,7 +70,8 @@ def test_cutoff_impossible_raises():
 
 
 def test_warp_mel_scale_matches_formula_and_identity():
-    assert np.allclose(warp_mel_scale(FREQUENCIES, 1.0), hz_to_mel(FREQUENCIES))
+    assert np.allclose(warp_mel_scale(FREQUENCIES, 1.0),
+                       hz_to_mel(FREQUENCIES))
     assert warp_mel_scale(1000.0, 1.1) == pytest.approx(
         2595 * np.log10(1 + 1000 / (700 * 1.1)))
     with pytest.raises(ValueError):

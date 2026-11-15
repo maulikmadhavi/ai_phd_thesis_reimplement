@@ -65,4 +65,5 @@ def test_unknown_split_raises():
 
 def test_pinned_revision_is_a_full_sha():
     assert len(timit_hf.TIMIT_HF_REVISION) == 40
-    assert timit_hf.SPLIT_FILES["test"] == ("data/test-00000-of-00001.parquet",)
+    assert timit_hf.SPLIT_FILES["test"] == (
+        "data/test-00000-of-00001.parquet",)

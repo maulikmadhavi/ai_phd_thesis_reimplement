@@ -64,12 +64,14 @@ class DatasetPaths:
         """
         if name not in self.field_names():
             raise ValueError(
-                f"Unknown dataset '{name}'; choose one of {self.field_names()}")
+                f"Unknown dataset '{name}'; "
+                f"choose one of {self.field_names()}")
         path = getattr(self, name)
         hint = (f"Set QBESTD_{name.upper()} or add it to paths.local.toml "
                 f"(see paths.local.toml.example).")
         if path is None:
-            raise FileNotFoundError(f"No location configured for '{name}'. {hint}")
+            raise FileNotFoundError(
+                f"No location configured for '{name}'. {hint}")
         if not path.exists():
             raise FileNotFoundError(
                 f"Configured path for '{name}' does not exist: {path}. {hint}")

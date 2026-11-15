@@ -85,7 +85,7 @@ def test_floor_hits_on_noise_are_counted_and_output_finite():
     energies = subband_teager_energies(noise, 8000)
     floor_hits = int(np.sum(energies <= FLOOR))
     print(f"floor hits on noise: {floor_hits} of {energies.size}")
-    assert 0 <= floor_hits <= energies.size
+    assert floor_hits < energies.size  # noise must not floor every cell
     assert np.all(np.isfinite(extract_mfcc_tmp(noise, 8000)))
 
 

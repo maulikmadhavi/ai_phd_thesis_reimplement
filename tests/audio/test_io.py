@@ -19,7 +19,8 @@ def test_stereo_is_downmixed_to_mono(tmp_path):
     left = np.full(100, 0.4)
     right = np.full(100, -0.2)
     path = tmp_path / "stereo.wav"
-    sf.write(str(path), np.stack([left, right], axis=1), 16000, subtype="PCM_16")
+    sf.write(str(path), np.stack([left, right], axis=1), 16000,
+             subtype="PCM_16")
     loaded, sample_rate = load_audio(path)
     assert loaded.ndim == 1
     assert sample_rate == 16000

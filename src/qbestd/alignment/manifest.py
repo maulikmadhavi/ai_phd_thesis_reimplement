@@ -84,7 +84,8 @@ def check_segments(segments, duration_s, expected_words=None):
     problems = []
     if expected_words is not None and len(segments) != expected_words:
         problems.append(
-            f"word count {len(segments)} != transcript tokens {expected_words}")
+            f"word count {len(segments)} != transcript tokens "
+            f"{expected_words}")
     previous_start = None
     for segment in segments:
         label = f"word {segment.word_index} '{segment.word}'"
@@ -97,7 +98,8 @@ def check_segments(segments, duration_s, expected_words=None):
         if segment.end_s <= segment.start_s:
             problems.append(f"{label}: end <= start")
         elif length < MIN_WORD_S:
-            problems.append(f"{label}: duration {length * 1000:.0f} ms < 20 ms")
+            problems.append(
+                f"{label}: duration {length * 1000:.0f} ms < 20 ms")
         elif length > MAX_WORD_S:
             problems.append(f"{label}: duration {length:.2f} s > 2 s")
         if previous_start is not None and segment.start_s < previous_start:

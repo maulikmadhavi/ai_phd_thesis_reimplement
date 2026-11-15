@@ -9,7 +9,11 @@ from qbestd.audio.preprocess import (
     remove_dc_offset,
 )
 from qbestd.audio.resample import resample_audio
-from qbestd.audio.windowing import DEFAULT_WINDOW_NAME, apply_window, make_window
+from qbestd.audio.windowing import (
+    DEFAULT_WINDOW_NAME,
+    apply_window,
+    make_window,
+)
 
 
 @dataclass(frozen=True)
@@ -20,7 +24,8 @@ class AudioFrontEndConfig:
     been checked against the MATLAB feature code (plan.md section 4).
     """
 
-    sample_rate: int | None = 8000  # unverified default; None keeps source rate
+    # unverified default; None keeps the source rate
+    sample_rate: int | None = 8000
     frame_ms: float = 25.0
     shift_ms: float = 10.0
     preemphasis: float = DEFAULT_PREEMPHASIS_COEFFICIENT  # unverified default
@@ -51,5 +56,6 @@ def prepare_frames(samples, sample_rate, config):
     if config.remove_dc:
         samples = remove_dc_offset(samples)
     samples = apply_preemphasis(samples, config.preemphasis)
-    frames = frame_signal(samples, target_rate, config.frame_ms, config.shift_ms)
+    frames = frame_signal(samples, target_rate, config.frame_ms,
+                          config.shift_ms)
     return apply_window(frames, make_window(config.window, frames.shape[1]))

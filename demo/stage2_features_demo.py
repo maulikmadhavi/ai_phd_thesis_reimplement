@@ -106,7 +106,8 @@ def build_demo():
             high_hz = gr.Slider(1000, 4000, value=4000, step=100,
                                 label="high_hz (MFCC / MFCC-TMP)")
         with gr.Row():
-            include_c0 = gr.Checkbox(True, label="include c0 (MFCC / MFCC-TMP)")
+            include_c0 = gr.Checkbox(
+                True, label="include c0 (MFCC / MFCC-TMP)")
             use_lifter = gr.Checkbox(False, label="HTK lifter (L = 22)")
         run_button = gr.Button("Run")
         filterbank_plot = gr.Plot(label="Mel filterbank")

@@ -7,7 +7,8 @@ from qbestd.features.mfcc import MfccConfig, extract_mfcc
 def speech_like(sample_rate, duration=1.0, seed=0):
     rng = np.random.default_rng(seed)
     time = np.arange(int(sample_rate * duration)) / sample_rate
-    tone = np.sin(2 * np.pi * 300 * time) + 0.5 * np.sin(2 * np.pi * 1700 * time)
+    tone = (np.sin(2 * np.pi * 300 * time)
+            + 0.5 * np.sin(2 * np.pi * 1700 * time))
     return 0.1 * tone + 0.01 * rng.normal(size=len(time))
 
 
@@ -20,7 +21,8 @@ def test_shapes_at_8k_and_16k():
 
 def test_deterministic():
     samples = speech_like(8000)
-    assert np.array_equal(extract_mfcc(samples, 8000), extract_mfcc(samples, 8000))
+    assert np.array_equal(extract_mfcc(samples, 8000),
+                          extract_mfcc(samples, 8000))
 
 
 def test_finite_on_silence_and_short_input():
@@ -44,14 +46,15 @@ def test_peak_normalisation_removes_amplitude_dependence():
 
 def test_warp_factor_one_equals_default():
     samples = speech_like(8000)
-    assert np.array_equal(extract_mfcc(samples, 8000, MfccConfig(warp_factor=1.0)),
+    unit = MfccConfig(warp_factor=1.0)
+    assert np.array_equal(extract_mfcc(samples, 8000, unit),
                           extract_mfcc(samples, 8000))
 
 
 def test_warping_changes_features():
     samples = speech_like(8000)
-    assert not np.allclose(extract_mfcc(samples, 8000),
-                           extract_mfcc(samples, 8000, MfccConfig(warp_factor=1.12)))
+    warped = extract_mfcc(samples, 8000, MfccConfig(warp_factor=1.12))
+    assert not np.allclose(extract_mfcc(samples, 8000), warped)
 
 
 def test_power_spectrum_option_and_include_c0_false():
@@ -59,7 +62,8 @@ def test_power_spectrum_option_and_include_c0_false():
     power = extract_mfcc(samples, 8000, MfccConfig(spectrum_type="power",
                                                    deltas=False))
     assert power.shape == (98, 13) and np.all(np.isfinite(power))
-    no_c0 = extract_mfcc(samples, 8000, MfccConfig(include_c0=False, deltas=False))
+    no_c0 = extract_mfcc(samples, 8000,
+                         MfccConfig(include_c0=False, deltas=False))
     with_c0 = extract_mfcc(samples, 8000, MfccConfig(n_ceps=14, deltas=False))
     assert np.allclose(no_c0, with_c0[:, 1:])
 
@@ -67,14 +71,16 @@ def test_power_spectrum_option_and_include_c0_false():
 def test_lifter_scales_coefficients():
     samples = speech_like(8000)
     plain = extract_mfcc(samples, 8000, MfccConfig(deltas=False))
-    lifted = extract_mfcc(samples, 8000, MfccConfig(deltas=False, lifter_length=22))
+    lifted = extract_mfcc(samples, 8000,
+                          MfccConfig(deltas=False, lifter_length=22))
     assert np.allclose(lifted[:, 0], plain[:, 0])
     assert not np.allclose(lifted[:, 5], plain[:, 5])
 
 
 def test_unknown_spectrum_type_raises():
     with pytest.raises(ValueError):
-        extract_mfcc(speech_like(8000), 8000, MfccConfig(spectrum_type="bogus"))
+        extract_mfcc(speech_like(8000), 8000,
+                     MfccConfig(spectrum_type="bogus"))
 
 
 def test_config_round_trips_through_dict():

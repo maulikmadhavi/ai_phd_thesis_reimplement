@@ -29,7 +29,8 @@ def test_apply_window_preserves_shape():
 
 
 def test_name_is_case_insensitive():
-    assert np.array_equal(make_window("Hamming", 16), make_window("hamming", 16))
+    assert np.array_equal(make_window("Hamming", 16),
+                          make_window("hamming", 16))
 
 
 def test_unknown_name_raises_value_error():

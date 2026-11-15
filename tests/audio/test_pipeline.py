@@ -6,7 +6,8 @@ from qbestd.audio.pipeline import AudioFrontEndConfig, prepare_frames
 
 def test_one_second_at_16k_resampled_to_8k_shape():
     samples = np.random.default_rng(0).normal(size=16000)
-    frames = prepare_frames(samples, 16000, AudioFrontEndConfig(sample_rate=8000))
+    config = AudioFrontEndConfig(sample_rate=8000)
+    frames = prepare_frames(samples, 16000, config)
     assert frames.shape == (98, 200)
 
 

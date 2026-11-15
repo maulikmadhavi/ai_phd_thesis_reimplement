@@ -44,8 +44,8 @@ def test_generic_defaults_are_unchanged():
     assert MfccTmpConfig().high_hz == 4000.0
 
 
-@pytest.mark.parametrize("name, kind", [("nope", "mfcc"), ("htk_like", "fbank"),
-                                        ("timit_matlab", "")])
+@pytest.mark.parametrize("name, kind", [
+    ("nope", "mfcc"), ("htk_like", "fbank"), ("timit_matlab", "")])
 def test_unknown_name_or_kind_raises(name, kind):
     with pytest.raises(ValueError):
         get_profile(name, kind)
