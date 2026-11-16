@@ -169,6 +169,26 @@ says 0-4000 Hz for MFCC (`ExpSetup.tex` 191). The user asked to run both.
   reference unless the user decides otherwise after seeing the results.
   Nothing is tuned.
 
+## HTK points recalled from memory, unverified (cycle 8, Q2)
+
+Every item below is **recalled, unverified**; nothing was checked against
+HTK, and none changes code.
+
+- **PLP and `USEPOWER`:** HTK's PLP works on the power spectrum; whether a
+  `USEPOWER` setting changes that here is not checked.
+- **Triangles:** whether HTK's triangular filters are linear in mel or in Hz
+  is not checked; ours are linear in Hz between mel-spaced edges.
+- **PLP edge bands:** HTK builds `N + 2` PLP bands and uses the outer ones
+  differently; ours copy the first and last band from their neighbours (as
+  `Fx_PLPCC_htk.m`).
+- **Log floor:** HTK floors the filterbank output at 1.0 before the log
+  (MFCC); ours floors at 1e-10.
+- **DC bin:** how HTK treats the DC bin in the filterbank is not checked.
+- **c0:** HTK's c0 is scaled by sqrt(2) against ours (note only, no code
+  change).
+- **Low filters:** 40 channels in 0-3400 Hz leave 1 to 3 FFT bins under the
+  lowest filters (a property of the profile, not a bug).
+
 ## Remaining unknowns
 
 - **TIMIT sample rate and mel ceiling** (plan 4 #14): the data is 16 kHz

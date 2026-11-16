@@ -63,6 +63,15 @@ Thesis differences are computed from the thesis table values.
 
 ### Feature minus MFCC
 
+**MFCC-TMP minus MFCC compares a MATLAB-described front end** (26 filters,
+0-4000 Hz, peak-normalised) **with an HTK-described one**, which is what the
+thesis did by the author's statement. Under `timit_matlab` both features
+here are MATLAB-derived, so the rows below are not that comparison; the
+`htk_described` comparison is in the Stage 4 section below.
+
+Bounds that round to 0.0 are printed with two decimals, and "excludes 0"
+is taken from the unrounded value.
+
 PLP and MFCC differ here in band, filter count, pre-emphasis and level
 handling, so "against the thesis's direction" describes this profile, not PLP
 as such (`docs/feature_parity.md`).
@@ -174,7 +183,8 @@ MAP). They are descriptive: no thesis direction is attached.
 
 What the intervals show, and no more: flipping the level handling gives
 paired differences whose intervals all include 0, for both features and both
-averages, so this check shows no change in either feature. PLP minus MFCC
+averages, so this check does not detect a change; the paired intervals allow
+differences of up to about 3 to 4 points either way. PLP minus MFCC
 stays negative with both features flipped (instance p@N -9.77, -14.8 to -4.9),
 with intervals that exclude 0. The check does not say why the two features
 sit on different sides of their thesis values, and it gives no reason to
@@ -328,7 +338,7 @@ direction is claimed beyond what the interval shows. 8 rows,
 
 | Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) |
 |---|---|---|---|---|
-| MFCC GMM-64: 4000 - 3400 Hz | instance | +2.89 (+0.0 to +5.9) | +4.77 (+2.1 to +7.5) | yes / yes |
+| MFCC GMM-64: 4000 - 3400 Hz | instance | +2.89 (+0.05 to +5.9) | +4.77 (+2.1 to +7.5) | yes / yes |
 | MFCC GMM-64: 4000 - 3400 Hz | keyword | +2.55 (-0.6 to +5.8) | +4.34 (+1.6 to +7.4) | no / yes |
 | MFCC GMM-128: 4000 - 3400 Hz | instance | +2.95 (+0.2 to +5.9) | +3.02 (+0.5 to +5.3) | yes / yes |
 | MFCC GMM-128: 4000 - 3400 Hz | keyword | +1.55 (-0.9 to +4.1) | +2.27 (+0.3 to +4.2) | no / yes |
@@ -339,7 +349,7 @@ direction is claimed beyond what the interval shows. 8 rows,
 
 Reading, descriptive only: the point differences are positive in 6 of the 8
 rows for p@N and 8 of 8 for MAP, and the intervals exclude 0 in 10 of 16
-cases, several of them barely (lower edge +0.0 to +0.6). PLP at GMM-128 shows
+cases, several of them barely (lower edge +0.05 to +0.6). PLP at GMM-128 shows
 no difference. With 16 unadjusted intervals, the barely-excluding ones should
 not be read on their own. Both bands stay on the record; this does not say
 which band the thesis used, and the choice of the reference band is the
@@ -390,4 +400,47 @@ pixi run eval-timit --kind plp --gmm outputs/models/textdisjoint_q20_v2/plp_timi
 
 and the same for `--components 128`, and for `--kind mfcc_tmp` (outputs
 `td2_mfcc_tmp_gmm64`, `td2_mfcc_tmp_gmm128`). Outputs go to git-ignored
-`outputs/`; only this summary is committed.
+`outputs/`; only this summary is committed. The `timit_matlab` commands need
+the cycle 8 retrain (G6): editing a feature source file changed the feature
+fingerprint, so the older `timit_matlab` models are rejected by the model
+guard until retrained.
+
+The `htk_described` and `htk_described_4k` rows (`--profile htk_described`
+or `htk_described_4k`; outputs `td2_htk_<kind>_gmm<N>`,
+`td2_4k_<kind>_gmm<N>`):
+
+```
+pixi run train-gmm --kind mfcc --profile htk_described --components 64 --split-manifest outputs/splits/textdisjoint_q20_v2.tsv
+pixi run eval-timit --kind mfcc --profile htk_described --gmm outputs/models/textdisjoint_q20_v2/mfcc_htk_described_gmm64.npz --split-manifest outputs/splits/textdisjoint_q20_v2.tsv --out outputs/eval/td2_htk_mfcc_gmm64
+pixi run train-gmm --kind plp --profile htk_described_4k --components 128 --split-manifest outputs/splits/textdisjoint_q20_v2.tsv
+pixi run eval-timit --kind plp --profile htk_described_4k --gmm outputs/models/textdisjoint_q20_v2/plp_htk_described_4k_gmm128.npz --split-manifest outputs/splits/textdisjoint_q20_v2.tsv --out outputs/eval/td2_4k_plp_gmm128
+```
+
+and the same for the other kind and size. Runs refuse a dirty tree unless
+`--allow-dirty` is passed.
+
+## Stage 4: GMM-VTLN
+
+Code: `ml/vtln.py`, `ml/vtln_train.py`, `data/warped_cache.py`. Nothing here
+is scored yet; this section holds the assumptions, declared before any
+Stage 4 number.
+
+### Assumptions (listed so a result cannot be re-read against them)
+
+- **Tie-break:** a warp tie goes to the warp closest to 1.0, then the
+  smaller one.
+- **No Jacobian or filter-area correction** is applied for the warp.
+- **Upper anchor:** the MATLAB one: the warp maps the band edge (`high_hz`)
+  to itself.
+- **Label map:** the thesis label is the mirror of ours, `alpha_thesis = 2 -
+  alpha_ours`, applied in `ml/vtln.py` for reporting only; cache file names,
+  the filterbank and the models keep our label. It rests on the author's
+  answer D3 (c) (alpha > 1 is the male side; HTK `WARPFREQ`). The thesis's
+  own `M_alpha(f)` (`Unsupervised.tex` 549) moves filter centres *up* for
+  alpha > 1, as our code does, so the code alone does not support a mirror.
+- **Fresh LBG** (plus EM) in every iteration: the thesis says "build" for
+  lambda_r; a warm start is the alternative.
+- **Query alpha-hat** is estimated on the query clip itself
+  (`Representation.tex` line 104), not inherited from the source utterance.
+- N_iter = 5 (`Representation.tex` line 229), warps 0.88 to 1.12 in steps of
+  0.02, 13 values, `k < N_iter` (plan section 5).

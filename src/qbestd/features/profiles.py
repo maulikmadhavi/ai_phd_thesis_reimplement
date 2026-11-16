@@ -53,6 +53,11 @@ def _htk_described(kind):
       no DC removal and no peak normalisation (``ZMEANSOURCE`` off); MFCC on
       the magnitude spectrum, PLP on the power spectrum.
 
+    Also recalled, unverified (no code change): PLP and ``USEPOWER``;
+    triangles linear in mel against in Hz; HTK's ``N + 2`` PLP edge bands;
+    HTK's log floor of 1.0; the DC bin; c0 times sqrt(2) in HTK; 40 channels
+    in 0 to 3400 Hz leave 1 to 3 FFT bins under the lowest filters.
+
     Known approximations: HTK takes the log of the mel-weighted magnitude,
     ``log(M |X|)``, and we take ``log((M |X|)^2)``, which is twice that and
     changes every cepstrum by a constant factor 2 (the code is kept as in
