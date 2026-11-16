@@ -472,3 +472,47 @@ retrieval score; it asks whether the warp factors track the speaker.
 - **Also reported:** mean F0 per thesis-label warp; mean F0 of the edge
   groups; the share of utterances with median F0 below 165 Hz (a rough male
   proxy) on each side of 1.0.
+
+### F0 against alpha-hat check (result)
+
+Run as declared: `train-vtln` N_iter = 1, MFCC `htk_described` GMM-64, split
+v2, from commit `0dd137b` on a clean tree (`git_dirty: false`); alpha-hat from
+iteration 0 under lambda_init. Median F0 (50 to 400 Hz autocorrelation,
+`audio/pitch.py`) for all 3696 of 3696 train-side utterances.
+
+| | Spearman rho with median F0 | 95 % interval (bootstrap over utterances) |
+|---|---|---|
+| alpha_thesis (= 2 - alpha_ours) | -0.637 | -0.659 to -0.615 |
+| alpha_ours | +0.637 | (the sign-flipped value) |
+
+**The declared rule is met:** rho(F0, alpha_thesis) = -0.637
+<= -0.2, and rho(F0, alpha_ours) = +0.637 >= +0.2; the two
+signs agree, so there is no sign mismatch from the label map. The interval
+is anti-conservative (no speaker IDs); the operative gate is the magnitude.
+The result agrees with D3 (c) (alpha_thesis > 1 on the male, low-F0 side) and
+says alpha-hat tracks the speaker in this respect. It says nothing about
+retrieval.
+
+| alpha_thesis | Mean median-F0 (Hz) | Utterances |
+|---|---|---|
+| 0.88 | 230.7 | 71 |
+| 0.90 | 210.5 | 227 |
+| 0.92 | 205.0 | 282 |
+| 0.94 | 194.8 | 220 |
+| 0.96 | 152.3 | 429 |
+| 0.98 | 127.1 | 619 |
+| 1.00 | 129.7 | 765 |
+| 1.02 | 130.0 | 110 |
+| 1.04 | 114.6 | 253 |
+| 1.06 | 111.3 | 74 |
+| 1.08 | 115.0 | 209 |
+| 1.10 | 115.5 | 57 |
+| 1.12 | 115.0 | 380 |
+
+Edge groups: mean F0 230.7 Hz at thesis 0.88 (71 utterances) against
+115.0 Hz at thesis 1.12 (380 utterances). Share of utterances with
+median F0 below 165 Hz: 0.474 for alpha_thesis < 1
+(1848), 0.865 at 1.00
+(765), 0.976 for alpha_thesis > 1
+(1083). The 1.00 group is a bump of lambda_init (765
+utterances), as the declaration said.
