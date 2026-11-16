@@ -444,3 +444,31 @@ Stage 4 number.
   (`Representation.tex` line 104), not inherited from the source utterance.
 - N_iter = 5 (`Representation.tex` line 229), warps 0.88 to 1.12 in steps of
   0.02, 13 values, `k < N_iter` (plan section 5).
+
+### F0 against alpha-hat check (declared)
+
+**Declared before it runs** (cycle 8, W1, Handoff_feedback Q4). It gives no
+retrieval score; it asks whether the warp factors track the speaker.
+
+- **Data:** a fresh N_iter = 1 run of `train-vtln` on MFCC `htk_described`
+  GMM-64 (split v2, the warp caches reused). The alpha-hat are those of
+  **iteration 0 under lambda_init**, the plain GMM, which has a known bump at
+  1.00. This is stated now so the check is not reinterpreted after the
+  result.
+- **F0:** median F0 over the voiced frames of every train-side utterance,
+  from a small autocorrelation estimator (50 to 400 Hz, `audio/pitch.py`).
+- **Expectation (D3 c):** under the thesis label (alpha > 1 is the male
+  side), median F0 correlates **negatively** with alpha_thesis, which is the
+  same as a positive correlation with alpha_ours (Spearman).
+- **Pass rule:** rho(F0, alpha_thesis) <= -0.2, equivalently rho(F0,
+  alpha_ours) >= +0.2. The report prints both, so a label-mapping bug shows
+  as a sign mismatch. **The -0.2 magnitude is the operative gate.** A 95 %
+  bootstrap interval over utterances is reported, but it is anti-conservative
+  (no speaker IDs; about 8 utterances per speaker are treated as
+  independent).
+- **Otherwise:** |rho| < 0.2, or an interval that includes 0, means alpha-hat
+  does not track the speaker: STOP before W2. A clear positive rho(F0,
+  alpha_thesis) contradicts D3 (c): STOP and report.
+- **Also reported:** mean F0 per thesis-label warp; mean F0 of the edge
+  groups; the share of utterances with median F0 below 165 Hz (a rough male
+  proxy) on each side of 1.0.
