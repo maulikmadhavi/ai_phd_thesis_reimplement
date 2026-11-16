@@ -283,6 +283,78 @@ evaluation was interrupted once (the session restarted at query 120 of 145)
 and re-run from the same, unchanged model file (hash checked against the
 training log); its summary records the commit of the re-run.
 
+## Band comparison
+
+Declared in `docs/feature_parity.md` ("Band comparison (declared)") before
+any run. `htk_described_4k` is `htk_described` with the band widened from
+0-3400 Hz to 0-4000 Hz for both MFCC and PLP; nothing else differs. Same
+split v2, 145 queries, 1344 documents, LC2, clip query features, A1 scorer
+and bootstrap (10000 resamples, seed 0). **No band is chosen by its score;**
+`htk_described` (0-3400 Hz) stays the reference, and the choice is the
+user's. Nothing was tuned.
+
+| Row | p@N, instance avg (95% CI) | MAP, instance avg (95% CI) | p@N, keyword avg (95% CI) | MAP, keyword avg (95% CI) | Queries | Non-matches |
+|---|---|---|---|---|---|---|
+| MFCC, GMM-64, thesis | 34.91 | 36.71 | not stated | not stated | 145 | n/a |
+| MFCC, GMM-64, 0-3400 Hz (`htk_described`, reference) | 34.58 (25.6-44.1) | 35.73 (26.4-45.8) | 32.51 (24.8-40.7) | 33.50 (25.0-42.3) | 145 | 1 |
+| MFCC, GMM-64, 0-4000 Hz (`htk_described_4k`) | 37.48 (28.0-47.6) | 40.50 (30.1-52.1) | 35.07 (26.6-43.9) | 37.84 (28.4-47.6) | 145 | 3 |
+| PLP, GMM-64, thesis | 35.50 | 37.58 | not stated | not stated | 145 | n/a |
+| PLP, GMM-64, 0-3400 Hz (`htk_described`, reference) | 34.34 (26.1-42.6) | 35.88 (26.5-45.8) | 31.83 (24.3-39.6) | 33.37 (25.2-42.0) | 145 | 0 |
+| PLP, GMM-64, 0-4000 Hz (`htk_described_4k`) | 38.59 (29.1-48.5) | 39.75 (29.3-50.9) | 35.82 (27.1-44.8) | 36.81 (27.5-46.5) | 145 | 0 |
+| MFCC, GMM-128, thesis | 36.81 | 38.34 | not stated | not stated | 145 | n/a |
+| MFCC, GMM-128, 0-3400 Hz (`htk_described`, reference) | 38.04 (29.7-47.0) | 39.87 (30.7-50.0) | 36.20 (28.2-44.3) | 37.53 (29.1-46.3) | 145 | 1 |
+| MFCC, GMM-128, 0-4000 Hz (`htk_described_4k`) | 40.99 (31.2-51.8) | 42.89 (32.2-54.5) | 37.75 (29.2-46.7) | 39.80 (30.6-49.5) | 145 | 1 |
+| PLP, GMM-128, thesis | 37.30 | 40.18 | not stated | not stated | 145 | n/a |
+| PLP, GMM-128, 0-3400 Hz (`htk_described`, reference) | 38.33 (29.8-47.0) | 39.73 (30.2-49.9) | 35.96 (28.6-43.6) | 37.11 (29.2-45.5) | 145 | 0 |
+| PLP, GMM-128, 0-4000 Hz (`htk_described_4k`) | 37.60 (29.8-45.7) | 40.01 (30.3-50.3) | 35.62 (28.2-43.2) | 37.51 (28.9-46.5) | 145 | 1 |
+
+### Gap to the thesis (descriptive, no cause attached)
+
+Instance average, ours minus thesis, p@N / MAP:
+
+| Feature, band | GMM-64 | GMM-128 |
+|---|---|---|
+| MFCC, 0-3400 Hz | -0.33 / -0.98 | +1.23 / +1.53 |
+| MFCC, 0-4000 Hz | +2.57 / +3.79 | +4.18 / +4.55 |
+| PLP, 0-3400 Hz | -1.16 / -1.70 | +1.03 / -0.45 |
+| PLP, 0-4000 Hz | +3.09 / +2.17 | +0.30 / -0.17 |
+
+### Paired 4000 minus 3400 Hz
+
+Same queries, 95 % keyword-cluster bootstrap; "second minus first". There is
+no thesis difference for a band, so these rows are descriptive and no
+direction is claimed beyond what the interval shows. 8 rows,
+16 unadjusted intervals.
+
+| Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) |
+|---|---|---|---|---|
+| MFCC GMM-64: 4000 - 3400 Hz | instance | +2.89 (+0.0 to +5.9) | +4.77 (+2.1 to +7.5) | yes / yes |
+| MFCC GMM-64: 4000 - 3400 Hz | keyword | +2.55 (-0.6 to +5.8) | +4.34 (+1.6 to +7.4) | no / yes |
+| MFCC GMM-128: 4000 - 3400 Hz | instance | +2.95 (+0.2 to +5.9) | +3.02 (+0.5 to +5.3) | yes / yes |
+| MFCC GMM-128: 4000 - 3400 Hz | keyword | +1.55 (-0.9 to +4.1) | +2.27 (+0.3 to +4.2) | no / yes |
+| PLP GMM-64: 4000 - 3400 Hz | instance | +4.25 (+0.6 to +7.6) | +3.88 (+1.2 to +6.5) | yes / yes |
+| PLP GMM-64: 4000 - 3400 Hz | keyword | +3.99 (+0.4 to +7.8) | +3.44 (+0.7 to +6.2) | yes / yes |
+| PLP GMM-128: 4000 - 3400 Hz | instance | -0.73 (-3.1 to +1.4) | +0.28 (-2.5 to +2.7) | no / no |
+| PLP GMM-128: 4000 - 3400 Hz | keyword | -0.34 (-2.7 to +1.9) | +0.40 (-2.3 to +3.1) | no / no |
+
+Reading, descriptive only: the point differences are positive in 6 of the 8
+rows for p@N and 8 of 8 for MAP, and the intervals exclude 0 in 10 of 16
+cases, several of them barely (lower edge +0.0 to +0.6). PLP at GMM-128 shows
+no difference. With 16 unadjusted intervals, the barely-excluding ones should
+not be read on their own. Both bands stay on the record; this does not say
+which band the thesis used, and the choice of the reference band is the
+user's. In the gap table the 0-4000 Hz MFCC rows sit above the thesis and
+the 0-3400 Hz rows close to it; no cause is claimed.
+
+### Provenance
+
+| Model | Parameter SHA-256 | Feature fingerprint | Mean LL per frame, start -> end | Variances at the floor | Non-matches | Commit the eval started from |
+|---|---|---|---|---|---|---|
+| MFCC GMM-64 | `324ebb5f6fee9d41...` | `cacb263d6c29...` | -118.303 -> -116.610 (monotonic) | 3 of 2496 | 3 | `be5c4f0` |
+| MFCC GMM-128 | `e7ef90b43b90b859...` | `cacb263d6c29...` | -117.723 -> -115.807 (monotonic) | 4 of 4992 | 1 | `be5c4f0` |
+| PLP GMM-64 | `751a0f9578e3c0d6...` | `56f4d6ed50e3...` | 11.615 -> 13.137 (monotonic) | 3 of 2496 | 0 | `be5c4f0` |
+| PLP GMM-128 | `f8b51f4d4c8b0bfa...` | `56f4d6ed50e3...` | 12.268 -> 13.956 (monotonic) | 6 of 4992 | 1 | `be5c4f0` |
+
 ## MFCC-TMP: TEO floor hits
 
 Subband Teager sums at or below the log floor (1e-10) are floored before the
