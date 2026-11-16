@@ -12,7 +12,7 @@ default, as the thesis excluded them from GMM training (3696 utterances).
 import hashlib
 import json
 import logging
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import numpy as np
@@ -71,7 +71,7 @@ ROW_SELECTION_VERSION = 1
 # test compares it, so a change to the row loop cannot pass unnoticed.
 # Not part of the fingerprint: it only guards the version above.
 ROW_LOOP_SOURCE_SHA256 = (
-    "9e2a4e6d5ba488cbe719d5c9f43ac04a37188b513e456846095b922849c67140")
+    "e06ccb661cf7c449874a7d31da8143f810fbd033599767bb6e49284d3673a9d7")
 
 
 class CacheMismatchError(ValueError):
@@ -101,14 +101,28 @@ def row_source_digest(root=None):
     return feature_source_digest(root, ROW_SOURCE_FILES)
 
 
+def _warped_config(kind, profile, warp_factor):
+    """Profile config, with the VTLN warp set when ``warp_factor`` is given.
+    ``None`` leaves the config (and so the fingerprint) as it was before
+    warped caches existed."""
+    config = get_profile(profile, kind)
+    if warp_factor is None:
+        return config
+    return replace(config, warp_factor=float(warp_factor))
+
+
 def feature_fingerprint(kind, profile, exclude_sa=True,
-                        dataset_revision=TIMIT_HF_REVISION):
+                        dataset_revision=TIMIT_HF_REVISION,
+                        warp_factor=None):
     """SHA-256 over everything that decides what the cached features are:
     the profile config values, feature kind, dataset revision, SA exclusion,
     the feature source digest, the row source digest (``timit_hf.py``), the
     ``SA_TOKENS`` text list, ``ROW_SELECTION_VERSION`` and
-    ``FEATURE_CACHE_VERSION`` (the cache format version)."""
-    payload = {"config": asdict(get_profile(profile, kind)), "kind": kind,
+    ``FEATURE_CACHE_VERSION`` (the cache format version). With
+    ``warp_factor`` the config carries that VTLN warp, so every warp has its
+    own fingerprint; a warp of 1.0 equals the plain one."""
+    config = _warped_config(kind, profile, warp_factor)
+    payload = {"config": asdict(config), "kind": kind,
                "dataset_revision": dataset_revision,
                "exclude_sa": bool(exclude_sa),
                "source_digest": feature_source_digest(),
@@ -129,15 +143,22 @@ def cache_path(out_dir, split, kind, profile):
     return Path(out_dir) / f"{split}_{kind}_{profile}.npz"
 
 
+def warped_cache_path(out_dir, split, kind, profile, warp_factor):
+    """``<split>_<kind>_<profile>_a<alpha x 100>.npz``, e.g. ``..._a88``."""
+    tag = int(round(float(warp_factor) * 100))
+    return Path(out_dir) / f"{split}_{kind}_{profile}_a{tag}.npz"
+
+
 def build_feature_cache(split, kind, profile, out_dir, exclude_sa=True,
-                        parquet_paths=None):
+                        parquet_paths=None, warp_factor=None):
     """Extract features for every row of ``split`` and save one ``.npz``.
 
     Rows are optionally skipped when they are SA sentences; a row too short
     to give a frame is skipped and counted. For ``mfcc_tmp`` the number of
     subband Teager sums at or below the log floor is counted into the
     metadata (``teo_floor_hits``, ``teo_values``). ``parquet_paths``
-    overrides the download (used by the tests).
+    overrides the download (used by the tests). ``warp_factor`` builds the
+    cache of one VTLN warp (same rows, own file and fingerprint).
 
     Returns:
         ``(path, meta)`` of the written file.
@@ -146,7 +167,7 @@ def build_feature_cache(split, kind, profile, out_dir, exclude_sa=True,
         ValueError: if the features do not have 39 dimensions or are not
             all finite.
     """
-    config = get_profile(profile, kind)
+    config = _warped_config(kind, profile, warp_factor)
     paths = parquet_paths or download_timit_parquet(split)
     blocks, lengths, row_indices = [], [], []
     skipped_sa = skipped_short = 0
@@ -177,17 +198,22 @@ def build_feature_cache(split, kind, profile, out_dir, exclude_sa=True,
     offsets = np.concatenate([[0], np.cumsum(lengths)]).astype(np.int64)
     meta = {"split": split, "kind": kind, "profile": profile,
             "dataset_revision": TIMIT_HF_REVISION, "dims": FEATURE_DIM,
-            "fingerprint": feature_fingerprint(kind, profile, exclude_sa),
+            "fingerprint": feature_fingerprint(kind, profile, exclude_sa,
+                                               warp_factor=warp_factor),
             "sample_rate": config.sample_rate, "exclude_sa": exclude_sa,
             "excluded_sa_rows": skipped_sa,
             "skipped_short_rows": skipped_short,
             "n_rows": len(lengths), "n_frames": int(offsets[-1])}
+    if warp_factor is not None:
+        meta["warp_factor"] = float(warp_factor)
     if kind == "mfcc_tmp":
         meta["teo_floor_hits"] = floor_hits
         meta["teo_values"] = teo_values
         LOGGER.info("%s %s: %d of %d subband Teager sums were at or below "
                     "the log floor", split, kind, floor_hits, teo_values)
-    path = cache_path(out_dir, split, kind, profile)
+    path = (cache_path(out_dir, split, kind, profile)
+            if warp_factor is None else
+            warped_cache_path(out_dir, split, kind, profile, warp_factor))
     path.parent.mkdir(parents=True, exist_ok=True)
     stacked = (np.concatenate(blocks) if blocks
                else np.zeros((0, FEATURE_DIM), np.float32))
