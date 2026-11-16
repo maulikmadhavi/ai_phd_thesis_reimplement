@@ -149,6 +149,26 @@ the thesis's PLP minus MFCC. `Fx_PLPCC_htk.m` takes `nfilt` and `LP_order` as
 arguments; 21 and 8 are only its defaults, and no caller is in the
 repository.
 
+## Band comparison (declared)
+
+**Declared before any run of it** (cycle 7, H3, user request 2026-11-16). The
+author's HTK configuration says 0-3400 Hz for MFCC and PLP; the thesis text
+says 0-4000 Hz for MFCC (`ExpSetup.tex` 191). The user asked to run both.
+
+- **Profile:** `htk_described_4k`, identical to `htk_described` except
+  `high_hz = 4000` for both MFCC and PLP (same 40 filters, 16 kHz, 0.97
+  pre-emphasis, lifter 22, LPC order 12, no DC removal, no peak
+  normalisation). It raises for MFCC-TMP.
+- **Runs:** MFCC and PLP, each at GMM-64 and GMM-128, on split v2
+  (`textdisjoint_q20_v2`): 4 caches, 4 models, 4 evaluations (LC2, clip query
+  features, A1 scorer, keyword-cluster bootstrap with 10000 resamples, seed
+  0). The matching 0-3400 Hz rows already exist (`htk_described`).
+- **Rule:** both bands are reported side by side with intervals and the gaps
+  to the thesis, plus paired 4k minus 3400 differences on the same queries.
+  **No band is chosen by its score.** `htk_described` (0-3400 Hz) stays the
+  reference unless the user decides otherwise after seeing the results.
+  Nothing is tuned.
+
 ## Remaining unknowns
 
 - **TIMIT sample rate and mel ceiling** (plan 4 #14): the data is 16 kHz
