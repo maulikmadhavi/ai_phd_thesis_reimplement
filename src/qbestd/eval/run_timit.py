@@ -99,6 +99,9 @@ def parse_args(argv=None):
                         help="text-disjoint manifest (default: HF split)")
     parser.add_argument("--limit-queries", type=int, default=None,
                         help="use only the first N queries (smoke tests)")
+    parser.add_argument("--vtln", action="store_true",
+                        help="the model is a GMM-VTLN model (train-vtln); "
+                        "documents and query clips are warped")
     parser.add_argument("--allow-dirty", action="store_true",
                         help="run on uncommitted changes (recorded)")
     return parser.parse_args(argv)
@@ -193,6 +196,25 @@ def query_features(args, examples):
         config, full_cache) for e in examples]
 
 
+def vtln_run_inputs(args, gmm, info, doc_rows, examples):
+    """Warped documents and query clips of a VTLN model (see vtln_eval)."""
+    from qbestd.eval.vtln_eval import (
+        load_example_audio,
+        read_source_alphas,
+        vtln_inputs,
+        warped_paths_for,
+    )
+    paths = warped_paths_for({split for split, _ in doc_rows}, args.kind,
+                             args.profile, args.features_dir)
+    last = info["n_vtln_iter"] - 1
+    trace = (args.gmm.with_name(args.gmm.stem + "_trace")
+             / f"iter{last}_alphas.tsv")
+    return vtln_inputs(
+        gmm, doc_rows, examples, load_example_audio(examples), paths,
+        args.kind, args.profile, get_profile(args.profile, args.kind),
+        read_source_alphas(trace))
+
+
 def load_inputs(args, selection):
     """``(documents, document keys, relevance, examples)`` of a selection."""
     utterances, keys = gather_utterances(
@@ -219,14 +241,22 @@ def main(argv=None):
     split_id = selection.split_id
     fingerprint = feature_fingerprint(args.kind, args.profile,
                                       exclude_sa=True)
-    check_model(info, args.kind, args.profile, split_id, fingerprint)
+    check_model(info, args.kind, args.profile, split_id, fingerprint,
+                model_type="vtln" if args.vtln else "plain")
     out = args.out or Path("outputs/eval") / args.gmm.stem
     utterances, doc_rows, relevance, examples = load_inputs(args, selection)
     if args.limit_queries:
         examples = examples[:args.limit_queries]
-    clips = query_features(args, examples)
-    document_posts = [floor_and_renormalise(gaussian_posteriorgram(gmm, u))
-                      for u in utterances]
+    vtln_info = {}
+    if args.vtln:
+        grams, clips, vtln_info = vtln_run_inputs(args, gmm, info, doc_rows,
+                                                  examples)
+        document_posts = [floor_and_renormalise(g) for g in grams]
+    else:
+        clips = query_features(args, examples)
+        document_posts = [
+            floor_and_renormalise(gaussian_posteriorgram(gmm, u))
+            for u in utterances]
     per_query, skipped_short = [], 0
     for count, (example, features) in enumerate(zip(examples, clips), 1):
         if count % 20 == 0:
@@ -255,7 +285,9 @@ def main(argv=None):
         "model_content_sha256": gmm_content_sha256(gmm),
         "model_info": info, "split_id": split_id,
         "feature_fingerprint": fingerprint,
-        "query_features": args.query_features,
+        "query_features": "clip" if args.vtln else args.query_features,
+        "model_type": "vtln" if args.vtln else "plain",
+        **({"vtln": vtln_info} if args.vtln else {}),
         "split_manifest": (str(args.split_manifest)
                            if args.split_manifest else None),
         "n_documents": len(doc_rows), "n_queries": len(per_query),
