@@ -66,7 +66,8 @@ def frame_f0(samples, rate, f0_min=F0_MIN_HZ, f0_max=F0_MAX_HZ,
     first = np.argmax(peaks >= 0.9 * top[:, None], axis=1)
     peak = top
     best = first
-    voiced = (peak >= threshold) & (energy >= ENERGY_RATIO * energy.max())         & (energy > 0)
+    voiced = ((peak >= threshold)
+              & (energy >= ENERGY_RATIO * energy.max()) & (energy > 0))
     f0 = np.full(len(frames), np.nan)
     f0[voiced] = rate / (low + best[voiced])
     return f0
