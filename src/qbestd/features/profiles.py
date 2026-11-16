@@ -14,7 +14,7 @@ from qbestd.features.plp import PlpConfig
 
 TIMIT_SAMPLE_RATE = 16000
 PROFILE_NAMES = ("timit_matlab", "timit_matlab_levelflip",
-                 "htk_described")
+                 "htk_described", "htk_described_4k")
 KINDS = ("mfcc", "plp", "mfcc_tmp")
 
 
@@ -79,6 +79,18 @@ def _htk_described(kind):
     return PlpConfig(**common, lpc_order=12)
 
 
+def _htk_described_4k(kind):
+    """Band comparison (cycle 7, H3): ``htk_described`` with the band
+    0 to 4000 Hz, the thesis text for MFCC (``ExpSetup.tex`` 191), for both
+    MFCC and PLP. Nothing else differs. A comparison profile only; the
+    reference stays ``htk_described`` unless the user decides otherwise.
+
+    Raises:
+        ValueError: for ``mfcc_tmp`` (see :func:`_htk_described`).
+    """
+    return replace(_htk_described(kind), high_hz=4000.0)
+
+
 def _timit_matlab_levelflip(kind):
     """Level-handling ablation (cycle 7, L1): ``timit_matlab`` with the
     waveform level handling of MFCC and PLP swapped.
@@ -99,7 +111,8 @@ def _timit_matlab_levelflip(kind):
 
 _BUILDERS = {"timit_matlab": _timit_matlab,
              "timit_matlab_levelflip": _timit_matlab_levelflip,
-             "htk_described": _htk_described}
+             "htk_described": _htk_described,
+             "htk_described_4k": _htk_described_4k}
 
 
 def get_profile(name, kind):

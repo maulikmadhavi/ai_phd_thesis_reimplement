@@ -45,7 +45,8 @@ def test_unknown_name_or_kind_raises(name, kind):
 
 
 NOT_DEFINED = {("timit_matlab_levelflip", "mfcc_tmp"),
-               ("htk_described", "mfcc_tmp")}
+               ("htk_described", "mfcc_tmp"),
+               ("htk_described_4k", "mfcc_tmp")}
 
 
 @pytest.mark.parametrize("name", PROFILE_NAMES)
@@ -181,3 +182,24 @@ def test_plp_band_limits_change_the_features_and_warping_stays_finite():
         warped = extract_features(noise, 16000, "plp", warp_factor=alpha,
                                   config=narrow)
         assert np.all(np.isfinite(warped))
+
+
+@pytest.mark.parametrize("kind", ["mfcc", "plp"])
+def test_htk_described_4k_differs_only_in_the_top_edge(kind):
+    narrow = get_profile("htk_described", kind)
+    wide = get_profile("htk_described_4k", kind)
+    assert (narrow.high_hz, wide.high_hz) == (3400.0, 4000.0)
+    assert replace(wide, high_hz=3400.0) == narrow
+
+
+def test_htk_described_4k_filter_edges_end_at_4000_hz():
+    from qbestd.features.filterbank import mel_filter_edges_hz
+    config = get_profile("htk_described_4k", "mfcc")
+    edges = mel_filter_edges_hz(config.n_filters, config.low_hz,
+                                config.high_hz)
+    assert edges[-1] == pytest.approx(4000.0) and config.n_filters == 40
+
+
+def test_htk_described_4k_raises_for_mfcc_tmp():
+    with pytest.raises(ValueError, match="mfcc_tmp stays on timit_matlab"):
+        get_profile("htk_described_4k", "mfcc_tmp")
