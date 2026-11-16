@@ -79,3 +79,49 @@ def estimate_warp_factors(ll_matrix, warps=WARP_FACTORS):
     order = _tie_priority(warps)
     best = np.argmax(ll_matrix[:, order], axis=1)  # first max in priority
     return warps[order[best]]
+
+
+def to_thesis_label(alpha):
+    """Thesis label of a warp factor: ``2 - alpha``, to two decimals.
+
+    Our ``alpha`` (the cache-file convention, ``warp_frequency_piecewise``)
+    is the mirror of the thesis's: user decision D3 (c) says that in the
+    thesis alpha > 1 is the male side and HTK ``WARPFREQ`` was used. The map
+    exists only for reporting; cache file names, the filterbank and the
+    models keep our label. The grid 0.88..1.12 maps onto itself.
+    """
+    return np.round(2.0 - np.asarray(alpha, dtype="float64"), 2)
+
+
+def warp_histogram(alphas, warps=WARP_FACTORS):
+    """``{thesis-label warp: number of utterances}`` over every warp (zeros
+    kept). ``alphas`` are in our label. The counts sum to ``len(alphas)``.
+
+    Raises:
+        ValueError: if an entry of ``alphas`` is not one of ``warps``.
+    """
+    alphas = np.asarray(alphas, dtype="float64")
+    counts = {f"{float(to_thesis_label(w)):.2f}": int(np.sum(alphas == w))
+              for w in warps}
+    if sum(counts.values()) != len(alphas):
+        raise ValueError("an alpha is not on the warp grid")
+    return counts
+
+
+def edge_shares(alphas, warps=WARP_FACTORS):
+    """Share of utterances at the lowest and the highest thesis-label warp
+    (0.88 and 1.12), as ``{"0.88": share, "1.12": share}``."""
+    labels = to_thesis_label(alphas)
+    low, high = min(warps), max(warps)  # the grid is symmetric
+    n = max(len(labels), 1)
+    return {f"{low:.2f}": float(np.sum(labels == low)) / n,
+            f"{high:.2f}": float(np.sum(labels == high)) / n}
+
+
+def changed_share(previous, current):
+    """Share of utterances whose warp differs between two estimates."""
+    previous = np.asarray(previous, dtype="float64")
+    current = np.asarray(current, dtype="float64")
+    if previous.shape != current.shape:
+        raise ValueError("estimates must have the same shape")
+    return float(np.mean(previous != current)) if len(current) else 0.0

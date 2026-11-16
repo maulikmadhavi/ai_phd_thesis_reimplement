@@ -90,3 +90,34 @@ def test_non_finite_log_likelihoods_are_refused():
 def test_a_custom_warp_list_is_honoured():
     ll = np.array([[0.0, 1.0, 0.5]])
     assert estimate_warp_factors(ll, warps=(0.9, 1.1, 1.0))[0] == 1.1
+
+
+def test_the_label_map_is_a_mirror_and_the_grid_maps_onto_itself():
+    from qbestd.ml.vtln import to_thesis_label
+    assert float(to_thesis_label(0.88)) == 1.12
+    assert float(to_thesis_label(1.0)) == 1.0
+    labels = to_thesis_label(np.array(WARP_FACTORS))
+    assert sorted(labels.tolist()) == sorted(WARP_FACTORS)
+    assert np.array_equal(to_thesis_label(labels), np.array(WARP_FACTORS))
+
+
+def test_histogram_counts_sum_to_the_utterances_and_refuse_off_grid_warps():
+    from qbestd.ml.vtln import warp_histogram
+    alphas = [0.88, 0.88, 1.0, 1.12]
+    hist = warp_histogram(alphas)
+    assert sum(hist.values()) == 4 and hist["1.12"] == 2 and hist["0.88"] == 1
+    with pytest.raises(ValueError, match="grid"):
+        warp_histogram([0.93])
+
+
+def test_edge_shares_are_in_the_thesis_label():
+    from qbestd.ml.vtln import edge_shares
+    shares = edge_shares([0.88, 0.88, 1.0, 1.12])
+    assert shares == {"0.88": 0.25, "1.12": 0.5}  # ours 0.88 -> thesis 1.12
+
+
+def test_changed_share_counts_differing_utterances():
+    from qbestd.ml.vtln import changed_share
+    assert changed_share([1.0, 1.0, 0.9, 0.9], [1.0, 0.9, 0.9, 1.1]) == 0.5
+    with pytest.raises(ValueError, match="same shape"):
+        changed_share([1.0], [1.0, 1.0])

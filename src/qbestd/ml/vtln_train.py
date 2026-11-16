@@ -46,8 +46,12 @@ from qbestd.ml.gmm import (
 from qbestd.ml.posteriorgram import gaussian_posteriorgram
 from qbestd.ml.vtln import (
     WARP_FACTORS,
+    changed_share,
+    edge_shares,
     estimate_warp_factors,
+    to_thesis_label,
     utterance_log_likelihoods,
+    warp_histogram,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -61,12 +65,6 @@ class VtlnResult:
     gmm: object
     alphas: np.ndarray
     iterations: list
-
-
-def warp_histogram(alphas, warps=WARP_FACTORS):
-    """``{warp: number of utterances}`` over every warp (zeros kept)."""
-    alphas = np.asarray(alphas, dtype="float64")
-    return {f"{w:.2f}": int(np.sum(alphas == w)) for w in warps}
 
 
 def estimate_utterance_warps(paths, gmm, keys, kind, profile,
@@ -107,16 +105,42 @@ def estimate_clip_warp(features_by_warp, gmm):
     return float(estimate_warp_factors(row, warps)[0])
 
 
+def write_trace(trace_dir, iteration, keys, alphas, matrix):
+    """Per-utterance warps of one iteration and the LL matrix, next to the
+    model. ``alpha_ours`` is the cache-file label, ``alpha_thesis`` is
+    ``2 - alpha_ours`` (D3 c). The matrix columns follow ``WARP_FACTORS``
+    (our label)."""
+    trace_dir = Path(trace_dir)
+    trace_dir.mkdir(parents=True, exist_ok=True)
+    lines = ["hf_split\trow_index\talpha_ours\talpha_thesis"]
+    labels = to_thesis_label(alphas)
+    for (split, row), ours, thesis in zip(keys, alphas, labels):
+        lines.append(f"{split}\t{row}\t{ours:.2f}\t{thesis:.2f}")
+    (trace_dir / f"iter{iteration}_alphas.tsv").write_text(
+        ("\n").join(lines) + "\n", encoding="utf-8")
+    np.save(trace_dir / f"iter{iteration}_ll_matrix.npy", matrix)
+
+
 def train_vtln(paths, keys, kind, profile, plain_gmm, n_iter,
                components, n_em_iter=10, epsilon=0.2, var_floor_ratio=0.01,
-               seed=0, warps=WARP_FACTORS):
+               seed=0, warps=WARP_FACTORS, trace_dir=None):
     """Run the iterations; returns a :class:`VtlnResult`.
 
-    Each record holds the warp histogram, the mean frame log-likelihood of
-    lambda_init on X^alpha_hat, the mean log-likelihood of the new model on
-    the same features, the EM history and the model hash.
+    Each record holds the warp histogram (thesis label), the share at each
+    edge, the share of utterances whose warp changed since the previous
+    iteration (iteration 0: since alpha = 1), the mean frame log-likelihood
+    of lambda_init on X^alpha_hat, the mean log-likelihood of the new model
+    on the same features, ``ll_decreased``, the EM history and the model
+    hash. With ``trace_dir`` the per-utterance warps and LL matrix are saved
+    for every iteration.
+
+    Raises:
+        ValueError: if ``n_iter < 1``.
     """
+    if n_iter < 1:
+        raise ValueError("n_iter must be at least 1")
     gmm, records = plain_gmm, []
+    previous = np.ones(len(keys))
     for k in range(n_iter):
         start = time.time()
         alphas, matrix = estimate_utterance_warps(paths, gmm, keys, kind,
@@ -127,17 +151,30 @@ def train_vtln(paths, keys, kind, profile, plain_gmm, n_iter,
                         [list(map(float, warps)).index(a) for a in alphas]]
         trained = train_gmm_detailed(features, components, n_em_iter,
                                      epsilon, var_floor_ratio, seed)
+        ll_init = float(chosen.sum() / len(features))
+        ll_new = trained.log_likelihood_history[-1]
+        if trace_dir is not None:
+            write_trace(trace_dir, k, keys, alphas, matrix)
         records.append({
             "iteration": k, "warp_histogram": warp_histogram(alphas, warps),
-            "mean_ll_init_on_selected": float(chosen.sum() / len(features)),
-            "mean_ll_new_on_selected": trained.log_likelihood_history[-1],
+            "edge_shares": edge_shares(alphas, warps),
+            "changed_share": changed_share(previous, alphas),
+            "mean_ll_init_on_selected": ll_init,
+            "mean_ll_new_on_selected": ll_new,
+            "ll_decreased": bool(ll_new < ll_init),
             "em_history": trained.log_likelihood_history,
             "model_content_sha256": gmm_content_sha256(trained.gmm),
             "seconds": round(time.time() - start, 1)})
-        LOGGER.info("iteration %d: LL init %.4f, new %.4f, %s", k,
-                    records[-1]["mean_ll_init_on_selected"],
-                    records[-1]["mean_ll_new_on_selected"],
+        if records[-1]["ll_decreased"]:
+            LOGGER.warning("iteration %d: log-likelihood fell from %.4f to "
+                           "%.4f on the selected features", k, ll_init,
+                           ll_new)
+        LOGGER.info("iteration %d: LL init %.4f, new %.4f, edges %s, "
+                    "changed %.3f, %s", k, ll_init, ll_new,
+                    records[-1]["edge_shares"],
+                    records[-1]["changed_share"],
                     records[-1]["warp_histogram"])
+        previous = alphas
         gmm = trained.gmm
         del features
     return VtlnResult(gmm, alphas, records)
@@ -241,14 +278,15 @@ def main(argv=None):
                                     args.features_dir, skip_existing=True)
         for alpha, path in built.items():
             paths[alpha][hf_split] = path
+    name = (f"{args.kind}_{args.profile}_gmm{plain.n_components}"
+            f"_vtln{args.n_iter}")
     result = train_vtln(paths, keys, args.kind, args.profile, plain,
                         args.n_iter, plain.n_components,
                         n_em_iter=info.get("n_iter", 10),
                         epsilon=info.get("epsilon", 0.2),
                         var_floor_ratio=info.get("var_floor_ratio", 0.01),
-                        seed=info.get("seed", 0))
-    name = (f"{args.kind}_{args.profile}_gmm{plain.n_components}"
-            f"_vtln{args.n_iter}")
+                        seed=info.get("seed", 0),
+                        trace_dir=args.out / f"{name}_trace")
     metadata = vtln_metadata(args.kind, args.profile, selection.split_id,
                              args.n_iter, plain, info)
     metadata["runtime_s"] = round(time.time() - started, 1)

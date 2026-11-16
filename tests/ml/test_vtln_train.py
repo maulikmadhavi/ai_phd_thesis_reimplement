@@ -49,9 +49,9 @@ def run(setup, n_iter):
                       components=2, n_em_iter=3, warps=WARPS)
 
 
-def test_warp_histogram_keeps_empty_warps():
+def test_warp_histogram_is_in_the_thesis_label_and_keeps_empty_warps():
     hist = warp_histogram([1.0, 1.0, 0.9], WARPS)
-    assert hist == {"0.90": 1, "1.00": 2, "1.10": 0}
+    assert hist == {"1.10": 1, "1.00": 2, "0.90": 0}  # ours 0.9 -> 1.10
     assert len(warp_histogram([], WARP_FACTORS)) == 13
 
 
@@ -94,8 +94,9 @@ def test_log_likelihood_on_the_selected_features_does_not_fall(setup):
 
 def test_model_and_log_survive_a_round_trip(setup, tmp_path):
     result = run(setup, 1)
-    meta = {"kind": KIND, "profile": PROFILE, "split_id": "s", "n_vtln_iter": 1,
-            "warps": list(WARPS), "feature_fingerprint": "f"}
+    meta = {"kind": KIND, "profile": PROFILE, "split_id": "s",
+            "n_vtln_iter": 1, "warps": list(WARPS),
+            "feature_fingerprint": "f"}
     path = tmp_path / "m" / "vtln.npz"
     info = save_vtln_model(path, result, meta)
     gmm, loaded = load_gmm(path)
@@ -151,3 +152,53 @@ def test_the_plain_slot_refuses_a_vtln_model_and_the_metadata_names_it(
     save_gmm(tmp_path / "vtln.npz", plain, {**info, **meta})
     with pytest.raises(ModelMismatchError, match="model_type"):
         load_plain_model(tmp_path / "vtln.npz", KIND, PROFILE, "s")
+
+
+def test_zero_iterations_are_refused(setup):
+    paths, plain = setup
+    with pytest.raises(ValueError, match="at least 1"):
+        train_vtln(paths, KEYS, KIND, PROFILE, plain, 0, components=2,
+                   warps=WARPS)
+
+
+def test_the_ll_flag_is_false_here_and_true_when_the_model_gets_worse(
+        setup, monkeypatch):
+    result = run(setup, 2)
+    assert [r["ll_decreased"] for r in result.iterations] == [False, False]
+    import qbestd.ml.vtln_train as module
+    real = module.train_gmm_detailed
+
+    def worse(*args, **kwargs):
+        out = real(*args, **kwargs)
+        out.log_likelihood_history[-1] = -1e9
+        return out
+    monkeypatch.setattr(module, "train_gmm_detailed", worse)
+    assert run(setup, 1).iterations[0]["ll_decreased"] is True
+
+
+def test_every_iteration_reports_edges_and_changes(setup):
+    result = run(setup, 2)
+    first, second = result.iterations
+    assert sum(first["warp_histogram"].values()) == 4
+    assert set(first["edge_shares"]) == {"0.88", "1.12"} or set(
+        first["edge_shares"]) == {"0.90", "1.10"}
+    assert 0.0 <= first["changed_share"] <= 1.0
+    assert 0.0 <= second["changed_share"] <= 1.0
+
+
+def test_trace_files_round_trip(setup, tmp_path):
+    paths, plain = setup
+    result = train_vtln(paths, KEYS, KIND, PROFILE, plain, 2, components=2,
+                        n_em_iter=3, warps=WARPS, trace_dir=tmp_path)
+    for k in range(2):
+        lines = (tmp_path / f"iter{k}_alphas.tsv").read_text().splitlines()
+        assert lines[0] == "hf_split	row_index	alpha_ours	alpha_thesis"
+        rows = [line.split("	") for line in lines[1:]]
+        assert [(r[0], int(r[1])) for r in rows] == KEYS
+        for row in rows:
+            assert float(row[3]) == round(2 - float(row[2]), 2)
+        matrix = np.load(tmp_path / f"iter{k}_ll_matrix.npy")
+        assert matrix.shape == (4, 3) and np.all(np.isfinite(matrix))
+    last = [float(r.split("	")[2]) for r in (
+        tmp_path / "iter1_alphas.tsv").read_text().splitlines()[1:]]
+    assert np.allclose(last, result.alphas)
