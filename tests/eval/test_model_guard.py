@@ -30,3 +30,19 @@ def test_model_without_a_field_is_rejected(missing):
     info = {k: v for k, v in INFO.items() if k != missing}
     with pytest.raises(ModelMismatchError, match=missing):
         check(info)
+
+
+def test_missing_model_type_counts_as_plain():
+    check({**INFO})
+    check({**INFO, "model_type": "plain"})
+
+
+def test_a_vtln_model_in_the_plain_slot_is_rejected():
+    with pytest.raises(ModelMismatchError, match="model_type"):
+        check({**INFO, "model_type": "vtln"})
+
+
+def test_a_plain_model_in_the_vtln_slot_is_rejected():
+    with pytest.raises(ModelMismatchError, match="model_type"):
+        check(model_type="vtln")
+    check({**INFO, "model_type": "vtln"}, model_type="vtln")

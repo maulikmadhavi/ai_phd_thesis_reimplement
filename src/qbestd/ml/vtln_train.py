@@ -200,15 +200,37 @@ def parse_args(argv=None):
     return parser.parse_args(argv)
 
 
+def load_plain_model(path, kind, profile, split_id):
+    """The plain GMM lambda_init; a VTLN model (or one for other features
+    or another split) is refused."""
+    gmm, info = load_gmm(path)
+    check_model(info, kind, profile, split_id,
+                feature_fingerprint(kind, profile), model_type="plain")
+    return gmm, info
+
+
+def vtln_metadata(kind, profile, split_id, n_vtln_iter, plain, info):
+    """Metadata of a VTLN model; EM settings are those of lambda_init."""
+    return {"model_type": "vtln", "kind": kind, "profile": profile,
+            "split_id": split_id, "n_vtln_iter": n_vtln_iter,
+            "n_em_iter": info.get("n_iter", 10),
+            "epsilon": info.get("epsilon", 0.2),
+            "var_floor_ratio": info.get("var_floor_ratio", 0.01),
+            "seed": info.get("seed", 0), "components": plain.n_components,
+            "warps": [float(w) for w in WARP_FACTORS],
+            "feature_fingerprint": feature_fingerprint(kind, profile),
+            "plain_model_sha256": gmm_content_sha256(plain),
+            "fresh_lbg_each_iteration": True}
+
+
 def main(argv=None):
     args = parse_args(argv)
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
     started = time.time()
     selection = manifest_selection(args.split_manifest)
-    plain, info = load_gmm(args.gmm)
-    check_model(info, args.kind, args.profile, selection.split_id,
-                feature_fingerprint(args.kind, args.profile))
+    plain, info = load_plain_model(args.gmm, args.kind, args.profile,
+                                   selection.split_id)
     keys = [(split, row) for split in ("train", "test")
             for row in sorted(selection.wanted("train", split) or ())]
     paths = {float(a): {} for a in WARP_FACTORS}
@@ -227,16 +249,10 @@ def main(argv=None):
                         seed=info.get("seed", 0))
     name = (f"{args.kind}_{args.profile}_gmm{plain.n_components}"
             f"_vtln{args.n_iter}")
-    metadata = {"kind": args.kind, "profile": args.profile,
-                "split_id": selection.split_id, "n_iter": args.n_iter,
-                "components": plain.n_components,
-                "warps": [float(w) for w in WARP_FACTORS],
-                "feature_fingerprint": feature_fingerprint(args.kind,
-                                                           args.profile),
-                "plain_model_sha256": gmm_content_sha256(plain),
-                "fresh_lbg_each_iteration": True,
-                "runtime_s": round(time.time() - started, 1),
-                "peak_memory_mb": peak_memory_mb()}
+    metadata = vtln_metadata(args.kind, args.profile, selection.split_id,
+                             args.n_iter, plain, info)
+    metadata["runtime_s"] = round(time.time() - started, 1)
+    metadata["peak_memory_mb"] = peak_memory_mb()
     out = args.out / f"{name}.npz"
     save_vtln_model(out, result, metadata)
     LOGGER.info("wrote %s in %.0f s, peak memory %s MB", out,

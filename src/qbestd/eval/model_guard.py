@@ -5,15 +5,21 @@ class ModelMismatchError(ValueError):
     """The model was trained on other features, profile or split."""
 
 
-def check_model(info, kind, profile, split_id, fingerprint):
+def check_model(info, kind, profile, split_id, fingerprint,
+                model_type="plain"):
     """Raise :class:`ModelMismatchError` unless ``info`` (the model metadata
     from ``load_gmm``) matches the request.
 
     ``fingerprint`` is ``feature_fingerprint(kind, profile, exclude_sa=True)``
     under the current code. It does not cover which rows were used, which is
     why ``split_id`` is compared as well. A model without these fields (an
-    older one) is rejected.
+    older one) is rejected. ``model_type`` is ``"plain"`` or ``"vtln"``; a
+    model without that field counts as plain, so existing models still load.
     """
+    found = info.get("model_type", "plain")
+    if found != model_type:
+        raise ModelMismatchError(
+            f"model_type is {found!r}, expected {model_type!r}")
     expected = {"kind": kind, "profile": profile, "split_id": split_id,
                 "feature_fingerprint": fingerprint}
     for field, wanted in expected.items():

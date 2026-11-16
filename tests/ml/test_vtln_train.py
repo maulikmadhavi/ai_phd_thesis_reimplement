@@ -94,7 +94,7 @@ def test_log_likelihood_on_the_selected_features_does_not_fall(setup):
 
 def test_model_and_log_survive_a_round_trip(setup, tmp_path):
     result = run(setup, 1)
-    meta = {"kind": KIND, "profile": PROFILE, "split_id": "s", "n_iter": 1,
+    meta = {"kind": KIND, "profile": PROFILE, "split_id": "s", "n_vtln_iter": 1,
             "warps": list(WARPS), "feature_fingerprint": "f"}
     path = tmp_path / "m" / "vtln.npz"
     info = save_vtln_model(path, result, meta)
@@ -129,3 +129,25 @@ def test_a_clip_gets_its_own_warp(setup):
 def test_peak_memory_is_positive_or_unknown():
     value = peak_memory_mb()
     assert value is None or value > 0
+
+
+def test_the_plain_slot_refuses_a_vtln_model_and_the_metadata_names_it(
+        setup, tmp_path):
+    from qbestd.data.feature_cache import feature_fingerprint
+    from qbestd.eval.model_guard import ModelMismatchError
+    from qbestd.ml.gmm import save_gmm
+    from qbestd.ml.vtln_train import load_plain_model, vtln_metadata
+    _, plain = setup
+    info = {"kind": KIND, "profile": PROFILE, "split_id": "s",
+            "feature_fingerprint": feature_fingerprint(KIND, PROFILE),
+            "n_iter": 7, "epsilon": 0.3, "var_floor_ratio": 0.02, "seed": 4}
+    save_gmm(tmp_path / "plain.npz", plain, info)
+    assert load_plain_model(tmp_path / "plain.npz", KIND, PROFILE, "s")
+    meta = vtln_metadata(KIND, PROFILE, "s", 5, plain, info)
+    assert meta["model_type"] == "vtln" and meta["n_vtln_iter"] == 5
+    assert "n_iter" not in meta
+    assert (meta["n_em_iter"], meta["epsilon"], meta["var_floor_ratio"],
+            meta["seed"]) == (7, 0.3, 0.02, 4)
+    save_gmm(tmp_path / "vtln.npz", plain, {**info, **meta})
+    with pytest.raises(ModelMismatchError, match="model_type"):
+        load_plain_model(tmp_path / "vtln.npz", KIND, PROFILE, "s")
