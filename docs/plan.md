@@ -521,8 +521,9 @@ than **one** warp's features for a whole split in memory at once.
   its runtime and peak memory, not a score.
 
 **Cycle 7 definition of done:**
-- F1–F5, L1, H1, H2, H3 and V1–V3 are on `main` in that order. L1's and H3's
-  declarations come before their runs.
+- F1–F5, L1, H1, H2, V1–V3, the smoke run and then H3 are on `main` in that order. H3
+  was added after V3 landed. L1's and H3's declarations come before their runs. Runs go
+  one at a time because memory is short.
 - `pixi run test` is green in the core env. Every module is under 400 lines, no line is
   over 79 characters, and every new function has tests. No derived data is committed.
 - No commit was made while a background run was going.
