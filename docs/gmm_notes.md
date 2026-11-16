@@ -206,6 +206,24 @@ Same recipe as the other models (LBG, 10 EM iterations, seed 0, variance floor 0
 
 The MFCC log-likelihoods are far lower than the `timit_matlab` models because the waveform is not peak-normalised (c0 follows the signal level); the numbers are not comparable across profiles. The PLP and MFCC profiles use no TEO, so there are no TEO floor counts. Retrieval numbers are in `docs/results_timit_q20_features.md`.
 
+## MFCC-TMP retrain under the current feature digest (cycle 8, G6)
+
+The feature source files changed in cycle 7 (`plp.py`), so the feature
+fingerprint changed and the cycle 6 MFCC-TMP models were rejected by the model
+guard. Both models were retrained on `textdisjoint_q20_v2` (caches rebuilt,
+same recipe and seed), from commit `2508051` on a clean tree.
+New feature fingerprint `c0ed2bb7028e228e1a16e94c98c291b9eae9535e5691cd5a0e1787750c996537`.
+
+| Model | Parameter SHA-256 (cycle 6) | Parameter SHA-256 (retrain) | Repeats |
+|---|---|---|---|
+| GMM-64 | `bebabe4220162631...` | `bebabe4220162631...` | yes |
+| GMM-128 | `105fb5ff5093fbcb...` | `105fb5ff5093fbcb...` | yes |
+
+**The parameter hashes repeat**, so the features are numerically unchanged,
+and the cycle 6 MFCC-TMP rows carry over without a new evaluation. The
+`timit_matlab` MFCC and PLP and the L1 models were **not** retrained: they
+are earlier references, and the model guard rejects them.
+
 ## What this does not show
 
 - No comparison with the thesis figure and no held-out likelihood.
