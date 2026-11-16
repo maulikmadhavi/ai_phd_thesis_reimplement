@@ -546,3 +546,49 @@ utterances), as the declaration said.
 - Nothing is tuned. No band is chosen; the 0-3400 Hz profile stays the
   reference. MFCC-TMP minus MFCC under VTLN is reported against both MFCC
   bands.
+
+### Stage 4 run 1 of 5: MFCC `htk_described` (0-3400 Hz), STOPPED on `ll_decreased`
+
+The declared STOP rule fired: iterations 2 and 4 set `ll_decreased`. This run
+was finished and is reported; **no further Stage 4 run was started.** Run
+from commit `cea4673` (clean tree, `git_dirty: false`), train-vtln
+644 s, peak memory 930 MB, eval 338 s.
+
+| Iteration | LL of lambda_init on X^alpha_hat | LL of new model on X^alpha_hat | ll_decreased | Share whose warp changed | Edge shares thesis 0.88 / 1.12 | Model hash |
+|---|---|---|---|---|---|---|
+| 0 | -116.4544 | -116.3199 | no | 0.793 | 0.019 / 0.103 | `455a873913f7...` |
+| 1 | -116.2789 | -116.2680 | no | 0.394 | 0.044 / 0.142 | `70c1a8d326c4...` |
+| 2 | -116.2589 | -116.2715 | **yes** | 0.226 | 0.060 / 0.145 | `5cdd9adcc79e...` |
+| 3 | -116.2688 | -116.2452 | no | 0.122 | 0.070 / 0.140 | `a1b5a5202cbb...` |
+| 4 | -116.2416 | -116.2677 | **yes** | 0.152 | 0.072 / 0.136 | `1bf1a1570ddb...` |
+
+The decreases are small (0.013 and 0.026 per frame, against a spread of
+about 0.1 between iterations). Each iteration trains a fresh LBG + EM model
+(`fresh_lbg_each_iteration`), so a new initialisation can end slightly below
+the previous model on the same data; this is the Q3 trigger for a warm-start
+variant. The reading is the Reviewer's.
+
+Final alpha-hat histogram of the training utterances (thesis label):
+1.12: 501, 1.10: 47, 1.08: 169, 1.06: 66, 1.04: 231, 1.02: 79, 1.00: 611, 0.98: 546, 0.96: 343, 0.94: 150, 0.92: 242, 0.90: 445, 0.88: 266.
+The pile-up at the 1.12 edge (501 of 3696) and at 1.00 persists
+after 5 iterations.
+
+| Row | p@N, instance avg (95% CI) | MAP, instance avg (95% CI) | p@N, keyword avg (95% CI) | MAP, keyword avg (95% CI) | Queries | Non-matches |
+|---|---|---|---|---|---|---|
+| MFCC `htk_described` GMM-64, no VTLN | 34.58 (25.6-44.1) | 35.73 (26.4-45.8) | 32.51 (24.8-40.7) | 33.50 (25.0-42.3) | 145 | 1 |
+| MFCC `htk_described` GMM-64, GMM-VTLN (N_iter 5) | 41.65 (31.9-51.4) | 45.21 (34.3-56.2) | 37.90 (28.6-47.6) | 41.18 (30.9-52.0) | 145 | 1 |
+
+Thesis (`Tab:TIMITVTLNPerformance1`, MFCC GMM-64): 34.91 / 36.71 without VTLN,
+36.26 / 39.62 with. Paired VTLN minus no-VTLN (same queries; 95 %
+keyword-cluster bootstrap):
+
+| Average | p@N diff | MAP diff |
+|---|---|---|
+| instance | +7.07 (+3.8 to +10.4) | +9.47 (+5.5 to +13.0) |
+| keyword | +5.38 (+1.7 to +9.1) | +7.68 (+3.8 to +11.7) |
+
+Test documents' alpha-hat: edges {'0.88': 0.06845238095238096, '1.12': 0.1331845238095238}; query
+clips: edges {'0.88': 0.06896551724137931, '1.12': 0.2689655172413793}; **0.60 of the queries**
+get an alpha-hat different from their source utterance's final train
+alpha-hat. Query features were extracted from the clips at all 13 warps
+(`query_features: "clip"`).
