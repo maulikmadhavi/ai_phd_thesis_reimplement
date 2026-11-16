@@ -513,6 +513,13 @@ out to need such an edit, STOP and report: it would invalidate every model.
   `outputs/features` (838 GB free).
 - **If any iteration sets `ll_decreased`:** finish that run, report it and **STOP**
   before the next run. That is the trigger for a warm-start variant (Q3).
+  - **Gate fired, and resolved by user decision D4 (2026-11-17).** Run 1 (MFCC
+    `htk_described`, `77a5ee8`) set `ll_decreased` at iterations 2 and 4, by 0.013 and
+    0.026 per frame. The user chose to **continue runs 2–5 with fresh LBG**, with no
+    warm-start variant.
+  - For runs 2–5, `ll_decreased` is recorded and reported per iteration but no longer
+    stops the chain. The fresh-LBG LL drops are reported as a property of the declared
+    procedure.
 - **Report**, in `docs/results_timit_q20_features.md`, section "Stage 4: GMM-VTLN":
   - the VTLN row next to the no-VTLN row for each of the 5 runs, with intervals and
     thesis gaps;
@@ -524,8 +531,8 @@ out to need such an edit, STOP and report: it would invalidate every model.
 **Cycle 8 definition of done:**
 - G1–G6, W1, W2 and W3 are on `main` in that order. W1's and W3's declarations come
   before their runs.
-- STOP gates: G6 hash mismatch, a W1 failure, `ll_decreased` in W3, or any needed edit to
-  a digest file.
+- STOP gates: G6 hash mismatch, a W1 failure, `ll_decreased` in W3 run 1 (resolved by D4;
+  recorded only for runs 2–5), or any needed edit to a digest file.
 - `pixi run test` is green. Modules stay under 400 lines and lines under 80 characters.
   No derived data is committed.
 - No commit was made while a run was going. Every run summary has
