@@ -516,3 +516,33 @@ median F0 below 165 Hz: 0.474 for alpha_thesis < 1
 (765), 0.976 for alpha_thesis > 1
 (1083). The 1.00 group is a bump of lambda_init (765
 utterances), as the declaration said.
+
+### Stage 4 runs (declared)
+
+**Declared before any Stage 4 run** (cycle 8, W3, user decision D3).
+
+- **Runs (5, GMM-64, split v2, N_iter = 5, one at a time, clean tree):**
+  MFCC `htk_described`; MFCC `htk_described_4k`; PLP `htk_described`; PLP
+  `htk_described_4k`; MFCC-TMP `timit_matlab`. Each: the 26 warp caches
+  (13 warps, two HF splits), `train-vtln` from the plain GMM-64 of that
+  feature and profile (fresh LBG per iteration), then `eval-timit --vtln`
+  (LC2, clip query features, A1 scorer, keyword-cluster bootstrap with 10000
+  resamples, seed 0). Records: alpha-hat histograms, edge shares, LL per
+  iteration, `ll_decreased`, hashes, runtime, peak memory.
+- **Targets** (`Tab:TIMITVTLNPerformance1`, p@N / MAP, no VTLN to VTLN): MFCC
+  34.91 / 36.71 to 36.26 / 39.62; PLP 35.50 / 37.58 to 37.48 / 39.95;
+  MFCC-TMP 40.03 / 41.50 to 42.88 / 45.52. The thesis gains are +1.35 /
+  +2.91 (MFCC), +1.98 / +2.37 (PLP) and +2.85 / +4.02 (MFCC-TMP).
+- **Comparison:** paired VTLN minus no-VTLN on the same queries (the plain
+  GMM-64 row of the same feature and profile), keyword-cluster bootstrap.
+- **What an interval that includes 0 means:** our half-widths are about 2 to
+  3 points, so an interval that includes 0 is a likely outcome. Then the
+  doc says "the direction matches / does not match the thesis; the interval
+  does not establish a gain", and claims nothing more. "In the thesis's
+  direction" is said only where the interval excludes 0 on the thesis side.
+- **STOP rule:** if any iteration sets `ll_decreased`, that run is finished,
+  reported, and no further run starts (that is the trigger for a warm-start
+  variant).
+- Nothing is tuned. No band is chosen; the 0-3400 Hz profile stays the
+  reference. MFCC-TMP minus MFCC under VTLN is reported against both MFCC
+  bands.
