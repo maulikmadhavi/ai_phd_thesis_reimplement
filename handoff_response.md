@@ -1,228 +1,276 @@
-# Handoff Response: Cycle 6
+# Handoff Response: Handoff_feedback → Orchestrator
 
-- **From:** Handoff_feedback. **To:** Orchestrator.
-- **Scope:** `handoff_request.md` at `1a0c20f`; exec commits `3fb279d..ec565b5`.
-- **Verdicts:** Q1 agree, Q2 agree, Q3 change requested, Q4 change requested with one
-  **user decision**, Q5 agree, Q6 unknown, Q7 change requested, Q8 change requested.
-- **What I checked myself (read-only, nothing written but this file):** the code and tests
-  of C2, C4, C5 and `baa3bc3`; the split and results docs; the thesis chapters
-  `ExpSetup.tex`, `Unsupervised.tex`, `Representation.tex`; `Fx_PLPCC_htk.m` and the file
-  list of `research_myMATLAB_codes` on GitHub; and one scan of the v2 units against the
-  transcripts (Q1). I did not re-run the test suite or any model.
-- **Not available:** the local folder `D:\Storage\research_code_qbe_std` holds only the
-  matching code (`matlab/*.cpp`, `Fx_do_SDTW.m`). The feature scripts exist only on GitHub.
+- **Cycle:** 7
+- **Answers:** `handoff_request.md` at `1456aa9` (16 exec commits, `c429300..c027e05`).
+- **Read for this review:** the request; `features/{profiles,plp,mfcc,cepstral,scales,
+  filterbank}.py`; `data/{feature_cache,warped_cache}.py`; `ml/{vtln,vtln_train}.py`;
+  `eval/model_guard.py` and the summary block of `eval/run_timit.py`;
+  `tests/data/test_warped_cache.py`; `docs/feature_parity.md`,
+  `docs/results_timit_q20_features.md`, the tail of `docs/plan.md`; the smoke model JSON
+  under `outputs/`; thesis `Representation.tex` 8–35, 84–200, 226–276, 308–318,
+  `ExpSetup.tex` 186–200 and `Unsupervised.tex` 525–584.
+- **Not done:** I did not re-run the tests, any model or any evaluation. HTK internals
+  below are **recalled from memory, not checked against the HTK source or book**; they
+  are marked as such.
+- **Loop status:** **pauses for the user.** Three user-decision items are in the last
+  section. The code changes in Q3, Q7 and Q8 do not depend on them.
 
-The loop pauses for the user on Q4 (see "User decision" at the end).
+Two findings matter more than the rest, so they come first:
 
-## 1. Plan Q27, link scope: **agree**
+1. **A VTLN model passes the plain-evaluation guard (Q8a).** The VTLN model JSON carries
+   the *plain* feature fingerprint, and `check_model` compares only kind, profile, split
+   and fingerprint. `run_timit` would therefore score a VTLN model on unwarped features
+   without an error. Fix this before any Stage 4 score.
+2. **Our warp label is probably the mirror of the thesis's (Q4).** Our filter peaks move
+   *up* for α > 1. The thesis says male speakers have α > 1, and that filters stretch for
+   *lower* α; both statements mean filters move *down* for α > 1. The 13 warps are
+   symmetric about 1, so the set of warped features is the same and no score changes, but
+   a histogram compared with the thesis must be read as 2 − α. A score-free check is
+   given in Q4.
 
-Linking all 20 verified pairs is the right reading. Merging only the 8 crossed pairs
-changes the step 2 and step 3 placements, so an unlinked pair could cross in v2.
+---
 
-The 7-row check is stronger than the doc says, because the whole corpus adds up. My scan
-of the v2 units gives 448 units of 7 rows, 2 units of 6 rows and 1892 single-read units.
-TIMIT has 450 SX texts read by 7 speakers and 1890 SI texts read once: 3150 + 1890 = 5040.
-The two 6-row units each have a two-token variant among the single-read units, which
-accounts for the 2 extra singles. So every multi-read unit is one SX text, and a wrong link
-would have broken this count. That covers link 19 (`had/ate`) and the three-variant unit:
-both complete a 7-row SX text.
+## 1. Plan Q31, level check — **agree**, one wording change
 
-The unlinked pair of two single-read groups (`0573d602eb5a` / `63b6c9fc4ec2`) is a
-content-word substitution between two SI texts. Leaving it unlinked is correct.
+- **Reading.** The result is right, the sentence is slightly too strong. "This check
+  shows no change in either feature" should be "this check does not detect a change; the
+  paired intervals allow differences of up to about 3 to 4 points either way".
+  File: `docs/results_timit_q20_features.md`, the paragraph after the paired table.
+- **My cycle 6 hypothesis is not supported.** I ranked level handling as the most likely
+  cause of MFCC sitting above and PLP below the thesis. L1 gives no evidence for that:
+  PLP − MFCC stays at −9.77 (−14.8 to −4.9) with both flipped.
+- **MFCC-TMP level handling:** leave it as it is. L1 gives no reason to change it, and
+  the MATLAB script is its only source.
+- **`timit_matlab`:** keep it as a labelled earlier reference for MFCC and PLP, and as
+  the MFCC-TMP profile. Do not spend compute on decomposing its PLP gap into band,
+  filter count, LPC order and pre-emphasis; that answers no thesis question.
+- **One thing it still affects:** MFCC-TMP − MFCC now compares a MATLAB-described front
+  end (26 filters, 0–4000 Hz, peak-normalised) with an HTK-described one (40 filters,
+  0–3400 Hz). By the author's statement the thesis did the same. The doc should say so
+  wherever that difference is reported, as it did for PLP − MFCC in cycle 6. See also
+  Q5, last bullet.
 
-One thing the doc should add (`docs/split_textdisjoint.md`, "What v2 does not do"):
+## 2. Plan Q32, HTK defaults — **unknown** (recalled values agree; three additions)
 
-- Two SX texts still have an unmerged variant that differs by **two** tokens:
-  unit `675129c68a2c` (6 rows) with single `b180942ceff1` (a contraction written as two
-  words), and unit `6d86e94d8394` (6 rows) with single `4c952c3a51e1` (one word moved).
-- In both cases the variant is on the **train** side with its unit, so no SX text crosses
-  sides in v2. That is by placement, not by rule.
-- State the corpus count above as the evidence for the links.
+I cannot verify HTK from the sources available here. From memory:
 
-I do not recommend a v3 for these two: nothing crosses, and merging them would change the
-manifest hash for no change in content. That choice is the Orchestrator's.
+| Item in `_htk_described` | My recollection |
+|---|---|
+| `PREEMCOEF` 0.97, `CEPLIFTER` 22, `LPCORDER` 12, `COMPRESSFACT` 0.33, `DELTAWINDOW` 2, `ZMEANSOURCE` off | agree |
+| MFCC on magnitude (`USEPOWER` off) | agree |
+| `log(M|X|)` against our `log((M|X|)²)`: factor 2 on every cepstrum | agree |
+| HTK c0 is `sqrt(2/N)·Σ`, ours `sqrt(1/N)·Σ`: factor √2 on c0 only | agree |
+| Pre-emphasis per frame, after framing | agree (small edge effect per frame) |
+| Filterbank skips the DC bin (`klo = 2`) | agree; see note below |
+| HTK PLP has its own internals | agree; details below |
 
-## 2. Plan Q28, underdetermined components: **agree**
+Additions to record in the docstring and in `docs/feature_parity.md`, all as "recalled,
+unverified":
 
-The hash-order choice is not a problem for the reported numbers. It was fixed before any
-score and it uses no score. It is the same kind of arbitrary choice as step 3, which places
-599 of the 624 test units by hash order.
+- **PLP and `USEPOWER`.** As I recall, with `USEPOWER` off HTK's PLP squares the
+  mel-weighted *magnitude* sum, `(M|X|)²`, and uses `M|X|²` only when `USEPOWER = T`.
+  Our PLP always uses `M|X|²`. So "PLP on the power spectrum" is right only if the
+  thesis config set `USEPOWER = T`. This is one of the author questions below.
+- **Triangle shape.** HTK's triangular weights are linear in *mel*; ours are linear in
+  Hz between mel-spaced edges. Small, but it is a difference.
+- **PLP edge bands.** HTK appends two extra points that copy the first and last band
+  (N + 2 points). Ours overwrites the first and last band (N points), as
+  `Fx_PLPCC_htk.m` does.
+- **Log floor.** HTK floors the filterbank output at 1.0 before the log; ours floors at
+  1e-10. With ×32768 scaling this matters only in digital silence.
+- **DC bin.** Our first triangle rises from `low_hz = 0`, so bin 0 has weight 0 at every
+  warp. DC does not leak in, even without DC removal.
 
-The doc should say slightly more than the count (`docs/split_textdisjoint.md`, per-component
-section):
+**Is the c0 √2 note worth adding?** Yes, one sentence. The reasoning in the request is
+right: EM on a diagonal GMM is invariant to per-dimension scale, the LBG start is not, so
+a uniform ×2 changes nothing and the √2 on c0, Δc0 and ΔΔc0 can change the
+initialisation. Do **not** change the code for it; a note is enough.
 
-- The product of the counts is 2,488,320 equal-cost keyword assignments; v2 is one of them.
-- For a component with a count above 1, *which* utterances are that keyword's queries and
-  documents depends on the fixed choice; the Inst./Occ. counts do not.
-- The intervals in the results docs resample keywords. They do not measure this split-draw
-  variation, which is unmeasured.
+## 3. Plan Q33, VTLN assumptions — **change requested** (small), one item **unknown**
 
-Do not score alternative assignments to look at the spread. Each one needs its own GMMs, and
-it would invite choosing a split by score.
+- **Fresh LBG against warm start: unknown.** The thesis says "re-trained" (line 103) and
+  "build" (line 161), which reads as a new model. But its claim
+  `P(X^α̂ | λ⁽¹⁾) ≥ P(X¹ | λ_init)` (line 138) is guaranteed only when EM continues from
+  `λ_init`; a fresh LBG start does not guarantee it. Keep fresh LBG as the declared
+  primary, since it is the same recipe as `λ_init`. Then:
+  - `ml/vtln_train.py`, `train_vtln`: after each iteration compare
+    `mean_ll_new_on_selected` with `mean_ll_init_on_selected`. If the new value is lower,
+    log a warning and store `"ll_decreased": true` in the record. The smoke run passed
+    (−116.45 → −116.32).
+  - Do not run a warm-start variant unless that flag fires or the author says the thesis
+    continued from the old model (author question below).
+- **Query α̂: agree with the implementation.** Line 104 says "the VTLN warping factors of
+  test and query features are estimated against the new GMM model λ_r", so a query gets
+  its own estimate. `Fig:VTLNwarpconst` (lines 286–291) is about how stable such
+  short-utterance estimates are, which fits. Record in the results doc that this is the
+  thesis reading, and report how often a query's α̂ differs from its source utterance's.
+- **Save per-utterance α̂: change requested.**
+  `ml/vtln_train.py`: store, for every iteration, α̂ keyed by `(hf_split, row)` (a small
+  `.npz` or TSV next to the model, under `outputs/`). The thesis's
+  `Fig:TIMITiterloglik` (b) plots the change in α̂ between iterations, which needs
+  exactly this. Saving the `(n_utt, 13)` log-likelihood matrix as well costs about
+  0.4 MB per iteration and makes the Reviewer's scratch analysis repeatable.
+- **`n_iter = 0`:** `train_vtln` returns `alphas` before it is assigned. Raise
+  `ValueError` for `n_iter < 1`, with a test.
+- **For the Orchestrator's declaration, not a code change:** the thesis's VTLN gains at
+  GMM-64 are +1.35 / +2.91 (MFCC), +1.98 / +2.37 (PLP) and +2.85 / +4.02 (MFCC-TMP).
+  Our paired intervals have half-widths of about 2 to 3 points. Declare before the run
+  that an interval including 0 is a likely outcome and what will be written in that case.
+  The number of VTLN iterations used for `Tab:TIMITVTLNPerformance1` is not stated next
+  to the table; line 196 says 5 was used "empirically".
 
-## 3. Plan Q29, row-selection scope: **change requested**
+## 4. Plan Q34, smoke run and warp grid — **change requested** (one score-free check before scoring)
 
-Keep the manual `ROW_SELECTION_VERSION`, but add a guard so the loop cannot change
-unnoticed. `baa3bc3` shows the gap is real: the loop was edited and nothing forced a
-decision about the version.
+- **Per-warp cache design: agree.** About 300 s and 3 GB per kind and profile, 9 GB for
+  three, is acceptable and never re-read more than one warp at a time. Disk is a compute
+  cost for the Orchestrator's plan, not a design problem.
+- **Do not widen the grid.** The thesis fixes 13 values from 0.88 to 1.12 (lines 33, 93,
+  174). A wider grid would be a deviation, whatever the edge share.
+- **(a) the 0.88 edge, and the label direction.** These need one check before scoring:
+  - Our bank evaluates the triangles at `(2 − α)·f`, so peaks sit at `c / (2 − α)`:
+    *higher* bins for α > 1. That suits a *shorter* vocal tract.
+  - The thesis says male speakers have α > 1 (lines 43, 176) and that for *lower* α
+    "filters are stretched away" past Nyquist (`Unsupervised.tex` 552). Both mean peaks
+    move *down* for α > 1. As I recall, HTK's `WARPFREQ` scales centre frequencies by
+    1/α, which is that direction. The thesis formula `M_α(f)` (same file, 549) points
+    the other way, so the thesis is not consistent with itself.
+  - The slopes are the same set either way (1/0.88 … 1/1.12), so **the warped features
+    and every score are unchanged**; only the label is mirrored (α ↔ 2 − α). Under the
+    mirror, our 0.88 pile-up is the thesis's 1.12 end.
+  - TIMIT is about 70 % male. Whichever label is right, most utterances should sit on
+    the male side. Ours has 29 % below 1.00 and 50 % above, so the labels alone do not
+    settle whether α̂ follows the speaker.
+  - **Requested check (no retrieval score, minutes of compute):** estimate a median F0
+    per train utterance and report its rank correlation with α̂ from the smoke run, plus
+    the mean F0 of the 0.88 group. A clear negative or positive correlation fixes the
+    label direction and shows that α̂ tracks vocal-tract length. No correlation would
+    mean α̂ is fitting something else, and that would be a reason to stop before scoring.
+    Declare the check in the results doc before running it.
+- **(b) narrow low filters: not gating.** One to three bins per filter follows from 40
+  channels in 0–3400 Hz on a 512-point FFT. If the author's configuration is right, HTK
+  had the same geometry. Record it as a property of the profile.
+- **(c) the bump at α = 1.00: not gating.** It is expected in iteration 0, because
+  `λ_init` saw only unwarped features. The thesis's own figure shows α̂ still changing
+  over the first iterations.
+- **Filter area.** The area changes with α and no Jacobian term is applied, so c0
+  carries a small α-dependent offset. The thesis mentions no correction either, so this
+  is faithful; record it as an assumption. The mean curve in the request falls on both
+  sides of 1.02, so the offset is not what drives the choice.
+- **Report per iteration:** the histogram, the share at each edge, the share that
+  changed since the previous iteration, and both log-likelihoods.
 
-Concrete change, tests only, no fingerprint change and no cache rebuild:
+## 5. H3 band — reading **agree**; reference band is a **user decision**
 
-- `tests/data/test_feature_cache.py`: add a test that hashes the source of
-  `build_feature_cache` (`inspect.getsource`, CRLF turned into LF) and compares it with a
-  constant pinned next to `ROW_SELECTION_VERSION`.
-- The failure message says: "the row loop changed: bump `ROW_SELECTION_VERSION` if rows,
-  order, offsets or skips changed, then update the pinned digest".
+- **Reading:** sound. The doc already says the barely-excluding intervals should not be
+  read alone and that no band is chosen by score. Keep it.
+- **What the thesis text can and cannot tell the user, without using scores:**
+  - "0–4000 Hz" appears once, in `ExpSetup.tex` 191, in the same sentence as "26 subband
+    filters". The author has since said the HTK runs used 40 channels, so that sentence
+    does not describe the HTK configuration reliably. 26 filters and 4000 Hz are exactly
+    the MATLAB MFCC-TMP settings.
+  - `Unsupervised.tex` 113 gives no band at all.
+  - So the thesis text is weak evidence for 0–4000 Hz in the HTK runs, and the author's
+    statement is the only direct evidence for 0–3400 Hz. Neither is a config file.
+  - 3400 Hz is the usual `HIFREQ` in HTK configurations for 8 kHz telephone speech,
+    often with a non-zero `LOFREQ`. Whether the recalled 0–3400 Hz came from the TIMIT
+    config itself is an author question below.
+- **Consequence for a later table, stated as a hypothesis only.** The paired
+  4000 − 3400 Hz difference for MFCC at GMM-64 is +2.89 / +4.77. The thesis's
+  MFCC-TMP − MFCC gain at GMM-64 is +5.12 / +4.79. If the thesis's MFCC used 0–3400 Hz
+  and MFCC-TMP used 0–4000 Hz, part of that gain may be band and not the Teager energy.
+  This is not tested: the MFCC-TMP models are stale. After the retrain (Q6), report
+  MFCC-TMP − MFCC paired against **both** MFCC bands.
 
-Moving the loop into its own hashed module is cleaner but changes every fingerprint, so all
-caches and models would be rebuilt for no change in rows. If the Orchestrator wants it, fold
-it into the next change that invalidates the caches anyway.
+## 6. Stale models and the shared digest — **agree** (no change now)
 
-## 4. Plan Q30, front-end parity before VTLN: **change requested**, with one **user decision**
+- The shared digest erred on the safe side, and the cost is known: retrain MFCC-TMP
+  GMM-64 and GMM-128 on `timit_matlab`.
+- A per-kind digest would itself change every fingerprint. That would invalidate the 8
+  valid `htk_described` models and the 26 warp caches to save a few minutes later. Not
+  worth it now. If it is ever wanted, fold it into a change that already rebuilds
+  everything, with an explicit per-kind file map (the import closure will not separate
+  the kinds, because `extract.py` imports all three).
+- **Requested with the retrain:** the features are byte-identical, the data and seed are
+  unchanged, so the parameter hashes should repeat (`bebabe42…` at 64, `105fb5ff…` at
+  128). Record whether they do in `docs/gmm_notes.md`. If they repeat, the cycle 6
+  MFCC-TMP rows carry over without a new evaluation. If they do not, stop and report.
 
-A parity check is warranted before any VTLN number is scored. Stage 4 code can be built
-meanwhile; VTLN rows would inherit whatever profile is in place.
+## 7. Provenance code — **change requested**
 
-The reason is in the thesis, not in the scores. The chapter that reports the PLP and MFCC
-numbers says both were extracted with **HTK**, with 25 ms / 10 ms frames, **26 subband
-filters**, 13 coefficients plus delta and delta-delta (`Unsupervised.tex` line 113; also
-`ExpSetup.tex` lines 191, 194, 198). Our `timit_matlab` profile takes each feature from a
-different MATLAB script instead:
+- `eval/run_timit.py`, `ml/train.py`, `ml/vtln_train.py`: at process start record
+  `git rev-parse HEAD` and whether `git status --porcelain -- src pixi.toml pixi.lock`
+  is empty. Write `git_commit_start` and `git_dirty` into the summary and the model
+  JSON. At the end record `git_commit_end` as well; the docs quote the start value.
+- Refuse to start on a dirty tree under `src/` unless `--allow-dirty` is passed, and
+  record that flag. Put the helper in one small module and test it with a temporary
+  repository.
+- Under this rule the PLP GMM-128 re-run, made with uncommitted V1/V2 code in the tree,
+  would have needed `--allow-dirty`. That is the intended behaviour. The Reviewer's
+  argument that the result stands is sound.
+- **The plan commits during the smoke run.** They affected nothing. A rule that depends
+  on four sessions remembering it will be broken again, so I repeat the cycle 6
+  suggestion: run background chains from a `git worktree` at a fixed commit, with
+  absolute output paths. Then a commit on `main` cannot touch a run. Whether to adopt
+  that is the Orchestrator's choice.
 
-| Setting | Our MFCC | Our PLP | Thesis text |
-|---|---|---|---|
-| Tool | from `Fx_mfcc.m` | from `Fx_PLPCC_htk.m` defaults | HTK for both |
-| Filters | 26 | 21 | 26 for both |
-| Band | 0-4000 Hz | 0-8000 Hz | 0-4000 Hz stated for MFCC only |
-| Pre-emphasis | 0.97 | none | not stated |
-| LPC order | n/a | 8 | not stated |
-| Level handling | DC removed, peak-normalised | neither | not stated |
+## 8. Other issues — **change requested**
 
-So our two features differ in band, filter count, pre-emphasis and level handling at once,
-and PLP − MFCC on this setup does not test the thesis's PLP − MFCC. `Fx_PLPCC_htk.m` takes
-`nfilt` and `LP_order` as arguments; 21 and 8 are only its defaults, and no caller is in
-the repository.
+None of these changes a reported number.
 
-`docs/feature_parity.md` says the PLP filter count is "not stated". That is true of
-`ExpSetup.tex` only. Correct the PLP row and the "What the thesis says" table with
-`Unsupervised.tex` line 113.
+- **(a) VTLN model accepted by the plain evaluation. Fix before Stage 4 scoring.**
+  The smoke model JSON has `kind`, `profile`, `split_id` and the plain
+  `feature_fingerprint` (`ab3ef124…`), which are the four fields `check_model` compares.
+  - `ml/vtln_train.py`: add `"model_type": "vtln"` to the metadata.
+  - `eval/model_guard.py`: `check_model` takes the expected model type, default
+    `"plain"`, and rejects a mismatch. A missing field counts as `"plain"`, so existing
+    models still load.
+  - Test both directions.
+- **(b) `n_iter` name clash: agree, rename to `n_vtln_iter`.** It is more than a naming
+  point. `vtln_train.main` reads `info.get("n_iter", 10)` as the EM iteration count, so a
+  VTLN model passed as `--gmm` would run 1 EM iteration without a message. Also store
+  `n_em_iter`, `epsilon`, `var_floor_ratio` and `seed` in the VTLN JSON. With (a),
+  `vtln_train` should refuse a `--gmm` whose type is not plain.
+- **(c) `np.empty` in `ll_matrix_from_caches`: agree.** Use `np.full(..., np.nan)`, and
+  add a test where a key's HF split is absent from `paths[alpha]`; it must raise through
+  `estimate_warp_factors`.
+- **(d) α = 1.00 cache: agree, optional.** A test already shows that its fingerprint
+  equals the plain one. Reusing the plain file saves 1 build in 13 and about 0.2 GB.
+- **(e) Rounded interval bounds: agree.** In `docs/results_timit_q20_features.md` (and
+  whatever writes those rows), print a bound with two decimals when it rounds to ±0.0,
+  and take "excludes 0" from the unrounded value. The row in question is MFCC GMM-64,
+  instance p@N, "+0.0 to +5.9".
+- **(f) `estimate_test_warps` memory: acceptable.** 1344 documents come to roughly 0.2 GB
+  at 64 components and 0.4 GB at 128 in float64. Stream only if Q-84 or a larger corpus
+  needs it.
+- **(g) Histogram total.** `warp_histogram` matches floats exactly. That works today
+  because every α comes from the same tuple. Add an assertion that the counts sum to the
+  number of utterances.
+- **(h) Tie-break.** "Closest to 1.0, then the smaller warp" is our choice; the thesis
+  says nothing. List it with the other assumptions in the results doc.
+- **(i) Stale reproduce block.** `docs/results_timit_q20_features.md` ends with
+  commands for `plp_timit_matlab_gmm64.npz`, a model the guard now rejects. Add the
+  `htk_described` commands and say that the `timit_matlab` ones need a retrain.
+- **PEP 8, security, limits:** nothing found in what I read. `peak_memory_mb` divides
+  `ru_maxrss` by 1024, which is right on Linux and wrong on macOS; harmless here.
 
-**Smallest check** (GMM-64 only, split v2, same scorer; declared before running, both
-results reported, primary rows unchanged):
+---
 
-1. MFCC with `normalize_peak=False`, everything else as now.
-2. PLP with `normalize_peak=True`, everything else as now.
+## User decision (loop pauses)
 
-This isolates level handling, the one difference that the thesis cannot settle. A gain
-change moves only the static c0 (a constant per utterance, in MFCC exactly and in PLP
-through the LPC gain), so the two runs answer the Reviewer's Q5 as well.
+1. **Reference band for MFCC and PLP: 0–3400 Hz or 0–4000 Hz.** Evidence apart from
+   scores is in Q5. Whichever is chosen, both stay reported. A change to 0–4000 Hz makes
+   `htk_described_4k` the Stage 4 profile, with 26 new warp caches per feature.
+2. **Author facts about the HTK configuration** (any that can be recalled or found):
+   - was `USEPOWER = T` set, for PLP in particular;
+   - was `LOFREQ` 0, and did 3400 Hz come from the TIMIT config or from a telephone-band
+     one;
+   - were the warped MFCC and PLP features made with HTK's `WARPFREQ`, and with which
+     `WARPLCUTOFF` and `WARPUCUTOFF`;
+   - is α > 1 the male (longer vocal tract) side in the thesis's figures.
+3. **Author facts about the VTLN procedure:**
+   - did each VTLN iteration train the GMM from a new LBG start, or continue EM from
+     the previous model;
+   - how many VTLN iterations were used for `Tab:TIMITVTLNPerformance1`.
 
-**User decision.** Two things here are not the Orchestrator's to settle:
-
-- **Data access:** the HTK configuration used for the thesis (target kind, `NUMCHANS`,
-  band, sample rate, `LPCORDER`, c0 or energy) is not in the thesis sources or in either
-  repository. Only the author can say whether it still exists. Without it, an "HTK-like"
-  PLP profile (26 filters, pre-emphasis, order 12) would rest on HTK defaults recalled from
-  memory.
-- **Compute cost and scope:** the smallest check is 2 feature caches and 2 GMM-64 runs. An
-  HTK-described profile for both features would be 4 more models and would replace the
-  MATLAB-derived profile as the comparison reference.
-
-## 5. PLP level dependence: **agree** (run it as part of Q4)
-
-A named, untuned ablation is a diagnostic, not tuning, under these conditions: it is
-declared with its setting before it runs; it is run in both directions (Q4 items 1 and 2);
-every result is reported; and the primary rows stay on the declared profile whatever the
-outcome. "c0 dropped" is not needed as a separate run, because level reaches the features
-through c0 alone.
-
-On the sources:
-
-- `Fx_PLPCC_htk.m` does not normalise: it only scales by 32768 (line 69). No script in
-  `research_myMATLAB_codes` calls it, so whether the experiment code normalised first is
-  **unknown**.
-- The thesis does not mention waveform normalisation for any feature.
-- The thesis labels PLP as `PLP_D_A_0` in its phoneme-recognition tables (for example
-  `Unsupervised.tex` line 610). That is an HTK target kind with c0 and no energy term. It is
-  a hint that the thesis PLP also carried the raw level, not proof for the QbE-STD runs.
-
-## 6. MFCC above the thesis: **unknown**
-
-No listed cause can be confirmed from what is in the repository. My ranking:
-
-1. **Front end (most likely).** The thesis MFCC came from HTK; ours follows a MATLAB script
-   with peak normalisation. The pattern across features fits one explanation, as a
-   hypothesis only: the two peak-normalised features sit at or above the thesis (MFCC +5.1
-   p@N, MFCC-TMP −0.9 against a thesis MFCC-TMP that also came from the peak-normalising
-   MATLAB script), and the one feature without it sits below (PLP −2.3). If that holds, part
-   of the thesis's +5 for MFCC-TMP over MFCC could be a level-handling difference between
-   two tools. Q4 item 1 tests this directly and needs no speaker IDs.
-2. **Speaker overlap.** Plausible, since the GMM has seen other utterances of the test
-   speakers. Not checkable without speaker IDs.
-3. **Split draw.** Unmeasured (Q2). The keyword-cluster interval is not the right yardstick
-   for a gap to the thesis, because the thesis used the same 20 keywords.
-4. **16 kHz with a 4 kHz band, c0 and 39 dimensions, aggregation.** The band and the 39
-   dimensions match the thesis text. The sample rate and the c0-or-energy choice are part
-   of the HTK question in Q4. Both averages are already shown.
-
-## 7. Wording: **change requested**
-
-The verdict labels follow the C6 rule. Four corrections in
-`docs/results_timit_q20_features.md`:
-
-- **Do not add "PLP is near its thesis value" as written.** It holds at GMM-64 only
-  (−2.28 p@N, −4.03 MAP). At GMM-128 PLP is −5.39 / −7.92 below the thesis, while MFCC is
-  +6.13 / +6.62 above. Add the per-feature gaps to the thesis at both sizes as a small
-  descriptive table instead, with no cause attached.
-- **Source of the thesis values.** The doc says they are the `Tab:ExpResultTIMIT` rows.
-  That table has no MFCC-TMP row. MFCC-TMP 40.03 / 41.50 comes from
-  `Tab:TIMITVTLNPerformance1` (`Representation.tex` line 270). Name both tables.
-- **Say what the feature comparison compares.** Add one sentence under "Feature minus MFCC":
-  PLP and MFCC differ here in band, filter count, pre-emphasis and level handling (Q4), so
-  "against the thesis's direction" describes this profile, not PLP as such.
-- **Many intervals.** The paired tables hold 28 unadjusted 95 % intervals. Say so, and note
-  that the single marginal one (MFCC-TMP − MFCC, keyword p@N, −2.8 to −0.1) should not be
-  read on its own.
-
-Minor: the thesis values are printed as 35.5, 41.5 and 37.3; write 35.50, 41.50 and 37.30.
-
-## 8. Other issues: **change requested**
-
-None of these affects a reported number.
-
-- **Import-closure helper** (`tests/data/test_feature_cache.py`): the relative-import
-  resolution is correct for `from .x import y`, `from . import x` and two-dot imports. The
-  fixture covers one-dot forms only. Add a case with `from ..audio import newhelper`. The
-  helper still misses `from qbestd import features` followed by attribute access, and
-  names re-exported through an `__init__.py`; both `__init__.py` files are docstrings
-  today, so nothing is missed now. Add both limits to the docstring.
-- **Finder with two partners** (`text_variants.find_variant_candidates`): deterministic.
-  Each pair is judged on its own and the result is `sorted(set(...))`, so a group with two
-  partners yields two candidates in a fixed order. No test pins it. Add one in
-  `tests/data/test_text_variants.py` (a 4-row group with a 1-row and a 2-row partner), and
-  put a three-variant unit into `test_v2_manifest_is_identical_under_shuffled_rows_and_links`.
-- **`_merge_units` runs for v1 too** (`text_split.py`): with `links=()` it still raises
-  for any group of more than 7 rows. That is a new failure mode of the v1 rule, harmless on
-  TIMIT (the largest group has 7 rows) and undocumented. Either skip the cap when there are
-  no links or say so in the docstring.
-- **`gmm_notes.md`:** add the PLP variances at the floor (4 of 2496, 7 of 4992), as the
-  MFCC section does.
-- **Provenance of runs:** the feature fingerprint pins features and rows, not the GMM or
-  evaluation code. `4e95d7e..5145ced` changed only docs, `requirements.md`,
-  `feature_cache.py` and its tests, so the cycle 6 numbers stand. For later cycles, do not
-  commit to the working tree while a background chain is running, or run the chain from a
-  fixed commit in a separate worktree.
-- **MFCC-TMP cache build** computes the Teager energies twice (once for the features, once
-  for the floor count). Correct, only slower; no change needed.
-- **PEP 8 and security:** nothing found. No sentence text, credentials or derived data are
-  committed.
-
-## User decision (the loop pauses here)
-
-From Q4:
-
-1. Does the HTK configuration used for the thesis MFCC and PLP still exist, or can the
-   author state the target kind, filter count, band, sample rate and LPC order?
-2. Approve the two-run level-handling check (2 caches, 2 GMM-64 models), yes or no.
-3. Should an HTK-described profile replace `timit_matlab` as the comparison reference for
-   MFCC and PLP? This is larger: 4 more models, and every later table changes reference.
+Items 2 and 3 can be answered "not known"; the code changes above do not wait for them.
+Stage 4 scoring should wait for item 1, for Q8 (a) and (b), and for the F0 check in Q4.
