@@ -443,6 +443,32 @@ commit in a separate worktree (`git worktree add ../qbestd_run <hash>`). Every
   reference. **Do not tune** anything towards §3.
 - **Commit:** `exec: evaluate htk described profile on split v2`
 
+### H3: Band comparison, 0–3400 vs 0–4000 Hz (user request, 2026-11-16)
+The user asked to run both bands and compare them. The author's HTK configuration says
+0–3400 Hz, and the thesis text says 0–4000 Hz for MFCC.
+- **Declare first:** before any H3 run, add a "Band comparison" section to
+  `docs/feature_parity.md`. Commit it as `exec: declare band comparison`. It states:
+  - the profile;
+  - the 8 runs;
+  - that `htk_described` (0–3400) stays the reference unless the user decides otherwise
+    after seeing the results.
+- **Profile:** `htk_described_4k` in `profiles.py` is identical to `htk_described`
+  except for `high_hz = 4000` for both MFCC and PLP. Tests:
+  - the top edge is 4000 Hz;
+  - every other field equals `htk_described`;
+  - `mfcc_tmp` raises.
+
+  Commit: `exec: add htk described 4k band profile`.
+- **Run:** MFCC and PLP, GMM-64 and GMM-128, on split v2: 4 caches, 4 models and 4 evals.
+  Do not commit while the runs are going.
+- **Report** in `docs/results_timit_q20_features.md`, section "Band comparison":
+  - both bands side by side, with intervals and the gaps to the thesis;
+  - paired 4k − 3400 per feature and size, on the same queries;
+  - the same wording rule as C6.
+
+  Do not pick a band by its score. The reference changes only if the user decides it.
+  Commit: `exec: compare 3400 and 4000 hz bands`.
+
 ### V1–V3: Stage 4 GMM-VTLN code (no VTLN scoring this cycle)
 Thesis: `Representation.tex` lines 100–138 and Algorithm `pseudocode_vtlnwarping`
 (lines 140–171). Use **`k < N_iter`** (erratum §5). The warps are 13 values,
@@ -495,8 +521,8 @@ than **one** warp's features for a whole split in memory at once.
   its runtime and peak memory, not a score.
 
 **Cycle 7 definition of done:**
-- F1–F5, L1, H1, H2 and V1–V3 are on `main` in that order, with L1's declaration before
-  L1's runs.
+- F1–F5, L1, H1, H2, H3 and V1–V3 are on `main` in that order. L1's and H3's
+  declarations come before their runs.
 - `pixi run test` is green in the core env. Every module is under 400 lines, no line is
   over 79 characters, and every new function has tests. No derived data is committed.
 - No commit was made while a background run was going.
@@ -506,8 +532,8 @@ than **one** warp's features for a whole split in memory at once.
 - 31: What does the level check show? Does it explain MFCC above the thesis and PLP below
   it, and should level handling change for MFCC-TMP?
 - 32: Are the recalled HTK defaults in `htk_described` right, especially MFCC log
-  magnitude vs log power, the DCT normalisation and the PLP mel filterbank? Should MFCC use
-  the author's 0–3400 Hz band or the thesis text's 0–4000 Hz?
+  magnitude vs log power, the DCT normalisation and the PLP mel filterbank? What does H3
+  show for 0–3400 vs 0–4000 Hz? The choice of reference band stays with the user.
 - 33: Stage 4: fresh LBG + EM per VTLN iteration, or warm start from λ_init? Should query
   clips get their own α̂ or inherit the train utterance's α̂ from the last iteration?
 - 34: Is the per-warp cache design (13 files per split and kind, streamed) acceptable for
