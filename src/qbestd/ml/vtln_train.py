@@ -44,6 +44,7 @@ from qbestd.ml.gmm import (
     train_gmm_detailed,
 )
 from qbestd.ml.posteriorgram import gaussian_posteriorgram
+from qbestd.provenance import finish_run, start_run
 from qbestd.ml.vtln import (
     WARP_FACTORS,
     changed_share,
@@ -234,6 +235,8 @@ def parse_args(argv=None):
     parser.add_argument("--features-dir", type=Path,
                         default=Path("outputs/features"))
     parser.add_argument("--out", type=Path, default=Path("outputs/models"))
+    parser.add_argument("--allow-dirty", action="store_true",
+                        help="run on uncommitted changes (recorded)")
     return parser.parse_args(argv)
 
 
@@ -262,6 +265,7 @@ def vtln_metadata(kind, profile, split_id, n_vtln_iter, plain, info):
 
 def main(argv=None):
     args = parse_args(argv)
+    provenance = start_run(args.allow_dirty)
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
     started = time.time()
@@ -289,6 +293,7 @@ def main(argv=None):
                         trace_dir=args.out / f"{name}_trace")
     metadata = vtln_metadata(args.kind, args.profile, selection.split_id,
                              args.n_iter, plain, info)
+    metadata.update(finish_run(provenance))
     metadata["runtime_s"] = round(time.time() - started, 1)
     metadata["peak_memory_mb"] = peak_memory_mb()
     out = args.out / f"{name}.npz"

@@ -35,6 +35,7 @@ from qbestd.data.feature_cache import (
 )
 from qbestd.data.split_selection import gather_utterances, manifest_selection
 from qbestd.data.text_split import read_split_manifest
+from qbestd.provenance import finish_run, start_run
 from qbestd.ml.gmm import (
     count_floored,
     gmm_content_sha256,
@@ -66,6 +67,8 @@ def parse_args(argv=None):
     parser.add_argument("--out", type=Path, default=DEFAULT_MODELS_DIR)
     parser.add_argument("--features-dir", type=Path,
                         default=DEFAULT_FEATURES_DIR)
+    parser.add_argument("--allow-dirty", action="store_true",
+                        help="train on uncommitted changes (recorded)")
     parser.add_argument("--rebuild-cache", action="store_true",
                         help="ignore an existing feature cache")
     return parser.parse_args(argv)
@@ -158,7 +161,8 @@ def train_from_features(features, meta, args):
            "wall_time_s": round(seconds, 1),
            "file_sha256": file_sha256(npz_path),
            "content_sha256": gmm_content_sha256(result.gmm),
-           "excluded_sa_rows": meta["excluded_sa_rows"]}
+           "excluded_sa_rows": meta["excluded_sa_rows"],
+           **finish_run(getattr(args, "provenance", None) or {})}
     (Path(args.out) / f"{name}.json").write_text(
         json.dumps(log, indent=2), encoding="utf-8")
     return log
@@ -166,6 +170,7 @@ def train_from_features(features, meta, args):
 
 def main(argv=None):
     args = parse_args(argv)
+    args.provenance = start_run(args.allow_dirty)
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
     if args.split_manifest:

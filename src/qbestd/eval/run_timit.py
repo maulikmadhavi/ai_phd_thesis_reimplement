@@ -29,7 +29,6 @@ Writes ``per_query.tsv`` and ``summary.json`` under ``--out`` (git-ignored).
 
 import argparse
 import json
-import subprocess
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -57,6 +56,7 @@ from qbestd.data.timit_hf import (
 from qbestd.eval.bootstrap import cluster_bootstrap
 from qbestd.eval.metrics import average_precision, precision_at_n, summarise
 from qbestd.eval.model_guard import check_model
+from qbestd.provenance import finish_run, start_run
 from qbestd.eval.selection_data import (
     selection_examples,
     selection_relevance,
@@ -99,6 +99,8 @@ def parse_args(argv=None):
                         help="text-disjoint manifest (default: HF split)")
     parser.add_argument("--limit-queries", type=int, default=None,
                         help="use only the first N queries (smoke tests)")
+    parser.add_argument("--allow-dirty", action="store_true",
+                        help="run on uncommitted changes (recorded)")
     return parser.parse_args(argv)
 
 
@@ -165,14 +167,6 @@ def write_per_query(path, per_query):
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def git_commit():
-    try:
-        return subprocess.run(["git", "rev-parse", "HEAD"], text=True,
-                              capture_output=True, check=True).stdout.strip()
-    except (OSError, subprocess.CalledProcessError):
-        return None
-
-
 def load_split_cache(args, hf_split):
     """Feature cache of one HF split, built on demand, fingerprint checked."""
     path = cache_path(args.features_dir, hf_split, args.kind, args.profile)
@@ -217,6 +211,7 @@ def load_inputs(args, selection):
 
 def main(argv=None):
     args = parse_args(argv)
+    provenance = start_run(args.allow_dirty)
     started = time.time()
     gmm, info = load_gmm(args.gmm)
     selection = (manifest_selection(args.split_manifest)
@@ -267,7 +262,8 @@ def main(argv=None):
         "queries_without_frames": skipped_short,
         "total_nonmatches": int(sum(q["nonmatches"] for q in per_query)),
         "runtime_s": round(time.time() - started, 1),
-        "git_commit": git_commit(),
+        "git_commit": provenance["git_commit_start"],
+        **finish_run(provenance),
         "label": ("closer to the thesis on sentence context; not an "
                   "official TIMIT reconstruction; speaker overlap present"
                   if args.split_manifest else
