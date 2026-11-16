@@ -18,6 +18,7 @@ PYTHONPATH = "src"
 [tasks]
 test = "pytest -q"
 train-gmm = "python -m qbestd.ml.train"
+train-vtln = "python -m qbestd.ml.vtln_train"
 eval-timit = "python -m qbestd.eval.run_timit"
 
 [feature.demo.dependencies]
