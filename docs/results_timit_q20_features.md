@@ -191,6 +191,98 @@ Provenance:
 The primary models are `docs/gmm_notes.md`; the EM curves of these two models
 are in `outputs/models/textdisjoint_q20_v2/` (git-ignored).
 
+## HTK-described profile (reference from cycle 7)
+
+**Profile `htk_described`** (user decision D2): 16 kHz, **0-3400 Hz band**,
+`NUMCHANS = 40` for MFCC and PLP (author statement, 2026-11-16); 25 ms / 10
+ms, 13 coefficients plus delta and delta-delta (thesis); pre-emphasis 0.97,
+lifter 22, PLP LPC order 12, no DC removal and no peak normalisation (HTK
+defaults, **recalled and unverified**). Every value and its source is in the
+docstring of `qbestd.features.profiles._htk_described`. **Open user item:**
+whether MFCC should use the author's 0-3400 Hz band or the thesis text's
+0-4000 Hz is not confirmed; 0-3400 Hz is kept and flagged. From here on
+`htk_described` is the comparison reference for MFCC and PLP; **MFCC-TMP stays
+`timit_matlab`** (it came from the MATLAB script with 26 filters). The
+`timit_matlab` rows stay as a labelled earlier reference. Same split v2, 145
+queries, 1344 documents, LC2, clip query features, A1 scorer and bootstrap
+(10000 resamples, seed 0) as above. **Nothing was tuned** towards the thesis
+values, and no setting was changed after seeing a score.
+
+| Row | p@N, instance avg (95% CI) | MAP, instance avg (95% CI) | p@N, keyword avg (95% CI) | MAP, keyword avg (95% CI) | Queries | Non-matches |
+|---|---|---|---|---|---|---|
+| MFCC, GMM-64, thesis | 34.91 | 36.71 | not stated | not stated | 145 | n/a |
+| MFCC, GMM-64, `htk_described` | 34.58 (25.6-44.1) | 35.73 (26.4-45.8) | 32.51 (24.8-40.7) | 33.50 (25.0-42.3) | 145 | 1 |
+| MFCC, GMM-64, `timit_matlab` (earlier reference) | 40.02 (30.8-49.7) | 42.23 (31.5-53.6) | 36.92 (28.1-45.9) | 39.09 (29.3-49.2) | 145 | 0 |
+| PLP, GMM-64, thesis | 35.50 | 37.58 | not stated | not stated | 145 | n/a |
+| PLP, GMM-64, `htk_described` | 34.34 (26.1-42.6) | 35.88 (26.5-45.8) | 31.83 (24.3-39.6) | 33.37 (25.2-42.0) | 145 | 0 |
+| PLP, GMM-64, `timit_matlab` (earlier reference) | 33.22 (22.8-45.0) | 33.55 (22.6-46.1) | 29.41 (21.2-38.5) | 30.03 (21.4-39.7) | 145 | 0 |
+| MFCC, GMM-128, thesis | 36.81 | 38.34 | not stated | not stated | 145 | n/a |
+| MFCC, GMM-128, `htk_described` | 38.04 (29.7-47.0) | 39.87 (30.7-50.0) | 36.20 (28.2-44.3) | 37.53 (29.1-46.3) | 145 | 1 |
+| MFCC, GMM-128, `timit_matlab` (earlier reference) | 42.94 (32.8-54.1) | 44.96 (34.2-56.7) | 40.19 (31.3-49.5) | 42.38 (32.9-52.3) | 145 | 1 |
+| PLP, GMM-128, thesis | 37.30 | 40.18 | not stated | not stated | 145 | n/a |
+| PLP, GMM-128, `htk_described` | 38.33 (29.8-47.0) | 39.73 (30.2-49.9) | 35.96 (28.6-43.6) | 37.11 (29.2-45.5) | 145 | 0 |
+| PLP, GMM-128, `timit_matlab` (earlier reference) | 31.91 (23.6-41.0) | 32.26 (21.9-43.9) | 30.11 (22.9-37.9) | 30.46 (21.7-40.0) | 145 | 0 |
+
+### Gap to the thesis (descriptive, no cause attached)
+
+`htk_described`, instance average, ours minus thesis, p@N / MAP:
+
+| Feature | GMM-64 | GMM-128 |
+|---|---|---|
+| MFCC | -0.33 / -0.98 | +1.23 / +1.53 |
+| PLP | -1.16 / -1.70 | +1.03 / -0.45 |
+
+Thesis values are `Tab:ExpResultTIMIT` (`Unsupervised.tex`).
+
+Paired differences use the same queries (second minus first, 95 %
+keyword-cluster bootstrap); the thesis-direction wording rule is as above.
+There are 32 unadjusted intervals in these three tables.
+
+### PLP minus MFCC, `htk_described`
+
+| Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Thesis diff p@N / MAP | p@N verdict | MAP verdict |
+|---|---|---|---|---|---|---|
+| PLP - MFCC, GMM-64 | instance | -0.24 (-3.5 to +3.4) | +0.14 (-2.4 to +3.0) | +0.59 / +0.87 | interval includes 0: no direction claimed | interval includes 0: no direction claimed |
+| PLP - MFCC, GMM-64 | keyword | -0.68 (-4.2 to +3.0) | -0.13 (-2.8 to +2.8) | +0.59 / +0.87 | interval includes 0: no direction claimed | interval includes 0: no direction claimed |
+| PLP - MFCC, GMM-128 | instance | +0.28 (-1.9 to +2.3) | -0.15 (-2.5 to +2.1) | +0.49 / +1.84 | interval includes 0: no direction claimed | interval includes 0: no direction claimed |
+| PLP - MFCC, GMM-128 | keyword | -0.25 (-2.8 to +2.2) | -0.42 (-2.7 to +2.0) | +0.49 / +1.84 | interval includes 0: no direction claimed | interval includes 0: no direction claimed |
+
+### GMM-128 minus GMM-64, `htk_described`
+
+| Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Thesis diff p@N / MAP | p@N verdict | MAP verdict |
+|---|---|---|---|---|---|---|
+| MFCC: GMM-128 - GMM-64 | instance | +3.46 (+0.6 to +7.6) | +4.14 (+1.8 to +7.3) | +1.90 / +1.63 | in the thesis's direction (interval excludes 0) | in the thesis's direction (interval excludes 0) |
+| MFCC: GMM-128 - GMM-64 | keyword | +3.69 (+0.2 to +7.9) | +4.03 (+1.8 to +6.9) | +1.90 / +1.63 | in the thesis's direction (interval excludes 0) | in the thesis's direction (interval excludes 0) |
+| PLP: GMM-128 - GMM-64 | instance | +3.98 (+1.6 to +6.5) | +3.85 (+1.6 to +6.3) | +1.80 / +2.60 | in the thesis's direction (interval excludes 0) | in the thesis's direction (interval excludes 0) |
+| PLP: GMM-128 - GMM-64 | keyword | +4.12 (+1.9 to +6.5) | +3.75 (+1.6 to +5.9) | +1.80 / +2.60 | in the thesis's direction (interval excludes 0) | in the thesis's direction (interval excludes 0) |
+
+### `htk_described` minus `timit_matlab`
+
+| Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Thesis diff p@N / MAP | p@N verdict | MAP verdict |
+|---|---|---|---|---|---|---|
+| MFCC GMM-64: `htk_described` - `timit_matlab` | instance | -5.44 (-8.6 to -1.9) | -6.50 (-10.1 to -2.6) | not stated | no thesis value: descriptive only | no thesis value: descriptive only |
+| MFCC GMM-64: `htk_described` - `timit_matlab` | keyword | -4.41 (-8.0 to -0.7) | -5.59 (-9.3 to -1.8) | not stated | no thesis value: descriptive only | no thesis value: descriptive only |
+| MFCC GMM-128: `htk_described` - `timit_matlab` | instance | -4.90 (-8.4 to -1.0) | -5.09 (-8.7 to -1.2) | not stated | no thesis value: descriptive only | no thesis value: descriptive only |
+| MFCC GMM-128: `htk_described` - `timit_matlab` | keyword | -3.99 (-7.2 to -0.8) | -4.86 (-8.0 to -1.5) | not stated | no thesis value: descriptive only | no thesis value: descriptive only |
+| PLP GMM-64: `htk_described` - `timit_matlab` | instance | +1.12 (-4.6 to +6.8) | +2.32 (-2.7 to +7.5) | not stated | no thesis value: descriptive only | no thesis value: descriptive only |
+| PLP GMM-64: `htk_described` - `timit_matlab` | keyword | +2.42 (-3.1 to +8.3) | +3.33 (-1.6 to +8.9) | not stated | no thesis value: descriptive only | no thesis value: descriptive only |
+| PLP GMM-128: `htk_described` - `timit_matlab` | instance | +6.42 (+3.2 to +10.0) | +7.47 (+4.0 to +11.4) | not stated | no thesis value: descriptive only | no thesis value: descriptive only |
+| PLP GMM-128: `htk_described` - `timit_matlab` | keyword | +5.84 (+1.7 to +10.4) | +6.65 (+2.1 to +11.4) | not stated | no thesis value: descriptive only | no thesis value: descriptive only |
+
+### Provenance
+
+| Model | Parameter SHA-256 | Feature fingerprint | Non-matches | Commit the eval started from |
+|---|---|---|---|---|
+| MFCC GMM-64 | `0faff5b8234e81bb...` | `ab3ef12487f2...` | 1 | `cb24a64` |
+| MFCC GMM-128 | `36693f287491491f...` | `ab3ef12487f2...` | 1 | `cb24a64` |
+| PLP GMM-64 | `fa99eafd6a2aa01b...` | `dc733b030de8...` | 0 | `cb24a64` |
+| PLP GMM-128 | `e2bcd79b2ba0bc1b...` | `dc733b030de8...` | 0 | `cb24a64` |
+
+EM curves, floor counts and hashes: `docs/gmm_notes.md`. The PLP GMM-128
+evaluation was interrupted once (the session restarted at query 120 of 145)
+and re-run from the same, unchanged model file (hash checked against the
+training log); its summary records the commit of the re-run.
+
 ## MFCC-TMP: TEO floor hits
 
 Subband Teager sums at or below the log floor (1e-10) are floored before the

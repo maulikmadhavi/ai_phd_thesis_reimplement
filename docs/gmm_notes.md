@@ -188,6 +188,24 @@ counted during the cache build; every cached feature was finite):
 No Teager sum reached the floor in either cache, so the floor did not alter a
 feature. Retrieval numbers: `docs/results_timit_q20_features.md`.
 
+## `htk_described` MFCC and PLP on `textdisjoint_q20_v2` (cycle 7, H2)
+
+Same recipe as the other models (LBG, 10 EM iterations, seed 0, variance floor 0.01 times the global variance), trained on the train side of `textdisjoint_q20_v2` (`split_id` `textdisjoint_q20_v2-0e913c50aae7`).
+
+| Model | Parameter SHA-256 | Feature fingerprint | Training frames | Mean LL per frame, start -> end | Variances at the floor | Monotonic |
+|---|---|---|---|---|---|---|
+| MFCC GMM-64 | `0faff5b8234e81bb...` | `ab3ef12487f2...` | 1119053 | -118.398 -> -116.766 | 1 of 2496 | yes |
+| MFCC GMM-128 | `36693f287491491f...` | `ab3ef12487f2...` | 1119053 | -117.829 -> -115.964 | 3 of 4992 | yes |
+| PLP GMM-64 | `fa99eafd6a2aa01b...` | `dc733b030de8...` | 1119053 | 11.887 -> 13.288 | 3 of 2496 | yes |
+| PLP GMM-128 | `e2bcd79b2ba0bc1b...` | `dc733b030de8...` | 1119053 | 12.538 -> 14.148 | 4 of 4992 | yes |
+
+- MFCC GMM-64: -118.398, -117.719, -117.306, -117.093, -116.984, -116.918, -116.872, -116.837, -116.809, -116.786, -116.766
+- MFCC GMM-128: -117.829, -117.070, -116.624, -116.407, -116.288, -116.206, -116.140, -116.083, -116.037, -115.998, -115.964
+- PLP GMM-64: 11.887, 12.428, 12.745, 12.952, 13.089, 13.170, 13.215, 13.242, 13.261, 13.276, 13.288
+- PLP GMM-128: 12.538, 13.164, 13.542, 13.763, 13.886, 13.959, 14.012, 14.057, 14.094, 14.123, 14.148
+
+The MFCC log-likelihoods are far lower than the `timit_matlab` models because the waveform is not peak-normalised (c0 follows the signal level); the numbers are not comparable across profiles. The PLP and MFCC profiles use no TEO, so there are no TEO floor counts. Retrieval numbers are in `docs/results_timit_q20_features.md`.
+
 ## What this does not show
 
 - No comparison with the thesis figure and no held-out likelihood.
