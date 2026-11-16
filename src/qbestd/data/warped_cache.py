@@ -68,7 +68,7 @@ def ll_matrix_from_caches(paths, gmm, keys, kind, profile,
         ValueError: if a key is missing from its cache or a fingerprint
             differs.
     """
-    matrix = np.empty((len(keys), len(warps)))
+    matrix = np.full((len(keys), len(warps)), np.nan)
     features = None
     for column, alpha in enumerate(warps):
         for hf_split, path in paths[float(alpha)].items():

@@ -150,3 +150,13 @@ def test_skip_existing_keeps_a_matching_file_and_rebuilds_a_stale_one(
     build_warped_caches("train", KIND, PROFILE, out, WARPS,
                         parquet_paths=[parquet], skip_existing=True)
     assert load_feature_cache(target)[3]["warp_factor"] == 0.9
+
+
+def test_a_missing_hf_split_leaves_nan_and_the_estimate_refuses_it(caches):
+    from qbestd.ml.vtln import estimate_warp_factors
+    _, paths = caches
+    matrix = ll_matrix_from_caches(paths, tiny_gmm(),
+                                   KEYS + [("test", 0)], KIND, PROFILE, WARPS)
+    assert np.all(np.isnan(matrix[-1])) and np.all(np.isfinite(matrix[:-1]))
+    with pytest.raises(ValueError, match="finite"):
+        estimate_warp_factors(matrix, WARPS)
