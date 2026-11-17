@@ -138,6 +138,7 @@ comparable, until the split matches (§8 C5, split v2).
 | 25 | Next suspect for the gap? | **None identified** (Codex Q2): fix v2, then PLP / MFCC-TMP / VTLN on v2. Revisit a front-end or aggregation hypothesis only with a parity test or new provenance. |
 | D2 | **User decision:** the HTK settings for the thesis MFCC/PLP | **Resolved 2026-11-16 (author):** `NUMCHANS = 40` for both, 16 kHz, band 0–3400 Hz; 25/10 ms and 13 + Δ/ΔΔ as in the thesis. The level check is approved; `htk_described` becomes the MFCC/PLP reference (§9). |
 | D3 | **User decision:** reference band, HTK facts and VTLN facts | **Resolved 2026-11-16 (author):** run Stage 4 on both bands (0–3400 and 0–4000 Hz). α > 1 is the male side and the warped features came from HTK `WARPFREQ`, so our label is mirrored (α_thesis = 2 − α_ours). `USEPOWER`, `LOFREQ`, the warp cutoffs, fresh vs warm start and the iteration count are not known; the defaults are kept (§7, §9). |
+| D5 | **User decision:** which band carries forward? | **Resolved 2026-11-17 (author):** 0–4000 Hz only. `htk_described_4k` is the MFCC/PLP reference, and the 0–3400 Hz rows are an earlier reference (§9 W3). |
 | 26 | Carry the HF baseline forward? | **No** (Codex Q3): v2 is the primary Q-20 comparison; HF v2 and text-disjoint v1 are one-off references. |
 
 Codex decisions adopted:
@@ -520,6 +521,14 @@ out to need such an edit, STOP and report: it would invalidate every model.
   - For runs 2–5, `ll_decreased` is recorded and reported per iteration but no longer
     stops the chain. The fresh-LBG LL drops are reported as a property of the declared
     procedure.
+- **User decision D5 (2026-11-17): keep the 0–4000 Hz band only.**
+  - `htk_described_4k` becomes the reference for MFCC and PLP, replacing D2's
+    `htk_described`. PLP `htk_described` VTLN is dropped.
+  - The remaining runs are MFCC 4k (done), PLP 4k (done) and MFCC-TMP.
+  - The 0–3400 Hz rows (H2 and VTLN run 1) stay as a labelled earlier reference.
+  - MFCC-TMP − MFCC under VTLN is reported against MFCC 4k, and also against MFCC 3400.
+  - The MFCC-TMP run was killed by the 08:00 shutdown and is re-run from a clean tree.
+    Warp caches are reused only if their fingerprints check out.
 - **Report**, in `docs/results_timit_q20_features.md`, section "Stage 4: GMM-VTLN":
   - the VTLN row next to the no-VTLN row for each of the 5 runs, with intervals and
     thesis gaps;
