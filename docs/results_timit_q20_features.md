@@ -1043,3 +1043,38 @@ points of the VTLN row (MFCC +0.49 / +0.77 above it, PLP +1.98 / +1.87),
 with overlapping intervals. Mean entropy of the documents is lower under
 VTLN (0.4235 against 0.4402 for MFCC, 0.4160 against 0.4361 for PLP). No
 mechanism is claimed.
+
+### Normalised reference runs (declared)
+
+**Declared before any S3 number** (cycle 9, S3; user decision D6, 2026-11-18).
+The author stated that the thesis's HTK pipeline subtracted the mean and then
+scaled the waveform to +-1. `htk_described_4k_pn` is `htk_described_4k` with
+`remove_dc=True` and `normalize_peak=True` (known approximation: our code
+peak-normalises first and removes the mean afterwards; S1 (c) measured the
+gap as negligible, a 99th-percentile c0 offset of 0.003). **It is the
+reference for MFCC and PLP whatever it scores.** The `htk_described_4k`
+rows are the un-normalised earlier reference.
+
+- **Runs:** MFCC first, then PLP, one at a time, clean tree, no commit while
+  a run goes. Each: (1) feature caches; (2) plain GMM-64 on the v2 train
+  split (`train-gmm`, 64 components); (3) no-VTLN evaluation; (4) the 26 warp
+  caches; (5) `train-vtln` with N_iter = 5 and fresh LBG (D4); (6) VTLN
+  evaluation; (7) the 2x2 cells *model only* and *selection only*. Same
+  protocol as W3 and S2 (LC2, A1 scorer, clip query features, 145 queries,
+  keyword-cluster bootstrap, 10000 resamples, seed 0).
+- **Targets:** `Tab:TIMITPerformance` GMM-64 rows (34.91 / 36.71 for MFCC,
+  35.50 / 37.58 for PLP) and `Tab:TIMITVTLNPerformance1` (36.26 / 39.62 and
+  37.48 / 39.95), p@N / MAP.
+- **Comparisons:** paired VTLN minus no-VTLN; paired `pn` minus un-normalised
+  (same queries, with and without VTLN); MFCC-TMP minus MFCC under the `pn`
+  reference, with and without VTLN; PLP minus MFCC.
+- **Rule:** the `pn` rows are the reference whatever they score. An interval
+  that includes 0 gets the usual wording (the direction matches or does not
+  match the thesis; the interval does not establish a difference) and nothing
+  more. Nothing is tuned; no band or level choice is made by score.
+- **Recorded:** everything W3 recorded (alpha-hat histograms in the thesis
+  label, edge shares, LL, `ll_decreased`, `selection_step_ok`, mean
+  alpha-hat per iteration, hashes, runtime, peak memory, provenance) plus the
+  mean posteriorgram entropy.
+- A `ll_decreased` is recorded and does not stop the chain (D4); a failing
+  `selection_step_ok` or any need to edit a feature source file is a STOP.
