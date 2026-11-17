@@ -68,7 +68,8 @@ def read_final_alphas(stem, n_iter=5):
 def c0_marginal_check(name, features_dir, n_iter=5):
     """Part (a) for one run."""
     kind, profile, stem = RUNS[name]
-    if not get_profile(profile, kind).include_c0:
+    # PLP always keeps c0 (log gain, column 0); MFCC kinds have a switch
+    if not getattr(get_profile(profile, kind), "include_c0", True):
         raise ValueError("the static c0 is column 0 only when include_c0")
     gmm, _ = load_gmm(MODELS / f"{stem}_vtln{n_iter}.npz")
     keys, _, _ = read_final_alphas(stem, n_iter)

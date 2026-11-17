@@ -92,3 +92,18 @@ def test_order_check_fails_the_gate_for_a_large_offset(monkeypatch):
         "train": {"train": frozenset({0}), "test": frozenset()},
         "test": {"train": frozenset(), "test": frozenset()}})
     assert s1.order_check(selection)["c0_offset"]["gate_met"] is False
+
+
+def test_c0_check_refuses_a_profile_without_c0_and_accepts_plp(monkeypatch):
+    from qbestd.features.plp import PlpConfig
+    monkeypatch.setattr(s1, "get_profile",
+                        lambda profile, kind: SimpleNamespace(include_c0=False))
+    with pytest.raises(ValueError, match="include_c0"):
+        s1.c0_marginal_check("mfcc_4k", "unused")
+
+    def stop(path):
+        raise FileNotFoundError(path)  # past the guard: no model file here
+    monkeypatch.setattr(s1, "get_profile", lambda p, k: PlpConfig())
+    monkeypatch.setattr(s1, "load_gmm", stop)
+    with pytest.raises(FileNotFoundError):
+        s1.c0_marginal_check("plp_4k", "unused")
