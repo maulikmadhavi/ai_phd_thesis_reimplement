@@ -56,6 +56,7 @@ from qbestd.ml.vtln import (
 )
 
 LOGGER = logging.getLogger(__name__)
+SELECTION_TOLERANCE = 1e-9  # per frame
 DEFAULT_N_ITER = 5  # Representation.tex line 229: gains saturate at 4-5
 
 
@@ -106,6 +107,20 @@ def estimate_clip_warp(features_by_warp, gmm):
     return float(estimate_warp_factors(row, warps)[0])
 
 
+def selection_step_ok(ll_init, previous_ll_new, tolerance=SELECTION_TOLERANCE):
+    """Selection-step check of one iteration (K1).
+
+    The previous model, scored on the features at the new alpha-hat
+    (``ll_init``), must not score below its own log-likelihood on the
+    previous alpha-hat features (``previous_ll_new``): alpha-hat maximises the
+    per-utterance likelihood under that model. ``None`` when there is no
+    previous iteration. A ``False`` would be a bug, not a model property.
+    """
+    if previous_ll_new is None:
+        return None
+    return bool(ll_init >= previous_ll_new - tolerance)
+
+
 def write_trace(trace_dir, iteration, keys, alphas, matrix):
     """Per-utterance warps of one iteration and the LL matrix, next to the
     model. ``alpha_ours`` is the cache-file label, ``alpha_thesis`` is
@@ -120,6 +135,15 @@ def write_trace(trace_dir, iteration, keys, alphas, matrix):
     (trace_dir / f"iter{iteration}_alphas.tsv").write_text(
         ("\n").join(lines) + "\n", encoding="utf-8")
     np.save(trace_dir / f"iter{iteration}_ll_matrix.npy", matrix)
+
+
+def write_flags(trace_dir, iteration, record):
+    """``ll_decreased`` and ``selection_step_ok`` of one iteration, next to
+    the trace files."""
+    flags = {key: record[key] for key in ("ll_decreased",
+                                          "selection_step_ok")}
+    (Path(trace_dir) / f"iter{iteration}_flags.json").write_text(
+        json.dumps(flags), encoding="utf-8")
 
 
 def train_vtln(paths, keys, kind, profile, plain_gmm, n_iter,
@@ -141,6 +165,7 @@ def train_vtln(paths, keys, kind, profile, plain_gmm, n_iter,
     if n_iter < 1:
         raise ValueError("n_iter must be at least 1")
     gmm, records = plain_gmm, []
+    previous_ll_new = None
     previous = np.ones(len(keys))
     for k in range(n_iter):
         start = time.time()
@@ -163,6 +188,7 @@ def train_vtln(paths, keys, kind, profile, plain_gmm, n_iter,
             "mean_ll_init_on_selected": ll_init,
             "mean_ll_new_on_selected": ll_new,
             "ll_decreased": bool(ll_new < ll_init),
+            "selection_step_ok": selection_step_ok(ll_init, previous_ll_new),
             "em_history": trained.log_likelihood_history,
             "model_content_sha256": gmm_content_sha256(trained.gmm),
             "seconds": round(time.time() - start, 1)})
@@ -175,6 +201,13 @@ def train_vtln(paths, keys, kind, profile, plain_gmm, n_iter,
                     records[-1]["edge_shares"],
                     records[-1]["changed_share"],
                     records[-1]["warp_histogram"])
+        if records[-1]["selection_step_ok"] is False:
+            LOGGER.warning("iteration %d: selection step check FAILED (LL "
+                           "%.6f below the previous model's %.6f): a bug",
+                           k, ll_init, previous_ll_new)
+        if trace_dir is not None:
+            write_flags(trace_dir, k, records[-1])
+        previous_ll_new = ll_new
         previous = alphas
         gmm = trained.gmm
         del features

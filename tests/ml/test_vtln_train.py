@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -15,6 +17,7 @@ from qbestd.ml.vtln_train import (
     estimate_utterance_warps,
     peak_memory_mb,
     save_vtln_model,
+    selection_step_ok,
     train_vtln,
     warp_histogram,
 )
@@ -202,3 +205,18 @@ def test_trace_files_round_trip(setup, tmp_path):
     last = [float(r.split("	")[2]) for r in (
         tmp_path / "iter1_alphas.tsv").read_text().splitlines()[1:]]
     assert np.allclose(last, result.alphas)
+
+
+def test_selection_step_check_passes_in_a_run_and_fails_when_violated(
+        setup, tmp_path):
+    paths, plain = setup
+    result = train_vtln(paths, KEYS, KIND, PROFILE, plain, 3, components=2,
+                        n_em_iter=3, warps=WARPS, trace_dir=tmp_path)
+    flags = [r["selection_step_ok"] for r in result.iterations]
+    assert flags[0] is None and flags[1:] == [True, True]
+    saved = json.loads((tmp_path / "iter1_flags.json").read_text())
+    assert saved == {"ll_decreased": result.iterations[1]["ll_decreased"],
+                     "selection_step_ok": True}
+    assert selection_step_ok(-5.0, -5.0) is True
+    assert selection_step_ok(-5.0 - 1e-6, -5.0) is False
+    assert selection_step_ok(-5.0, None) is None
