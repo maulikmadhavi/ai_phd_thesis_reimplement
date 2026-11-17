@@ -18,7 +18,7 @@
 
   The Executor's message calls the MFCC band "still the user's"; D5 settled it, and the doc
   states D5 correctly.
-- **Status:** COMPLETE. 15 exec commits, `0c53448..c2e323c`. One STOP gate fired:
+- **Status:** COMPLETE. 14 exec commits, `0c53448..c2e323c`. One STOP gate fired:
   `ll_decreased` in W3 run 1, resolved by D4.
 - **Sources:** the thesis is at `D:\Storage\career_phd_daiict_work\Thesis`. The old MATLAB
   code is at `D:\Storage\research_code_qbe_std`.
@@ -58,10 +58,14 @@ its runs).
 
   | Run | Start commit | End commit | Dirty |
   |---|---|---|---|
+  | G6 MFCC-TMP retrain (64, 128) | `2508051` | `2508051` | false |
+  | W1 (`train-vtln` N_iter 1) | `0dd137b` | `0dd137b` | false |
   | 1 | `cea4673` | `cea4673` | false |
   | 2, 3 | `0f899b3` | `0f899b3` | false |
   | MFCC-TMP | `57acbc8` | `57acbc8` | false |
 
+  - G6: the models were written at 21:51:03 and 21:53:18, before `d7e132d` (21:53:44).
+    W1 finished at 21:57:15, before `b4589e4` (21:58:40).
   - Training and evaluation times sit between the commits. Run 1 trained 22:00:24–22:11:08
     and evaluated until 22:16:47; `77a5ee8` was committed at 22:17:19.
   - MFCC-TMP trained from 23:18:32 to 02:23:40 (11065 s) and evaluated until 02:29:26;
@@ -82,7 +86,7 @@ its runs).
 
 ### Results (instance p@N / MAP; thesis `Tab:TIMITVTLNPerformance1`)
 
-| Run | no VTLN | VTLN | Paired gain (95 % CI, p@N) | Thesis gain |
+| Run | no VTLN | VTLN | Paired gain, p@N / MAP (95 % CI) | Thesis gain |
 |---|---|---|---|---|
 | MFCC 0–4000 Hz | 37.48 / 40.50 | 48.17 / 50.58 | +10.69 (+6.8 to +14.3) / +10.08 (+6.2 to +13.9) | +1.35 / +2.91 |
 | PLP 0–4000 Hz | 38.59 / 39.75 | 45.37 / 48.99 | +6.78 (+3.4 to +10.2) / +9.24 (+6.3 to +12.4) | +1.98 / +2.37 |
@@ -130,7 +134,7 @@ It is not a claim of cause.
   the low cepstra. In the run 1 MFCC 0–3400 Hz train caches, the frame-mean c0 is 77.15 at
   α_ours 0.88 (thesis 1.12), 79.05 at 1.00 and 80.17 at α_ours 1.12 (thesis 0.88).
 - **Correlation:** Spearman ρ(final α̂_thesis, utterance mean c0 at α = 1) is **+0.263**
-  (run 1, 3696 train utterances). Mean c0 rises steadily from 77.7 at thesis 0.88 to 81.2 at
+  (run 1, 3696 train utterances). Mean c0 rises overall from 77.7 at thesis 0.88 to 81.2 at
   thesis 1.12; the c0 standard deviation across utterances is 5.3. Louder utterances choose
   the warp that lowers c0, and quieter ones the warp that raises it, so the choice pulls
   each utterance towards the average level. This alone is confounded with gender.
@@ -145,7 +149,10 @@ It is not a claim of cause.
   | PLP 0–4000 Hz | 8 % | 9 % | 22 / 24 / 26 | +0.002 / −0.002 |
 
   For MFCC, a ×2 gain shifts c0 by about +8.8, about 1.7 standard deviations of the level
-  spread across utterances. For MFCC-TMP the test is moot: peak normalisation makes the
+  spread across utterances. It is an exact **c0-only** perturbation: a waveform gain adds a
+  constant to every log filterbank output, which the DCT maps to c0 alone (lifter weight 1
+  at n = 0, deltas unchanged). So every α̂ change in the MFCC rows is caused by the c0 shift
+  alone, with no noise floor to subtract. For MFCC-TMP the test is moot: peak normalisation makes the
   features, and so α̂, exactly invariant to a waveform gain.
 - **What this does and does not say:**
   - For **MFCC** (both bands), α̂ is partly a per-utterance level adjustment, and the
