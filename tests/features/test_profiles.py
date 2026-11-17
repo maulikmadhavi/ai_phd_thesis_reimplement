@@ -46,7 +46,8 @@ def test_unknown_name_or_kind_raises(name, kind):
 
 NOT_DEFINED = {("timit_matlab_levelflip", "mfcc_tmp"),
                ("htk_described", "mfcc_tmp"),
-               ("htk_described_4k", "mfcc_tmp")}
+               ("htk_described_4k", "mfcc_tmp"),
+               ("htk_described_4k_pn", "mfcc_tmp")}
 
 
 @pytest.mark.parametrize("name", PROFILE_NAMES)
@@ -203,3 +204,40 @@ def test_htk_described_4k_filter_edges_end_at_4000_hz():
 def test_htk_described_4k_raises_for_mfcc_tmp():
     with pytest.raises(ValueError, match="mfcc_tmp stays on timit_matlab"):
         get_profile("htk_described_4k", "mfcc_tmp")
+
+
+@pytest.mark.parametrize("kind", ["mfcc", "plp"])
+def test_htk_described_4k_pn_differs_only_in_dc_and_peak(kind):
+    base = get_profile("htk_described_4k", kind)
+    pn = get_profile("htk_described_4k_pn", kind)
+    assert (base.remove_dc, base.normalize_peak) == (False, False)
+    assert (pn.remove_dc, pn.normalize_peak) == (True, True)
+    assert replace(pn, remove_dc=False, normalize_peak=False) == base
+
+
+def test_htk_described_4k_pn_raises_for_mfcc_tmp():
+    with pytest.raises(ValueError, match="mfcc_tmp stays on timit_matlab"):
+        get_profile("htk_described_4k_pn", "mfcc_tmp")
+
+
+@pytest.mark.parametrize("kind", ["mfcc", "plp"])
+@pytest.mark.parametrize("gain", [0.5, 2.0])
+def test_htk_described_4k_pn_features_are_invariant_to_waveform_gain(
+        kind, gain):
+    rng = np.random.default_rng(3)
+    wave = 0.1 * rng.normal(size=12000) + 0.02  # with an offset
+    config = get_profile("htk_described_4k_pn", kind)
+    reference = extract_features(wave, 16000, kind, config=config)
+    scaled = extract_features(gain * wave, 16000, kind, config=config)
+    assert np.allclose(scaled, reference, rtol=1e-6, atol=1e-6)
+    plain = get_profile("htk_described_4k", kind)
+    assert not np.allclose(
+        extract_features(gain * wave, 16000, kind, config=plain),
+        extract_features(wave, 16000, kind, config=plain), atol=1e-3)
+
+
+def test_htk_described_4k_pn_has_its_own_cache_fingerprint():
+    from qbestd.data.feature_cache import feature_fingerprint
+    for kind in ("mfcc", "plp"):
+        assert (feature_fingerprint(kind, "htk_described_4k_pn")
+                != feature_fingerprint(kind, "htk_described_4k"))

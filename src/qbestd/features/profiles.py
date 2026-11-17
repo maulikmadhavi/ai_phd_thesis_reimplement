@@ -14,7 +14,8 @@ from qbestd.features.plp import PlpConfig
 
 TIMIT_SAMPLE_RATE = 16000
 PROFILE_NAMES = ("timit_matlab", "timit_matlab_levelflip",
-                 "htk_described", "htk_described_4k")
+                 "htk_described", "htk_described_4k",
+                 "htk_described_4k_pn")
 KINDS = ("mfcc", "plp", "mfcc_tmp")
 
 
@@ -96,6 +97,31 @@ def _htk_described_4k(kind):
     return replace(_htk_described(kind), high_hz=4000.0)
 
 
+def _htk_described_4k_pn(kind):
+    """The normalised reference (cycle 9, user decision D6):
+    ``htk_described_4k`` with ``remove_dc=True`` and ``normalize_peak=True``.
+    Nothing else changes.
+
+    Sources:
+
+    * **author-stated (2026-11-18):** the thesis's HTK pipeline subtracted the
+      mean and then scaled the waveform to +-1.
+    * **known approximation:** our code peak-normalises first
+      (``scale_waveform``) and removes the mean afterwards
+      (``prepare_frames``), so the waveform is ``(x - m) / max|x|`` instead of
+      the author's ``(x - m) / max|x - m|``: a per-utterance gain of
+      ``max|x - m| / max|x|``. The order is not changed (that would be a
+      feature source edit); the size of the gap is measured by S1 (c).
+    * the extra x32768 PCM scale is a constant gain on every utterance; it
+      shifts every c0 by the same amount, which the GMM absorbs.
+
+    Raises:
+        ValueError: for ``mfcc_tmp`` (see :func:`_htk_described`).
+    """
+    return replace(_htk_described_4k(kind), remove_dc=True,
+                   normalize_peak=True)
+
+
 def _timit_matlab_levelflip(kind):
     """Level-handling ablation (cycle 7, L1): ``timit_matlab`` with the
     waveform level handling of MFCC and PLP swapped.
@@ -117,7 +143,8 @@ def _timit_matlab_levelflip(kind):
 _BUILDERS = {"timit_matlab": _timit_matlab,
              "timit_matlab_levelflip": _timit_matlab_levelflip,
              "htk_described": _htk_described,
-             "htk_described_4k": _htk_described_4k}
+             "htk_described_4k": _htk_described_4k,
+             "htk_described_4k_pn": _htk_described_4k_pn}
 
 
 def get_profile(name, kind):
