@@ -971,3 +971,75 @@ caches, no training.
   chosen from them.
 - **Reading rule:** the cells describe where the gain shows up. No mechanism
   is claimed, and the two halves need not add up to the total.
+
+### Gain split of the un-normalised rows (result)
+
+Run as declared (clean tree, commit `d4422af`). The "no VTLN" and "both"
+rows are the W3 rows; their entropy comes from the re-evaluations below.
+
+#### MFCC 0-4000 Hz (`htk_described_4k`, un-normalised, earlier reference)
+
+| Cell | p@N, instance (95% CI) | MAP, instance (95% CI) | p@N, keyword (95% CI) | MAP, keyword (95% CI) | Mean entropy documents / queries (nats) | git commit | Dirty |
+|---|---|---|---|---|---|---|---|
+| no VTLN (existing row) | 37.48 (28.0-47.6) | 40.50 (30.1-52.1) | 35.07 (26.6-43.9) | 37.84 (28.4-47.6) | 0.4402 / 0.4470 | `be5c4f0` | not recorded |
+| model only (lambda_r, alpha = 1) | 39.45 (28.9-50.8) | 41.92 (30.6-54.4) | 35.87 (26.5-45.6) | 38.74 (29.1-49.0) | 0.4404 / 0.4576 | `d4422af` | False |
+| selection only (lambda_init, alpha-hat) | 41.25 (32.4-51.0) | 44.57 (34.1-56.0) | 38.84 (30.2-47.8) | 41.67 (31.8-51.9) | 0.4383 / 0.4392 | `d4422af` | False |
+| both = VTLN row (existing) | 48.17 (37.3-59.9) | 50.58 (39.0-62.9) | 44.95 (34.5-55.9) | 46.88 (35.7-58.5) | 0.4235 / 0.4390 | `0f899b3` | False |
+| query_inherit (lambda_r, documents alpha-hat, queries at the source alpha-hat) | 48.66 (37.9-59.9) | 51.35 (39.9-63.5) | 44.99 (34.1-56.1) | 47.71 (36.6-59.3) | 0.4235 / 0.4449 | `d4422af` | False |
+
+| Cell minus no VTLN | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) |
+|---|---|---|---|---|
+| model only (lambda_r, alpha = 1) | instance | +1.98 (-1.1 to +4.5) | +1.42 (-0.9 to +3.7) | no / no |
+| model only (lambda_r, alpha = 1) | keyword | +0.80 (-1.8 to +3.4) | +0.90 (-1.3 to +3.2) | no / no |
+| selection only (lambda_init, alpha-hat) | instance | +3.77 (+0.4 to +7.2) | +4.07 (+0.7 to +7.5) | yes / yes |
+| selection only (lambda_init, alpha-hat) | keyword | +3.77 (-0.2 to +8.0) | +3.83 (-0.4 to +8.3) | no / no |
+| both = VTLN row (existing) | instance | +10.69 (+6.8 to +14.3) | +10.08 (+6.2 to +13.9) | yes / yes |
+| both = VTLN row (existing) | keyword | +9.88 (+5.1 to +15.1) | +9.04 (+3.5 to +14.8) | yes / yes |
+| query_inherit (lambda_r, documents alpha-hat, queries at the source alpha-hat) | instance | +11.18 (+7.7 to +14.4) | +10.84 (+7.3 to +14.2) | yes / yes |
+| query_inherit (lambda_r, documents alpha-hat, queries at the source alpha-hat) | keyword | +9.92 (+5.0 to +15.3) | +9.87 (+5.0 to +15.2) | yes / yes |
+`query_inherit` query edge shares (thesis 0.88 / 1.12): 0.041 / 0.110.
+
+#### PLP 0-4000 Hz (`htk_described_4k`, un-normalised, earlier reference)
+
+| Cell | p@N, instance (95% CI) | MAP, instance (95% CI) | p@N, keyword (95% CI) | MAP, keyword (95% CI) | Mean entropy documents / queries (nats) | git commit | Dirty |
+|---|---|---|---|---|---|---|---|
+| no VTLN (existing row) | 38.59 (29.1-48.5) | 39.75 (29.3-50.9) | 35.82 (27.1-44.8) | 36.81 (27.5-46.5) | 0.4361 / 0.4458 | `be5c4f0` | not recorded |
+| model only (lambda_r, alpha = 1) | 37.06 (28.4-46.6) | 39.63 (29.2-51.2) | 35.44 (27.1-43.9) | 37.43 (28.1-47.0) | 0.4373 / 0.4385 | `d4422af` | False |
+| selection only (lambda_init, alpha-hat) | 44.11 (34.0-55.0) | 46.65 (35.5-58.7) | 41.32 (31.6-51.1) | 43.39 (33.1-53.9) | 0.4341 / 0.4375 | `d4422af` | False |
+| both = VTLN row (existing) | 45.37 (35.5-56.2) | 48.99 (38.2-60.9) | 43.29 (33.6-53.5) | 46.55 (36.0-57.7) | 0.4160 / 0.4131 | `0f899b3` | False |
+| query_inherit (lambda_r, documents alpha-hat, queries at the source alpha-hat) | 47.35 (37.6-57.9) | 50.86 (40.4-62.2) | 44.95 (35.5-54.9) | 47.93 (37.5-58.9) | 0.4160 / 0.4126 | `d4422af` | False |
+
+| Cell minus no VTLN | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) |
+|---|---|---|---|---|
+| model only (lambda_r, alpha = 1) | instance | -1.53 (-3.6 to +1.0) | -0.12 (-1.6 to +1.6) | no / no |
+| model only (lambda_r, alpha = 1) | keyword | -0.38 (-3.1 to +2.5) | +0.62 (-1.2 to +2.5) | no / no |
+| selection only (lambda_init, alpha-hat) | instance | +5.52 (+2.3 to +8.5) | +6.89 (+4.1 to +9.4) | yes / yes |
+| selection only (lambda_init, alpha-hat) | keyword | +5.50 (+2.4 to +8.6) | +6.58 (+4.0 to +9.1) | yes / yes |
+| both = VTLN row (existing) | instance | +6.78 (+3.4 to +10.2) | +9.24 (+6.3 to +12.4) | yes / yes |
+| both = VTLN row (existing) | keyword | +7.46 (+3.4 to +12.4) | +9.74 (+5.7 to +14.7) | yes / yes |
+| query_inherit (lambda_r, documents alpha-hat, queries at the source alpha-hat) | instance | +8.76 (+5.6 to +12.0) | +11.11 (+9.0 to +13.5) | yes / yes |
+| query_inherit (lambda_r, documents alpha-hat, queries at the source alpha-hat) | keyword | +9.12 (+5.3 to +13.8) | +11.12 (+7.5 to +15.6) | yes / yes |
+`query_inherit` query edge shares (thesis 0.88 / 1.12): 0.055 / 0.207.
+
+Re-evaluation check (the existing rows evaluated once more, same models):
+
+| Row | Scores and per-query rows against the W3 evaluation | Mean entropy documents (nats) | Mean entropy queries (nats) |
+|---|---|---|---|
+| MFCC 0-4000 Hz, no VTLN | identical | 0.4402 | 0.4470 |
+| MFCC 0-4000 Hz, VTLN | identical | 0.4235 | 0.4390 |
+| PLP 0-4000 Hz, no VTLN | identical | 0.4361 | 0.4458 |
+| PLP 0-4000 Hz, VTLN | identical | 0.4160 | 0.4131 |
+
+The cells describe where the gain shows up; no mechanism is claimed, and the
+two halves need not add up to the total. Which cell carries the gain is read
+from the paired intervals above, not from their sum.
+
+What the tables show, as facts: in no cell does *model only* have an
+interval that excludes 0 (MFCC +1.98 / +1.42, PLP -1.53 / -0.12 for p@N /
+MAP, instance average). *Selection only* excludes 0 on the instance average
+for both features and on the keyword average for PLP only (MFCC keyword
+intervals include 0). The `query_inherit` cell is within about 0.5 to 2
+points of the VTLN row (MFCC +0.49 / +0.77 above it, PLP +1.98 / +1.87),
+with overlapping intervals. Mean entropy of the documents is lower under
+VTLN (0.4235 against 0.4402 for MFCC, 0.4160 against 0.4361 for PLP). No
+mechanism is claimed.
