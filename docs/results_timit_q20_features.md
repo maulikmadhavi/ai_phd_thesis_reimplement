@@ -941,3 +941,33 @@ correlation of alpha-hat with mean c0 given F0 is small and positive in the
 three runs (largest for MFCC, 0.235; MFCC-TMP, whose features are
 peak-normalised, 0.076). All of this is descriptive; the D3 (c) gate already
 passed.
+
+### Gain split of the un-normalised rows (declared)
+
+**Declared before any S2 number** (cycle 9, S2). The VTLN row changes two
+things at once: the model (lambda_init to lambda_r) and the test-time
+selection (alpha = 1 to alpha-hat per document and per query). This splits
+them. Un-normalised, earlier-reference rows only: MFCC 0-4000 Hz and PLP
+0-4000 Hz (`htk_described_4k`), GMM-64, split v2, existing models and warp
+caches, no training.
+
+| | alpha = 1 everywhere | alpha-hat per document and query |
+|---|---|---|
+| lambda_init (plain GMM-64) | existing no-VTLN row | **selection only** (`--vtln-cell selection_only`) |
+| lambda_r (final VTLN model) | **model only** (`--vtln-cell model_only`) | existing VTLN row |
+
+- **Fifth cell, `query_inherit`:** documents as in the VTLN row, and each
+  query clip at its source utterance's final alpha-hat (`iter4_alphas.tsv`)
+  instead of its own estimate.
+- **Evaluations:** 6 (three cells for each of the two features), same
+  protocol as W3 (LC2, A1 scorer, clip query features, 145 queries,
+  keyword-cluster bootstrap with 10000 resamples, seed 0). The two existing
+  rows of each feature (no VTLN, VTLN) are **re-evaluated** once more into
+  separate directories, so that they also carry the mean posteriorgram
+  entropy (K3); their scores must reproduce the W3 rows and any difference is
+  reported.
+- **Comparisons:** each cell minus the no-VTLN row on the same 145 queries,
+  paired keyword-cluster bootstrap. Every cell is reported and nothing is
+  chosen from them.
+- **Reading rule:** the cells describe where the gain shows up. No mechanism
+  is claimed, and the two halves need not add up to the total.
