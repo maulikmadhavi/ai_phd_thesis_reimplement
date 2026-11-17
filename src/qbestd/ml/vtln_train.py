@@ -44,7 +44,6 @@ from qbestd.ml.gmm import (
     train_gmm_detailed,
 )
 from qbestd.ml.posteriorgram import gaussian_posteriorgram
-from qbestd.provenance import finish_run, start_run
 from qbestd.ml.vtln import (
     WARP_FACTORS,
     changed_share,
@@ -54,6 +53,7 @@ from qbestd.ml.vtln import (
     utterance_log_likelihoods,
     warp_histogram,
 )
+from qbestd.provenance import finish_run, start_run
 
 LOGGER = logging.getLogger(__name__)
 SELECTION_TOLERANCE = 1e-9  # per frame

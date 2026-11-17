@@ -62,14 +62,15 @@ def frame_f0(samples, rate, f0_min=F0_MIN_HZ, f0_max=F0_MAX_HZ,
                & (inner > ratio[:, low + 1:high + 2]))
     peaks = np.where(is_peak, inner, -np.inf)
     top = peaks.max(axis=1)
-    # the first peak near the best one, so 2x the period is not preferred
-    first = np.argmax(peaks >= 0.9 * top[:, None], axis=1)
-    peak = top
-    best = first
-    voiced = ((peak >= threshold)
+    has_peak = np.isfinite(top)
+    # the first peak near the best one, so 2x the period is not preferred;
+    # a frame without any peak is unvoiced (no -inf arithmetic)
+    first = np.where(has_peak, np.argmax(
+        peaks >= 0.9 * np.where(has_peak, top, 0.0)[:, None], axis=1), 0)
+    voiced = (has_peak & (top >= threshold)
               & (energy >= ENERGY_RATIO * energy.max()) & (energy > 0))
     f0 = np.full(len(frames), np.nan)
-    f0[voiced] = rate / (low + best[voiced])
+    f0[voiced] = rate / (low + first[voiced])
     return f0
 
 

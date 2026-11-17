@@ -56,7 +56,6 @@ from qbestd.data.timit_hf import (
 from qbestd.eval.bootstrap import cluster_bootstrap
 from qbestd.eval.metrics import average_precision, precision_at_n, summarise
 from qbestd.eval.model_guard import check_model
-from qbestd.provenance import finish_run, start_run
 from qbestd.eval.selection_data import (
     selection_examples,
     selection_relevance,
@@ -69,6 +68,7 @@ from qbestd.ml.posteriorgram import (
     floor_and_renormalise,
     gaussian_posteriorgram,
 )
+from qbestd.provenance import finish_run, start_run
 from qbestd.search.distance import symmetric_kl_matrix
 from qbestd.search.score import rank_documents
 from qbestd.search.subdtw import best_utterance_distance, subdtw_lc2

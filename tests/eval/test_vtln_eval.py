@@ -1,3 +1,4 @@
+import warnings
 from types import SimpleNamespace
 
 import numpy as np
@@ -70,8 +71,11 @@ def test_a_clip_is_warped_from_its_own_audio(world):
 
 def test_a_clip_too_short_for_a_frame_raises(world):
     _, gmm, _ = world
-    with pytest.raises(ValueError, match="too short"):
-        clip_warp_features(np.zeros(100), RATE, KIND, CONFIG, gmm, WARPS)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # no RuntimeWarning from empty banks
+        with pytest.raises(ValueError, match="too short"):
+            clip_warp_features(np.zeros(100), RATE, KIND, CONFIG, gmm,
+                               WARPS)
 
 
 def test_end_to_end_inputs_for_documents_and_queries(world, tmp_path):

@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pytest
 
@@ -47,3 +49,11 @@ def test_silent_frames_are_unvoiced_inside_a_voiced_signal():
 def test_a_dc_offset_does_not_change_the_estimate():
     assert median_f0(tone(180) + 0.5, RATE) == pytest.approx(
         median_f0(tone(180), RATE), rel=0.01)
+
+
+def test_a_frame_without_any_peak_is_unvoiced_without_a_warning():
+    ramp = np.linspace(-1.0, 1.0, RATE // 4)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        f0 = frame_f0(ramp, RATE)
+    assert len(f0) > 0 and np.isnan(f0).all()

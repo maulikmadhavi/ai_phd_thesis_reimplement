@@ -49,8 +49,12 @@ def clip_warp_features(clip, sample_rate, kind, config, gmm,
     """``(features at alpha-hat, alpha-hat)`` of one query clip.
 
     Features at every warp come from the clip audio. Raises ``ValueError``
-    for a clip too short to give a frame (no warp can be estimated).
+    for a clip too short to give a frame (no warp can be estimated); the
+    length is checked before any feature is computed, and an empty bank is
+    a second guard.
     """
+    if len(clip) < round(config.frame_ms * sample_rate / 1000.0):
+        raise ValueError("clip too short for a frame")
     bank = extract_warped_bank(clip, sample_rate, kind, warps, config)
     if any(len(features) == 0 for features in bank.values()):
         raise ValueError("clip too short for a frame")
