@@ -421,9 +421,12 @@ and the same for the other kind and size. Runs refuse a dirty tree unless
 
 ## Stage 4: GMM-VTLN
 
-Code: `ml/vtln.py`, `ml/vtln_train.py`, `data/warped_cache.py`. Nothing here
-is scored yet; this section holds the assumptions, declared before any
-Stage 4 number.
+**User decision D5 (2026-11-17): 0-4000 Hz only.** `htk_described_4k` is the
+reference for MFCC and PLP in Stage 4; the 0-3400 Hz rows (run 1 and the H2
+rows) are an earlier reference. Results are at the end of this section.
+
+Code: `ml/vtln.py`, `ml/vtln_train.py`, `data/warped_cache.py`. The
+assumptions below were declared before any Stage 4 number.
 
 ### Assumptions (listed so a result cannot be re-read against them)
 
@@ -547,7 +550,7 @@ utterances), as the declaration said.
   reference. MFCC-TMP minus MFCC under VTLN is reported against both MFCC
   bands.
 
-### Stage 4 run 1 of 5: MFCC `htk_described` (0-3400 Hz), STOPPED on `ll_decreased`
+### Stage 4 run 1: MFCC `htk_described` (0-3400 Hz), earlier reference, stopped on `ll_decreased`
 
 The declared STOP rule fired: iterations 2 and 4 set `ll_decreased`. This run
 was finished and is reported; **no further Stage 4 run was started.** Run
@@ -592,3 +595,143 @@ clips: edges {'0.88': 0.06896551724137931, '1.12': 0.2689655172413793}; **0.60 o
 get an alpha-hat different from their source utterance's final train
 alpha-hat. Query features were extracted from the clips at all 13 warps
 (`query_features: "clip"`).
+
+### Stage 4 runs 2 to 5: results
+
+**User decision D5 (2026-11-17): only the 0-4000 Hz band is kept.**
+`htk_described_4k` is the reference for MFCC and PLP and PLP
+`htk_described` (0-3400 Hz) VTLN was not run. Run 1 (MFCC 0-3400 Hz, above)
+and the H2 0-3400 Hz rows stay as a labelled earlier reference. **User
+decision D4 (2026-11-17):** `ll_decreased` is recorded for runs 2 to 5 and
+does not stop the chain; fresh LBG every iteration, no warm start. So four
+runs were made, not five: MFCC 0-3400 Hz (run 1), MFCC 0-4000 Hz, PLP
+0-4000 Hz and MFCC-TMP. Runs 2 and 3 ran from `0f899b3`, MFCC-TMP from
+`57acbc8` after the first attempt was killed by a machine shutdown (warp
+caches from the killed attempt were reused only where their fingerprint
+matched; the rest were built, which is why its train-vtln time is much
+longer); `0f899b3` and `57acbc8` differ in `docs/plan.md` only.
+All runs: clean tree, GMM-64, split v2, N_iter 5, 145 queries, 1344
+documents, clip query features, A1 scorer, 10000 bootstrap resamples,
+seed 0. Nothing was tuned and no band was chosen by its score.
+
+| Row | p@N, instance avg (95% CI) | MAP, instance avg (95% CI) | p@N, keyword avg (95% CI) | MAP, keyword avg (95% CI) | Queries | Non-matches |
+|---|---|---|---|---|---|---|
+| MFCC 0-4000 Hz (`htk_described_4k`), thesis, no VTLN | 34.91 | 36.71 | not stated | not stated | 145 | n/a |
+| MFCC 0-4000 Hz (`htk_described_4k`), thesis, VTLN | 36.26 | 39.62 | not stated | not stated | 145 | n/a |
+| MFCC 0-4000 Hz (`htk_described_4k`), GMM-64, no VTLN | 37.48 (28.0-47.6) | 40.50 (30.1-52.1) | 35.07 (26.6-43.9) | 37.84 (28.4-47.6) | 145 | 3 |
+| MFCC 0-4000 Hz (`htk_described_4k`), GMM-64, GMM-VTLN | 48.17 (37.3-59.9) | 50.58 (39.0-62.9) | 44.95 (34.5-55.9) | 46.88 (35.7-58.5) | 145 | 1 |
+| PLP 0-4000 Hz (`htk_described_4k`), thesis, no VTLN | 35.50 | 37.58 | not stated | not stated | 145 | n/a |
+| PLP 0-4000 Hz (`htk_described_4k`), thesis, VTLN | 37.48 | 39.95 | not stated | not stated | 145 | n/a |
+| PLP 0-4000 Hz (`htk_described_4k`), GMM-64, no VTLN | 38.59 (29.1-48.5) | 39.75 (29.3-50.9) | 35.82 (27.1-44.8) | 36.81 (27.5-46.5) | 145 | 0 |
+| PLP 0-4000 Hz (`htk_described_4k`), GMM-64, GMM-VTLN | 45.37 (35.5-56.2) | 48.99 (38.2-60.9) | 43.29 (33.6-53.5) | 46.55 (36.0-57.7) | 145 | 0 |
+| MFCC-TMP (`timit_matlab`, 0-4000 Hz), thesis, no VTLN | 40.03 | 41.50 | not stated | not stated | 145 | n/a |
+| MFCC-TMP (`timit_matlab`, 0-4000 Hz), thesis, VTLN | 42.88 | 45.52 | not stated | not stated | 145 | n/a |
+| MFCC-TMP (`timit_matlab`, 0-4000 Hz), GMM-64, no VTLN | 39.17 (29.6-48.9) | 41.15 (30.7-52.1) | 35.44 (26.4-44.5) | 37.65 (28.3-47.3) | 145 | 1 |
+| MFCC-TMP (`timit_matlab`, 0-4000 Hz), GMM-64, GMM-VTLN | 44.07 (33.7-55.1) | 47.37 (36.0-59.2) | 41.43 (31.1-51.8) | 44.55 (33.5-55.7) | 145 | 2 |
+| MFCC 0-3400 Hz (`htk_described`, earlier reference, run 1), thesis, no VTLN | 34.91 | 36.71 | not stated | not stated | 145 | n/a |
+| MFCC 0-3400 Hz (`htk_described`, earlier reference, run 1), thesis, VTLN | 36.26 | 39.62 | not stated | not stated | 145 | n/a |
+| MFCC 0-3400 Hz (`htk_described`, earlier reference, run 1), GMM-64, no VTLN | 34.58 (25.6-44.1) | 35.73 (26.4-45.8) | 32.51 (24.8-40.7) | 33.50 (25.0-42.3) | 145 | 1 |
+| MFCC 0-3400 Hz (`htk_described`, earlier reference, run 1), GMM-64, GMM-VTLN | 41.65 (31.9-51.4) | 45.21 (34.3-56.2) | 37.90 (28.6-47.6) | 41.18 (30.9-52.0) | 145 | 1 |
+
+### Gap to the thesis (descriptive, no cause attached)
+
+Instance average, ours minus thesis, p@N / MAP. The last column is the
+thesis's own gain, for the same two numbers.
+
+| Run | no VTLN | VTLN | Thesis gain (VTLN minus no VTLN) |
+|---|---|---|---|
+| MFCC 0-4000 Hz (`htk_described_4k`) | +2.57 / +3.79 | +11.91 / +10.96 | +1.35 / +2.91 |
+| PLP 0-4000 Hz (`htk_described_4k`) | +3.09 / +2.17 | +7.89 / +9.04 | +1.98 / +2.37 |
+| MFCC-TMP (`timit_matlab`, 0-4000 Hz) | -0.86 / -0.35 | +1.19 / +1.85 | +2.85 / +4.02 |
+| MFCC 0-3400 Hz (`htk_described`, earlier reference, run 1) | -0.33 / -0.98 | +5.39 / +5.59 | +1.35 / +2.91 |
+
+### Paired VTLN minus no-VTLN (same queries, keyword-cluster bootstrap)
+
+| Run | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) |
+|---|---|---|---|---|
+| MFCC 0-4000 Hz (`htk_described_4k`) | instance | +10.69 (+6.8 to +14.3) | +10.08 (+6.2 to +13.9) | yes / yes |
+| MFCC 0-4000 Hz (`htk_described_4k`) | keyword | +9.88 (+5.1 to +15.1) | +9.04 (+3.5 to +14.8) | yes / yes |
+| PLP 0-4000 Hz (`htk_described_4k`) | instance | +6.78 (+3.4 to +10.2) | +9.24 (+6.3 to +12.4) | yes / yes |
+| PLP 0-4000 Hz (`htk_described_4k`) | keyword | +7.46 (+3.4 to +12.4) | +9.74 (+5.7 to +14.7) | yes / yes |
+| MFCC-TMP (`timit_matlab`, 0-4000 Hz) | instance | +4.90 (+1.4 to +8.6) | +6.22 (+3.4 to +9.1) | yes / yes |
+| MFCC-TMP (`timit_matlab`, 0-4000 Hz) | keyword | +5.99 (+2.3 to +10.1) | +6.90 (+3.6 to +10.4) | yes / yes |
+| MFCC 0-3400 Hz (`htk_described`, earlier reference, run 1) | instance | +7.07 (+3.8 to +10.4) | +9.47 (+5.5 to +13.0) | yes / yes |
+| MFCC 0-3400 Hz (`htk_described`, earlier reference, run 1) | keyword | +5.38 (+1.7 to +9.1) | +7.68 (+3.8 to +11.7) | yes / yes |
+
+The thesis gains are +1.35 / +2.91 (MFCC), +1.98 / +2.37 (PLP) and
++2.85 / +4.02 (MFCC-TMP). Our paired gains are above these in the MFCC and PLP
+runs (MFCC-TMP is closest); this is stated as a fact and no cause is
+claimed. The no-VTLN rows also differ by band, so the VTLN rows are not a
+like-for-like comparison with the 0-3400 Hz run. A reading is the
+Reviewer's.
+
+### MFCC-TMP minus MFCC under VTLN (Q5), and PLP minus MFCC
+
+| Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) |
+|---|---|---|---|---|
+| MFCC-TMP minus MFCC 0-4000 Hz, both VTLN | instance | -4.09 (-7.1 to -1.0) | -3.22 (-6.4 to +0.2) | yes / no |
+| MFCC-TMP minus MFCC 0-4000 Hz, both VTLN | keyword | -3.52 (-6.9 to -0.3) | -2.33 (-6.4 to +1.8) | yes / no |
+| MFCC-TMP minus MFCC 0-3400 Hz, both VTLN | instance | +2.42 (-1.1 to +6.0) | +2.16 (-2.1 to +6.6) | no / no |
+| MFCC-TMP minus MFCC 0-3400 Hz, both VTLN | keyword | +3.53 (+0.2 to +7.0) | +3.38 (-0.2 to +7.1) | yes / no |
+| PLP minus MFCC, both 0-4000 Hz, both VTLN | instance | -2.80 (-5.5 to +0.1) | -1.59 (-4.0 to +1.2) | no / no |
+| PLP minus MFCC, both 0-4000 Hz, both VTLN | keyword | -1.66 (-4.5 to +1.1) | -0.33 (-2.8 to +2.3) | no / no |
+| MFCC-TMP minus MFCC 0-4000 Hz, both no VTLN | instance | +1.70 (-0.6 to +3.9) | +0.64 (-1.8 to +3.0) | no / no |
+| MFCC-TMP minus MFCC 0-4000 Hz, both no VTLN | keyword | +0.37 (-1.9 to +2.6) | -0.19 (-2.5 to +2.1) | no / no |
+
+### LL per iteration and `ll_decreased` (fresh LBG each iteration, D4)
+
+**MFCC 0-4000 Hz (`htk_described_4k`)**
+
+| Iteration | LL of lambda_init on X^alpha_hat | LL of new model | ll_decreased | Share changed | Edge shares (thesis 0.88 / 1.12) |
+|---|---|---|---|---|---|
+| 0 | -116.3560 | -116.2613 | no | 0.738 | {'0.88': 0.012445887445887446, '1.12': 0.04220779220779221} |
+| 1 | -116.2149 | -116.2017 | no | 0.495 | {'0.88': 0.04004329004329004, '1.12': 0.06791125541125541} |
+| 2 | -116.1846 | -116.1366 | no | 0.326 | {'0.88': 0.054653679653679656, '1.12': 0.09523809523809523} |
+| 3 | -116.1269 | -116.1762 | **yes** | 0.257 | {'0.88': 0.055735930735930736, '1.12': 0.11174242424242424} |
+| 4 | -116.1705 | -116.1512 | no | 0.197 | {'0.88': 0.05357142857142857, '1.12': 0.12932900432900432} |
+
+**PLP 0-4000 Hz (`htk_described_4k`)**
+
+| Iteration | LL of lambda_init on X^alpha_hat | LL of new model | ll_decreased | Share changed | Edge shares (thesis 0.88 / 1.12) |
+|---|---|---|---|---|---|
+| 0 | 13.5453 | 13.7348 | no | 0.871 | {'0.88': 0.07088744588744589, '1.12': 0.07792207792207792} |
+| 1 | 13.8230 | 13.8474 | no | 0.542 | {'0.88': 0.10606060606060606, '1.12': 0.12878787878787878} |
+| 2 | 13.8606 | 13.8714 | no | 0.268 | {'0.88': 0.10335497835497835, '1.12': 0.16206709956709955} |
+| 3 | 13.8748 | 13.8353 | **yes** | 0.146 | {'0.88': 0.09632034632034632, '1.12': 0.1875} |
+| 4 | 13.8375 | 13.8749 | no | 0.110 | {'0.88': 0.09036796536796536, '1.12': 0.19967532467532467} |
+
+**MFCC-TMP (`timit_matlab`, 0-4000 Hz)**
+
+| Iteration | LL of lambda_init on X^alpha_hat | LL of new model | ll_decreased | Share changed | Edge shares (thesis 0.88 / 1.12) |
+|---|---|---|---|---|---|
+| 0 | -32.4569 | -32.3155 | no | 0.889 | {'0.88': 0.04788961038961039, '1.12': 0.045725108225108224} |
+| 1 | -32.2463 | -32.2243 | no | 0.505 | {'0.88': 0.09145021645021645, '1.12': 0.08116883116883117} |
+| 2 | -32.2111 | -32.2124 | **yes** | 0.250 | {'0.88': 0.09415584415584416, '1.12': 0.10687229437229437} |
+| 3 | -32.2088 | -32.2143 | **yes** | 0.149 | {'0.88': 0.09063852813852814, '1.12': 0.12878787878787878} |
+| 4 | -32.2099 | -32.2064 | no | 0.154 | {'0.88': 0.0854978354978355, '1.12': 0.14583333333333334} |
+
+**MFCC 0-3400 Hz (`htk_described`, earlier reference, run 1)**
+
+| Iteration | LL of lambda_init on X^alpha_hat | LL of new model | ll_decreased | Share changed | Edge shares (thesis 0.88 / 1.12) |
+|---|---|---|---|---|---|
+| 0 | -116.4544 | -116.3199 | no | 0.793 | {'0.88': 0.019209956709956708, '1.12': 0.10281385281385282} |
+| 1 | -116.2789 | -116.2680 | no | 0.394 | {'0.88': 0.043560606060606064, '1.12': 0.141504329004329} |
+| 2 | -116.2589 | -116.2715 | **yes** | 0.226 | {'0.88': 0.059794372294372296, '1.12': 0.14475108225108224} |
+| 3 | -116.2688 | -116.2452 | no | 0.122 | {'0.88': 0.06953463203463203, '1.12': 0.13988095238095238} |
+| 4 | -116.2416 | -116.2677 | **yes** | 0.152 | {'0.88': 0.07196969696969698, '1.12': 0.13555194805194806} |
+
+### Warp statistics and provenance
+
+Final train alpha-hat histograms (thesis label, 0.88 to 1.12):
+
+- MFCC 0-4000 Hz (`htk_described_4k`): {'1.12': 478, '1.10': 216, '1.08': 172, '1.06': 571, '1.04': 448, '1.02': 309, '1.00': 385, '0.98': 110, '0.96': 216, '0.94': 245, '0.92': 255, '0.90': 93, '0.88': 198}
+- PLP 0-4000 Hz (`htk_described_4k`): {'1.12': 738, '1.10': 567, '1.08': 238, '1.06': 538, '1.04': 262, '1.02': 113, '1.00': 154, '0.98': 38, '0.96': 179, '0.94': 159, '0.92': 237, '0.90': 139, '0.88': 334}
+- MFCC-TMP (`timit_matlab`, 0-4000 Hz): {'1.12': 539, '1.10': 517, '1.08': 547, '1.06': 395, '1.04': 221, '1.02': 234, '1.00': 141, '0.98': 102, '0.96': 136, '0.94': 203, '0.92': 202, '0.90': 143, '0.88': 316}
+- MFCC 0-3400 Hz (`htk_described`, earlier reference, run 1): {'1.12': 501, '1.10': 47, '1.08': 169, '1.06': 66, '1.04': 231, '1.02': 79, '1.00': 611, '0.98': 546, '0.96': 343, '0.94': 150, '0.92': 242, '0.90': 445, '0.88': 266}
+
+| Run | VTLN model hash | ll_decreased at iteration | Train edge shares (final) | Share changed (final) | Test-document edge shares | Query edge shares | Queries with alpha-hat different from source | train-vtln time / peak memory | Start commit | Dirty |
+|---|---|---|---|---|---|---|---|---|---|---|
+| MFCC 0-4000 Hz (`htk_described_4k`) | `1c0742a0603b...` | 3 | {'0.88': 0.05357142857142857, '1.12': 0.12932900432900432} | 0.197 | {'0.88': 0.050595238095238096, '1.12': 0.15252976190476192} | {'0.88': 0.05517241379310345, '1.12': 0.18620689655172415} | 0.72 | 989 s / 1246 MB | `0f899b3` | False |
+| PLP 0-4000 Hz (`htk_described_4k`) | `03f7143df3fd...` | 3 | {'0.88': 0.09036796536796536, '1.12': 0.19967532467532467} | 0.110 | {'0.88': 0.078125, '1.12': 0.22470238095238096} | {'0.88': 0.05517241379310345, '1.12': 0.2827586206896552} | 0.59 | 978 s / 1280 MB | `0f899b3` | False |
+| MFCC-TMP (`timit_matlab`, 0-4000 Hz) | `390547cd8d45...` | 2, 3 | {'0.88': 0.0854978354978355, '1.12': 0.14583333333333334} | 0.154 | {'0.88': 0.07589285714285714, '1.12': 0.171875} | {'0.88': 0.04827586206896552, '1.12': 0.2689655172413793} | 0.72 | 11065 s / 1138 MB | `57acbc8` | False |
+| MFCC 0-3400 Hz (`htk_described`, earlier reference, run 1) | `1bf1a1570ddb...` | 2, 4 | {'0.88': 0.07196969696969698, '1.12': 0.13555194805194806} | 0.152 | {'0.88': 0.06845238095238096, '1.12': 0.1331845238095238} | {'0.88': 0.06896551724137931, '1.12': 0.2689655172413793} | 0.60 | 644 s / 930 MB | `cea4673` | False |
