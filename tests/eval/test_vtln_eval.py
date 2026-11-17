@@ -11,6 +11,7 @@ from qbestd.eval.query_features import clip_query_features
 from qbestd.eval.timit_queries import QueryExample
 from qbestd.eval.vtln_eval import (
     clip_warp_features,
+    expected_model_type,
     read_source_alphas,
     vtln_inputs,
 )
@@ -105,7 +106,10 @@ def test_source_alphas_read_back_and_a_missing_file_is_empty(tmp_path):
 
 
 @pytest.mark.parametrize("model_type, flags", [
-    ("plain", ["--vtln"]), ("vtln", [])])
+    ("plain", ["--vtln"]), ("vtln", []),
+    ("plain", ["--vtln-cell", "model_only"]),
+    ("vtln", ["--vtln-cell", "selection_only"]),
+    ("plain", ["--vtln-cell", "query_inherit"])])
 def test_run_timit_refuses_the_wrong_model_type(world, tmp_path, model_type,
                                                 flags):
     from qbestd.data.feature_cache import feature_fingerprint, hf_split_id
@@ -119,3 +123,47 @@ def test_run_timit_refuses_the_wrong_model_type(world, tmp_path, model_type,
     save_gmm(tmp_path / "m.npz", gmm, info)
     with pytest.raises(ModelMismatchError, match="model_type"):
         main(["--gmm", str(tmp_path / "m.npz"), "--allow-dirty", *flags])
+
+
+def test_each_cell_expects_its_own_model_type():
+    assert expected_model_type(False) == "plain"
+    assert expected_model_type(True) == "vtln"
+    assert expected_model_type(False, "model_only") == "vtln"
+    assert expected_model_type(False, "selection_only") == "plain"
+    assert expected_model_type(False, "query_inherit") == "vtln"
+
+
+def test_selection_only_cell_needs_no_trace_and_warps_both_sides(world):
+    paths, gmm, rows = world  # a plain model: no source alphas at all
+    grams, queries, info = vtln_inputs(
+        gmm, [("train", 0), ("train", 2)], [example(0), example(1)], rows,
+        paths, KIND, PROFILE, CONFIG, None, WARPS)
+    assert len(grams) == 2 and len(queries) == 2
+    assert info["query_alpha"] == "own"
+    assert info["share_queries_alpha_differs_from_source"] is None
+
+
+def test_query_inherit_cell_uses_the_source_warp_not_its_own(world):
+    paths, gmm, rows = world
+    source = {("train", 0): 0.9, ("train", 1): 1.1}
+    grams, queries, info = vtln_inputs(
+        gmm, [("train", 0)], [example(0), example(1, 0.2, 0.6)], rows,
+        paths, KIND, PROFILE, CONFIG, source, WARPS, inherit=True)
+    from qbestd.eval.timit_queries import cut_clip
+    for query, ex, alpha in zip(queries, [example(0), example(1, 0.2, 0.6)],
+                                (0.9, 1.1)):
+        clip = cut_clip(rows[("train", ex.row_index)].audio, RATE, ex)
+        bank = extract_warped_bank(clip, RATE, KIND, WARPS, CONFIG)
+        assert np.array_equal(query, bank[alpha])
+    assert info["query_alpha"] == "inherited"
+    assert info["share_queries_alpha_differs_from_source"] == 0.0
+    with pytest.raises(KeyError):
+        vtln_inputs(gmm, [("train", 0)], [example(2)], rows, paths, KIND,
+                    PROFILE, CONFIG, source, WARPS, inherit=True)
+
+
+def test_the_two_vtln_switches_are_exclusive():
+    from qbestd.eval.run_timit import parse_args
+    with pytest.raises(SystemExit):
+        parse_args(["--gmm", "x.npz", "--vtln", "--vtln-cell",
+                    "model_only"])

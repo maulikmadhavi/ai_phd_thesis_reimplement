@@ -62,11 +62,13 @@ from qbestd.eval.selection_data import (
 )
 from qbestd.eval.query_features import MODES, query_features_for
 from qbestd.eval.timit_queries import Q20_KEYWORDS
+from qbestd.eval.vtln_eval import CELL_MODEL_TYPE, expected_model_type
 from qbestd.features.profiles import get_profile
 from qbestd.ml.gmm import gmm_content_sha256, load_gmm
 from qbestd.ml.posteriorgram import (
     floor_and_renormalise,
     gaussian_posteriorgram,
+    mean_posteriorgram_entropy,
 )
 from qbestd.provenance import finish_run, start_run
 from qbestd.search.distance import symmetric_kl_matrix
@@ -102,9 +104,18 @@ def parse_args(argv=None):
     parser.add_argument("--vtln", action="store_true",
                         help="the model is a GMM-VTLN model (train-vtln); "
                         "documents and query clips are warped")
+    parser.add_argument("--vtln-cell", choices=tuple(CELL_MODEL_TYPE),
+                        default=None,
+                        help="gain-split cell: model_only (VTLN model, "
+                        "plain inputs), selection_only (plain model, "
+                        "alpha-hat inputs) or query_inherit (VTLN model, "
+                        "queries at their source utterance's alpha-hat)")
     parser.add_argument("--allow-dirty", action="store_true",
                         help="run on uncommitted changes (recorded)")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.vtln and args.vtln_cell:
+        parser.error("--vtln and --vtln-cell are exclusive")
+    return args
 
 
 def utterance_distances(query_post, document_posts):
@@ -206,13 +217,16 @@ def vtln_run_inputs(args, gmm, info, doc_rows, examples):
     )
     paths = warped_paths_for({split for split, _ in doc_rows}, args.kind,
                              args.profile, args.features_dir)
-    last = info["n_vtln_iter"] - 1
-    trace = (args.gmm.with_name(args.gmm.stem + "_trace")
-             / f"iter{last}_alphas.tsv")
+    sources = {}
+    if "n_vtln_iter" in info:  # a plain model has no trace
+        last = info["n_vtln_iter"] - 1
+        trace = (args.gmm.with_name(args.gmm.stem + "_trace")
+                 / f"iter{last}_alphas.tsv")
+        sources = read_source_alphas(trace)
     return vtln_inputs(
         gmm, doc_rows, examples, load_example_audio(examples), paths,
         args.kind, args.profile, get_profile(args.profile, args.kind),
-        read_source_alphas(trace))
+        sources, inherit=args.vtln_cell == "query_inherit")
 
 
 def load_inputs(args, selection):
@@ -241,14 +255,17 @@ def main(argv=None):
     split_id = selection.split_id
     fingerprint = feature_fingerprint(args.kind, args.profile,
                                       exclude_sa=True)
+    model_type = expected_model_type(args.vtln, args.vtln_cell)
     check_model(info, args.kind, args.profile, split_id, fingerprint,
-                model_type="vtln" if args.vtln else "plain")
+                model_type=model_type)
     out = args.out or Path("outputs/eval") / args.gmm.stem
     utterances, doc_rows, relevance, examples = load_inputs(args, selection)
     if args.limit_queries:
         examples = examples[:args.limit_queries]
     vtln_info = {}
-    if args.vtln:
+    warped = args.vtln or args.vtln_cell in ("selection_only",
+                                             "query_inherit")
+    if warped:
         grams, clips, vtln_info = vtln_run_inputs(args, gmm, info, doc_rows,
                                                   examples)
         document_posts = [floor_and_renormalise(g) for g in grams]
@@ -257,7 +274,7 @@ def main(argv=None):
         document_posts = [
             floor_and_renormalise(gaussian_posteriorgram(gmm, u))
             for u in utterances]
-    per_query, skipped_short = [], 0
+    query_posts, per_query, skipped_short = [], [], 0
     for count, (example, features) in enumerate(zip(examples, clips), 1):
         if count % 20 == 0:
             print(f"query {count}/{len(examples)} "
@@ -267,6 +284,7 @@ def main(argv=None):
             continue
         query_post = floor_and_renormalise(
             gaussian_posteriorgram(gmm, features))
+        query_posts.append(query_post)
         distances, nonmatches = utterance_distances(
             query_post, document_posts)
         p_at_n, ap = score_query(distances, doc_rows,
@@ -285,9 +303,11 @@ def main(argv=None):
         "model_content_sha256": gmm_content_sha256(gmm),
         "model_info": info, "split_id": split_id,
         "feature_fingerprint": fingerprint,
-        "query_features": "clip" if args.vtln else args.query_features,
-        "model_type": "vtln" if args.vtln else "plain",
-        **({"vtln": vtln_info} if args.vtln else {}),
+        "query_features": "clip" if warped else args.query_features,
+        "model_type": model_type, "vtln_cell": args.vtln_cell,
+        "mean_entropy_documents": mean_posteriorgram_entropy(document_posts),
+        "mean_entropy_queries": mean_posteriorgram_entropy(query_posts),
+        **({"vtln": vtln_info} if warped else {}),
         "split_manifest": (str(args.split_manifest)
                            if args.split_manifest else None),
         "n_documents": len(doc_rows), "n_queries": len(per_query),

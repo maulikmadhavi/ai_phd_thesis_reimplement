@@ -11,6 +11,11 @@ lambda_r of a VTLN model:
   VTLN row stays comparable with the clip-mode no-VTLN rows
   (``query_features: "clip"``).
 
+Gain-split cells (``--vtln-cell``, K3): ``model_only`` (lambda_r, plain
+documents and clips), ``selection_only`` (lambda_init, alpha-hat for
+documents and clips) and ``query_inherit`` (documents as in the VTLN row;
+each query clip at its source utterance's final alpha-hat).
+
 Histograms and edge shares are in the thesis label (``2 - alpha_ours``).
 """
 
@@ -21,7 +26,7 @@ import numpy as np
 from qbestd.data.timit_hf import download_timit_parquet, iter_timit_rows
 from qbestd.data.warped_cache import build_warped_caches
 from qbestd.eval.timit_queries import cut_clip
-from qbestd.features.extract import extract_warped_bank
+from qbestd.features.extract import extract_features, extract_warped_bank
 from qbestd.ml.vtln import (
     WARP_FACTORS,
     edge_shares,
@@ -30,6 +35,17 @@ from qbestd.ml.vtln import (
     warp_histogram,
 )
 from qbestd.ml.vtln_train import estimate_test_warps
+
+
+CELL_MODEL_TYPE = {"model_only": "vtln", "selection_only": "plain",
+                   "query_inherit": "vtln"}
+
+
+def expected_model_type(vtln, cell=None):
+    """The ``model_type`` the run must load: by cell, else by ``--vtln``."""
+    if cell is not None:
+        return CELL_MODEL_TYPE[cell]
+    return "vtln" if vtln else "plain"
 
 
 def warped_paths_for(hf_splits, kind, profile, features_dir,
@@ -89,8 +105,17 @@ def read_source_alphas(path):
     return out
 
 
+def inherited_clip_features(clip, sample_rate, kind, config, alpha):
+    """Features of a clip at the warp ``alpha`` of its source utterance
+    (``query_inherit``); ``None`` for a clip too short for a frame."""
+    if len(clip) < round(config.frame_ms * sample_rate / 1000.0):
+        return None
+    return extract_features(clip, sample_rate, kind, alpha, config)
+
+
 def vtln_inputs(gmm, doc_keys, examples, audio, paths, kind, profile,
-                config, source_alphas=None, warps=WARP_FACTORS):
+                config, source_alphas=None, warps=WARP_FACTORS,
+                inherit=False):
     """Warped document posteriorgrams, query features and a summary dict.
 
     Args:
@@ -100,6 +125,8 @@ def vtln_inputs(gmm, doc_keys, examples, audio, paths, kind, profile,
         paths: ``warped_paths_for(...)`` covering the documents' HF splits.
         source_alphas: final train alpha-hat of the source utterances, for
             the share of queries whose alpha-hat differs from it.
+        inherit: ``query_inherit``: each query clip takes ``source_alphas``
+            instead of its own estimate; a missing source is an error.
 
     Returns:
         ``(posteriorgrams, query_features, info)``; a query whose clip is too
@@ -111,19 +138,29 @@ def vtln_inputs(gmm, doc_keys, examples, audio, paths, kind, profile,
     for example in examples:
         row = audio[(example.hf_split, example.row_index)]
         clip = cut_clip(row.audio, row.sample_rate, example)
+        source = (source_alphas or {}).get((example.hf_split,
+                                            example.row_index))
+        if inherit and source is None:
+            raise KeyError((example.hf_split, example.row_index))
         try:
-            features, alpha = clip_warp_features(
-                clip, row.sample_rate, kind, config, gmm, warps)
+            if inherit:
+                features = inherited_clip_features(
+                    clip, row.sample_rate, kind, config, source)
+                if features is None:
+                    raise ValueError("clip too short for a frame")
+                alpha = source
+            else:
+                features, alpha = clip_warp_features(
+                    clip, row.sample_rate, kind, config, gmm, warps)
         except ValueError:
             queries.append(np.zeros((0, gmm.dim)))
             continue
         queries.append(features)
         alphas.append(alpha)
-        source = (source_alphas or {}).get((example.hf_split,
-                                            example.row_index))
         if source is not None:
             differs.append(alpha != source)
     info = {"query_features": "clip",
+            "query_alpha": "inherited" if inherit else "own",
             "test_warp_histogram": warp_histogram(doc_alphas, warps),
             "test_edge_shares": edge_shares(doc_alphas, warps),
             "query_warp_histogram": warp_histogram(alphas, warps),

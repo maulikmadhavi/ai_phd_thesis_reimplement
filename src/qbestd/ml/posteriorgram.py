@@ -43,3 +43,18 @@ def utterance_log_likelihood(gmm, features):
     if len(features) == 0:
         return float("nan")
     return float(frame_log_likelihoods(gmm, features).mean())
+
+
+def mean_posteriorgram_entropy(posteriorgrams):
+    """Mean per-frame entropy (nats) over all frames of a list of
+    posteriorgrams (descriptive; ``nan`` without frames). Zero entries
+    count as zero."""
+    total, frames = 0.0, 0
+    for gram in posteriorgrams:
+        gram = np.asarray(gram, dtype="float64")
+        if len(gram) == 0:
+            continue
+        safe = np.where(gram > 0, gram, 1.0)
+        total += float(-(gram * np.log(safe)).sum())
+        frames += len(gram)
+    return total / frames if frames else float("nan")

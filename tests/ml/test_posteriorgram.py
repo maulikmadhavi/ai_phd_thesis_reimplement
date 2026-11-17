@@ -5,6 +5,7 @@ from qbestd.ml.gmm import DiagonalGmm, train_gmm
 from qbestd.ml.posteriorgram import (
     floor_and_renormalise,
     gaussian_posteriorgram,
+    mean_posteriorgram_entropy,
     utterance_log_likelihood,
 )
 
@@ -72,3 +73,14 @@ def test_likelihood_is_finite_for_far_outliers_and_nan_for_empty():
     gmm = gmm_at([[0, 0], [5, 5]])
     assert np.isfinite(utterance_log_likelihood(gmm, np.array([[1e4, 1e4]])))
     assert np.isnan(utterance_log_likelihood(gmm, np.zeros((0, 2))))
+
+
+def test_mean_entropy_is_zero_for_one_hot_and_log_k_for_uniform():
+    one_hot = np.eye(4)
+    uniform = np.full((3, 4), 0.25)
+    assert mean_posteriorgram_entropy([one_hot]) == pytest.approx(0.0)
+    assert mean_posteriorgram_entropy([uniform]) == pytest.approx(np.log(4))
+    # pooled over frames: 4 frames of 0 and 3 frames of log 4
+    assert mean_posteriorgram_entropy([one_hot, uniform]) == pytest.approx(
+        3 * np.log(4) / 7)
+    assert np.isnan(mean_posteriorgram_entropy([np.zeros((0, 4))]))
