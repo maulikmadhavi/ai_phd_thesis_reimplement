@@ -825,3 +825,40 @@ no-VTLN row does not have; it does not say that the level component causes
 the gain. **Author fact (D6 a, 2026-11-18): the thesis's HTK pipeline
 subtracted the mean and scaled the waveform to +-1**, so the un-normalised
 rows differ from the thesis on this point.
+
+### Score-free VTLN checks (declared)
+
+**Declared before any S1 number** (cycle 9, S1). No retrieval score is
+computed. Each part is reported in full and nothing is chosen from it.
+Clean tree; every summary records `git_commit_start` and `git_dirty`.
+
+- **(a) c0-marginalised alpha-hat.** Under each final lambda_r (MFCC
+  0-4000 Hz, MFCC 0-3400 Hz, PLP 0-4000 Hz, MFCC-TMP) the train alpha-hat is
+  re-estimated twice on the 3696 train utterances, with the same 13 warps and
+  tie-break: with all 39 dimensions, and with the static c0 dimension
+  (column 0) dropped from the diagonal GMM (means, variances and that
+  dimension of the log-likelihood; the weights stay). Reported: the share of
+  utterances whose alpha-hat differs between the two, the new histogram and
+  the new mean alpha_thesis. The baseline is alpha-hat under lambda_r itself,
+  not the iteration-4 alpha-hat (which was chosen under the previous model).
+- **(b) F0 against final alpha-hat.** Per-utterance median F0
+  (`audio/pitch.py`, 50 to 400 Hz) is recomputed for the 3696 train
+  utterances and saved under `outputs/` keyed by `(hf_split, row)` (not
+  committed). For the three D5 runs (MFCC 0-4000 Hz, PLP 0-4000 Hz,
+  MFCC-TMP), with the iteration-4 alpha-hat in the thesis label: Spearman rho
+  with F0 overall, and within F0 < 165 Hz and >= 165 Hz, each with a 95 %
+  percentile bootstrap interval over utterances (10000 resamples, seed 0;
+  anti-conservative, as there are no speaker IDs); and the partial
+  correlation of alpha-hat with the utterance mean c0 at alpha = 1, controlling
+  for F0 (Spearman partial: Pearson on ranks of the residuals of the ranks on
+  the ranks of F0). Utterances without F0 are left out of every statistic and
+  counted. Descriptive: the D3 (c) gate already passed.
+- **(c) Order approximation (K4).** Over all 5040 train and test utterances
+  of split v2, `r = max|x - m| / max|x|` of the raw waveform (`m` its mean)
+  and the implied MFCC c0 offset `sqrt(40) * 2 * |ln r|`. **Gate:** if the
+  99th percentile of the offset is <= 0.1 the approximation is negligible and
+  S3 goes ahead; otherwise **STOP** and report (matching the author's order
+  needs a feature source edit, which is a user decision). The distribution
+  (min, median, 99th percentile, max) is reported either way.
+- Nothing is tuned. Code: `ml/vtln_checks.py` and `eval/s1_checks.py`; outputs
+  go to `outputs/s1/`.
