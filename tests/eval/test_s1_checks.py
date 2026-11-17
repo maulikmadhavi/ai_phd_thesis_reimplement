@@ -96,8 +96,8 @@ def test_order_check_fails_the_gate_for_a_large_offset(monkeypatch):
 
 def test_c0_check_refuses_a_profile_without_c0_and_accepts_plp(monkeypatch):
     from qbestd.features.plp import PlpConfig
-    monkeypatch.setattr(s1, "get_profile",
-                        lambda profile, kind: SimpleNamespace(include_c0=False))
+    no_c0 = SimpleNamespace(include_c0=False)
+    monkeypatch.setattr(s1, "get_profile", lambda profile, kind: no_c0)
     with pytest.raises(ValueError, match="include_c0"):
         s1.c0_marginal_check("mfcc_4k", "unused")
 

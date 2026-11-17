@@ -862,3 +862,82 @@ Clean tree; every summary records `git_commit_start` and `git_dirty`.
   (min, median, 99th percentile, max) is reported either way.
 - Nothing is tuned. Code: `ml/vtln_checks.py` and `eval/s1_checks.py`; outputs
   go to `outputs/s1/`.
+
+### Score-free VTLN checks
+
+Run as declared above, no retrieval score. Part (c) ran from `fa01e4d`;
+parts (a) and (b) from `cc086de` (the first attempt failed on PLP, which has
+no `include_c0` switch although its c0 is column 0; `cc086de` fixed that
+guard). All clean trees (`git_dirty: false`). Run time: (a) 337 s,
+(b) 148 s, (c) 14 s. Outputs are in
+git-ignored `outputs/s1/`, including per-utterance F0 (`f0_train.tsv`).
+
+#### (c) Order approximation: gate met
+
+`r = max|x - m| / max|x|` over all 5040 train and test
+utterances of split v2:
+
+| Quantity | min | median | 99th percentile | max |
+|---|---|---|---|---|
+| r | 0.999650 | 0.999999 | 1.000205 | 1.000428 |
+| implied MFCC c0 offset | 2.49e-07 | 6.14e-04 | 0.0030 | 0.0054 |
+
+**The declared gate is met:** the 99th percentile of the offset is
+0.0030, at most 0.1, so the order approximation (peak-normalise
+first, remove the mean afterwards) is negligible and S3 goes ahead. For
+scale, the c0 spread across utterances is about 5.3 and a gain of 2 shifts
+c0 by 8.77.
+
+#### (a) c0-marginalised alpha-hat (train utterances, 3696)
+
+Under each final lambda_r, alpha-hat with all 39 dimensions against alpha-hat
+with the static c0 dimension dropped (same warps, same tie-break):
+
+| Run | Share whose alpha-hat changes | Mean alpha_thesis, all dims | Mean alpha_thesis, c0 dropped | Edge shares 0.88 / 1.12, all dims | Edge shares 0.88 / 1.12, c0 dropped |
+|---|---|---|---|---|---|
+| MFCC 0-4000 Hz (un-normalised, earlier reference) | 0.136 | 1.0221 | 1.0219 | 0.051 / 0.141 | 0.054 / 0.151 |
+| MFCC 0-3400 Hz (run 1, earlier reference) | 0.124 | 0.9889 | 0.9888 | 0.078 / 0.133 | 0.078 / 0.141 |
+| PLP 0-4000 Hz (un-normalised, earlier reference) | 0.064 | 1.0339 | 1.0338 | 0.087 / 0.216 | 0.089 / 0.215 |
+| MFCC-TMP (`timit_matlab`) | 0.138 | 1.0310 | 1.0307 | 0.082 / 0.152 | 0.091 / 0.162 |
+
+Histograms (thesis label, counts):
+
+| Run | 1.12 | 1.10 | 1.08 | 1.06 | 1.04 | 1.02 | 1.00 | 0.98 | 0.96 | 0.94 | 0.92 | 0.90 | 0.88 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| MFCC 0-4000 Hz (un-normalised, earlier reference), all 39 dimensions | 521 | 236 | 185 | 586 | 426 | 303 | 336 | 105 | 221 | 247 | 246 | 94 | 190 |
+| MFCC 0-4000 Hz (un-normalised, earlier reference), c0 dropped | 558 | 233 | 174 | 548 | 421 | 270 | 382 | 113 | 222 | 236 | 249 | 91 | 199 |
+| MFCC 0-3400 Hz (run 1, earlier reference), all 39 dimensions | 491 | 38 | 166 | 66 | 225 | 70 | 622 | 545 | 367 | 135 | 252 | 432 | 287 |
+| MFCC 0-3400 Hz (run 1, earlier reference), c0 dropped | 520 | 39 | 164 | 60 | 202 | 67 | 588 | 542 | 392 | 137 | 267 | 428 | 290 |
+| PLP 0-4000 Hz (un-normalised, earlier reference), all 39 dimensions | 797 | 561 | 240 | 507 | 261 | 108 | 144 | 42 | 179 | 169 | 234 | 134 | 320 |
+| PLP 0-4000 Hz (un-normalised, earlier reference), c0 dropped | 793 | 558 | 246 | 514 | 253 | 110 | 142 | 46 | 183 | 166 | 229 | 126 | 330 |
+| MFCC-TMP (`timit_matlab`), all 39 dimensions | 563 | 535 | 541 | 394 | 213 | 227 | 128 | 111 | 137 | 202 | 202 | 140 | 303 |
+| MFCC-TMP (`timit_matlab`), c0 dropped | 597 | 547 | 516 | 374 | 208 | 225 | 130 | 92 | 134 | 195 | 201 | 142 | 335 |
+
+Dropping c0 changes alpha-hat for 0.064
+to 0.138 of the utterances; the mean
+alpha_thesis moves by less than 0.001 in every run and the histograms keep their
+shape. In this measure c0 drives part of the individual choices (the MFCC
+runs 0.124 to 0.138, PLP 0.064), not the distribution. This is a description;
+it does not say what a level normalisation would do to retrieval.
+
+#### (b) F0 and c0 against the final alpha-hat
+
+Spearman correlations, alpha-hat in the thesis label (iteration 4), 3696 train
+utterances (none without F0 or c0); 95 % percentile bootstrap over utterances,
+10000 resamples (anti-conservative: no speaker IDs). The two F0 groups hold
+2595 (F0 < 165 Hz) and 1101 (>= 165 Hz) utterances. The partial correlation
+is of alpha-hat with the utterance mean c0 at alpha = 1, controlling for F0.
+
+| Run | rho(F0, alpha) all | within F0 < 165 Hz | within F0 >= 165 Hz | rho(c0, alpha) | partial rho(c0, alpha given F0) |
+|---|---|---|---|---|---|
+| MFCC 0-4000 Hz (un-normalised, earlier reference) | -0.697 (-0.716 to -0.677) | -0.235 (-0.272 to -0.198) | -0.441 (-0.490 to -0.388) | +0.252 (+0.223 to +0.281) | +0.235 (+0.205 to +0.266) |
+| PLP 0-4000 Hz (un-normalised, earlier reference) | -0.688 (-0.707 to -0.667) | -0.181 (-0.220 to -0.143) | -0.422 (-0.472 to -0.369) | +0.160 (+0.129 to +0.191) | +0.206 (+0.174 to +0.237) |
+| MFCC-TMP (`timit_matlab`) | -0.745 (-0.762 to -0.727) | -0.339 (-0.374 to -0.303) | -0.435 (-0.485 to -0.382) | +0.035 (+0.003 to +0.067) | +0.076 (+0.044 to +0.107) |
+
+The negative correlation with F0 is present in every run and is smaller
+within each F0 group than overall, as expected when the two gender clusters
+carry part of it; it stays clearly non-zero within both groups. The partial
+correlation of alpha-hat with mean c0 given F0 is small and positive in the
+three runs (largest for MFCC, 0.235; MFCC-TMP, whose features are
+peak-normalised, 0.076). All of this is descriptive; the D3 (c) gate already
+passed.
