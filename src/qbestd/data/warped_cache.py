@@ -54,13 +54,15 @@ def _positions(row_indices):
 
 
 def ll_matrix_from_caches(paths, gmm, keys, kind, profile,
-                          warps=WARP_FACTORS):
+                          warps=WARP_FACTORS, drop_dim=None):
     """Log-likelihood of every utterance at every warp, ``(n_utt, n_warps)``.
 
     Args:
         paths: ``{alpha: {hf_split: cache path}}``.
         keys: ``(hf_split, row_index)`` per utterance, in output order.
         kind, profile: checked against each file's fingerprint.
+        drop_dim: feature column removed before scoring (``gmm`` must then
+            be the marginal GMM without that dimension; S1 a).
 
     Streams one warp, and one HF split of it, at a time.
 
@@ -73,6 +75,8 @@ def ll_matrix_from_caches(paths, gmm, keys, kind, profile,
     for column, alpha in enumerate(warps):
         for hf_split, path in paths[float(alpha)].items():
             features, offsets, rows, _ = _read(path, kind, profile, alpha)
+            if drop_dim is not None:
+                features = np.delete(features, drop_dim, axis=1)
             per_row = utterance_log_likelihoods(features, offsets, gmm)
             where = _positions(rows)
             for index, (split, row) in enumerate(keys):

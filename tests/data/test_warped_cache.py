@@ -160,3 +160,22 @@ def test_a_missing_hf_split_leaves_nan_and_the_estimate_refuses_it(caches):
     assert np.all(np.isnan(matrix[-1])) and np.all(np.isfinite(matrix[:-1]))
     with pytest.raises(ValueError, match="finite"):
         estimate_warp_factors(matrix, WARPS)
+
+
+def test_dropping_a_dimension_scores_the_marginal_model(caches):
+    from qbestd.ml.vtln_checks import drop_dimension
+    out, paths = caches
+    keys = [("train", 0), ("train", 1), ("train", 2)]
+    gmm = tiny_gmm()
+    matrix = ll_matrix_from_caches(paths, drop_dimension(gmm, 0), keys,
+                                   KIND, PROFILE, WARPS, drop_dim=0)
+    features, offsets, rows, _ = load_feature_cache(
+        paths[1.0]["train"], feature_fingerprint(KIND, PROFILE,
+                                                 warp_factor=1.0))
+    frame_ll = frame_log_likelihoods(drop_dimension(gmm, 0),
+                                     np.delete(features, 0, axis=1))
+    for position in range(3):
+        expected = frame_ll[offsets[position]:offsets[position + 1]].sum()
+        assert matrix[position, 1] == pytest.approx(expected)
+    full = ll_matrix_from_caches(paths, gmm, keys, KIND, PROFILE, WARPS)
+    assert not np.allclose(full, matrix)
