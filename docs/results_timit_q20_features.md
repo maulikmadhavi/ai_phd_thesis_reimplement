@@ -1078,3 +1078,188 @@ rows are the un-normalised earlier reference.
   mean posteriorgram entropy.
 - A `ll_decreased` is recorded and does not stop the chain (D4); a failing
   `selection_step_ok` or any need to edit a feature source file is a STOP.
+
+### Normalised HTK reference (D6)
+
+**User decision D6 (2026-11-18): `htk_described_4k_pn` is the reference for
+MFCC and PLP, whatever it scores.** Declared above ("Normalised reference
+runs (declared)"); run as declared, one run at a time on a clean tree, from
+`84e26bc` (the MFCC train-vtln was first killed by a machine shutdown and
+re-run from the same commit; the MFCC plain GMM-64, its no-VTLN evaluation
+and the 26 MFCC warp caches from before the stop were reused, each after its
+model hash or fingerprint check). GMM-64, split v2, N_iter 5, fresh LBG (D4),
+145 queries, 1344 documents, clip query features, A1 scorer, 10000 bootstrap
+resamples, seed 0. These rows are **not** merged into the un-normalised
+tables above; the un-normalised rows are repeated here only for the paired
+comparison. Nothing was tuned.
+
+| Row | p@N, instance avg (95% CI) | MAP, instance avg (95% CI) | p@N, keyword avg (95% CI) | MAP, keyword avg (95% CI) | Queries | Non-matches |
+|---|---|---|---|---|---|---|
+| MFCC 0-4000 Hz, normalised (`htk_described_4k_pn`), thesis, no VTLN | 34.91 | 36.71 | n/s | n/s | 145 | n/a |
+| MFCC 0-4000 Hz, normalised (`htk_described_4k_pn`), thesis, VTLN | 36.26 | 39.62 | n/s | n/s | 145 | n/a |
+| MFCC 0-4000 Hz, normalised (`htk_described_4k_pn`), GMM-64, no VTLN | 37.04 (27.7-47.0) | 38.75 (28.5-50.0) | 34.23 (25.7-43.1) | 36.44 (27.0-46.2) | 145 | 1 |
+| MFCC 0-4000 Hz, normalised (`htk_described_4k_pn`), GMM-64, GMM-VTLN | 45.10 (35.1-55.5) | 48.10 (37.0-59.8) | 43.06 (32.7-53.6) | 45.80 (35.0-56.9) | 145 | 2 |
+| MFCC 0-4000 Hz, un-normalised (earlier reference), GMM-64, no VTLN | 37.48 (28.0-47.6) | 40.50 (30.1-52.1) | 35.07 (26.6-43.9) | 37.84 (28.4-47.6) | 145 | 3 |
+| MFCC 0-4000 Hz, un-normalised (earlier reference), GMM-64, GMM-VTLN | 48.17 (37.3-59.9) | 50.58 (39.0-62.9) | 44.95 (34.5-55.9) | 46.88 (35.7-58.5) | 145 | 1 |
+| PLP 0-4000 Hz, normalised (`htk_described_4k_pn`), thesis, no VTLN | 35.50 | 37.58 | n/s | n/s | 145 | n/a |
+| PLP 0-4000 Hz, normalised (`htk_described_4k_pn`), thesis, VTLN | 37.48 | 39.95 | n/s | n/s | 145 | n/a |
+| PLP 0-4000 Hz, normalised (`htk_described_4k_pn`), GMM-64, no VTLN | 36.88 (28.0-46.4) | 37.83 (28.2-48.3) | 34.20 (26.0-42.7) | 35.25 (26.6-44.1) | 145 | 0 |
+| PLP 0-4000 Hz, normalised (`htk_described_4k_pn`), GMM-64, GMM-VTLN | 45.85 (36.3-56.5) | 49.03 (38.4-60.6) | 44.61 (34.9-54.6) | 47.34 (36.7-58.3) | 145 | 0 |
+| PLP 0-4000 Hz, un-normalised (earlier reference), GMM-64, no VTLN | 38.59 (29.1-48.5) | 39.75 (29.3-50.9) | 35.82 (27.1-44.8) | 36.81 (27.5-46.5) | 145 | 0 |
+| PLP 0-4000 Hz, un-normalised (earlier reference), GMM-64, GMM-VTLN | 45.37 (35.5-56.2) | 48.99 (38.2-60.9) | 43.29 (33.6-53.5) | 46.55 (36.0-57.7) | 145 | 0 |
+
+(n/s: not stated in the thesis.) Targets: `Tab:TIMITPerformance` GMM-64 rows
+for the no-VTLN pairs, `Tab:TIMITVTLNPerformance1` for the VTLN pairs.
+
+#### Gap to the thesis (descriptive, no cause attached)
+
+Instance average, ours minus thesis, p@N / MAP; last column the thesis's own
+gain.
+
+| Run | no VTLN | VTLN | Thesis gain (VTLN minus no VTLN) |
+|---|---|---|---|
+| MFCC normalised | +2.13 / +2.04 | +8.84 / +8.48 | +1.35 / +2.91 |
+| PLP normalised | +1.38 / +0.25 | +8.37 / +9.08 | +1.98 / +2.37 |
+
+#### Paired VTLN minus no-VTLN, normalised reference
+
+| Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) | Thesis gain against our instance interval (p@N / MAP) |
+|---|---|---|---|---|---|
+| MFCC normalised | instance | +8.07 (+3.7 to +12.0) | +9.35 (+4.9 to +13.1) | yes / yes | below / below |
+| MFCC normalised | keyword | +8.83 (+4.1 to +14.0) | +9.35 (+4.8 to +14.2) | yes / yes | |
+| PLP normalised | instance | +8.97 (+6.1 to +12.2) | +11.20 (+8.4 to +14.3) | yes / yes | below / below |
+| PLP normalised | keyword | +10.42 (+6.5 to +15.4) | +12.10 (+8.3 to +16.8) | yes / yes | |
+
+The last column puts the thesis's gain against our instance interval
+("below", "inside", "above"); it is descriptive, not a test.
+
+#### Normalised minus un-normalised (same queries)
+
+| Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) |
+|---|---|---|---|---|
+| MFCC normalised minus un-normalised, no VTLN | instance | -0.44 (-2.0 to +1.1) | -1.76 (-3.36 to +0.03) | no / no |
+| MFCC normalised minus un-normalised, no VTLN | keyword | -0.84 (-2.4 to +0.7) | -1.40 (-2.9 to +0.2) | no / no |
+| MFCC normalised minus un-normalised, VTLN | instance | -3.06 (-6.8 to +0.8) | -2.49 (-5.8 to +1.0) | no / no |
+| MFCC normalised minus un-normalised, VTLN | keyword | -1.89 (-5.5 to +1.8) | -1.09 (-4.5 to +2.5) | no / no |
+| PLP normalised minus un-normalised, no VTLN | instance | -1.71 (-4.3 to +0.8) | -1.92 (-4.1 to +0.3) | no / no |
+| PLP normalised minus un-normalised, no VTLN | keyword | -1.62 (-4.1 to +0.9) | -1.56 (-3.6 to +0.5) | no / no |
+| PLP normalised minus un-normalised, VTLN | instance | +0.48 (-1.0 to +2.2) | +0.04 (-1.2 to +1.5) | no / no |
+| PLP normalised minus un-normalised, VTLN | keyword | +1.33 (-0.5 to +3.4) | +0.79 (-0.8 to +2.7) | no / no |
+
+#### MFCC-TMP minus MFCC, and PLP minus MFCC, under the normalised reference
+
+| Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) |
+|---|---|---|---|---|
+| MFCC-TMP minus MFCC normalised, no VTLN | instance | +2.14 (-0.1 to +4.2) | +2.40 (-0.6 to +4.9) | no / no |
+| MFCC-TMP minus MFCC normalised, no VTLN | keyword | +1.21 (-1.0 to +3.5) | +1.21 (-1.7 to +4.0) | no / no |
+| MFCC-TMP minus MFCC normalised, VTLN | instance | -1.03 (-4.3 to +2.0) | -0.73 (-3.6 to +2.7) | no / no |
+| MFCC-TMP minus MFCC normalised, VTLN | keyword | -1.63 (-4.8 to +1.4) | -1.24 (-4.1 to +1.9) | no / no |
+| PLP minus MFCC, both normalised, no VTLN | instance | -0.15 (-2.9 to +2.8) | -0.92 (-3.4 to +1.7) | no / no |
+| PLP minus MFCC, both normalised, no VTLN | keyword | -0.03 (-2.7 to +2.7) | -1.20 (-3.5 to +1.3) | no / no |
+| PLP minus MFCC, both normalised, VTLN | instance | +0.75 (-2.1 to +4.2) | +0.93 (-1.9 to +4.0) | no / no |
+| PLP minus MFCC, both normalised, VTLN | keyword | +1.56 (-1.4 to +4.8) | +1.54 (-1.0 to +4.1) | no / no |
+
+MFCC-TMP (`timit_matlab`) is the same row as in the earlier tables. The
+thesis's MFCC-TMP advantage is +5.12 / +4.79 without VTLN and +6.62 / +5.90
+with VTLN. As before, the features differ in lineage, filter count, level
+handling and VTLN response at once, so nothing is claimed about Teager
+energy.
+
+#### Gain split of the normalised rows (model only, selection only)
+
+| Cell | p@N, instance (95% CI) | MAP, instance (95% CI) | p@N, keyword (95% CI) | MAP, keyword (95% CI) | Mean entropy documents / queries (nats) |
+|---|---|---|---|---|---|
+| MFCC normalised, no VTLN | 37.04 (27.7-47.0) | 38.75 (28.5-50.0) | 34.23 (25.7-43.1) | 36.44 (27.0-46.2) | 0.4357 / 0.4670 |
+| MFCC normalised, model only | 37.96 (28.8-48.0) | 40.73 (30.3-52.0) | 36.31 (27.5-45.5) | 38.74 (29.1-48.7) | 0.4366 / 0.4392 |
+| MFCC normalised, selection only | 39.18 (29.7-49.0) | 41.54 (30.9-52.6) | 37.61 (28.4-47.1) | 39.57 (29.3-49.9) | 0.4347 / 0.4590 |
+| MFCC normalised, both = VTLN row | 45.10 (35.1-55.5) | 48.10 (37.0-59.8) | 43.06 (32.7-53.6) | 45.80 (35.0-56.9) | 0.4200 / 0.4098 |
+| PLP normalised, no VTLN | 36.88 (28.0-46.4) | 37.83 (28.2-48.3) | 34.20 (26.0-42.7) | 35.25 (26.6-44.1) | 0.4490 / 0.4631 |
+| PLP normalised, model only | 35.91 (27.5-45.1) | 38.93 (29.1-49.9) | 34.12 (26.1-42.3) | 37.00 (28.3-46.1) | 0.4430 / 0.4480 |
+| PLP normalised, selection only | 41.37 (31.0-52.7) | 43.54 (31.9-56.4) | 38.37 (29.1-47.8) | 39.97 (29.9-50.4) | 0.4489 / 0.4562 |
+| PLP normalised, both = VTLN row | 45.85 (36.3-56.5) | 49.03 (38.4-60.6) | 44.61 (34.9-54.6) | 47.34 (36.7-58.3) | 0.4198 / 0.4230 |
+
+| Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) |
+|---|---|---|---|---|
+| MFCC normalised, model only | instance | +0.92 (-2.0 to +3.6) | +1.98 (-1.2 to +4.6) | no / no |
+| MFCC normalised, model only | keyword | +2.08 (-1.2 to +5.6) | +2.30 (-0.7 to +4.9) | no / no |
+| MFCC normalised, selection only | instance | +2.14 (-1.9 to +6.2) | +2.79 (-0.9 to +6.4) | no / no |
+| MFCC normalised, selection only | keyword | +3.39 (-1.0 to +8.0) | +3.13 (-0.7 to +7.1) | no / no |
+| MFCC normalised, both = VTLN row | instance | +8.07 (+3.7 to +12.0) | +9.35 (+4.9 to +13.1) | yes / yes |
+| MFCC normalised, both = VTLN row | keyword | +8.83 (+4.1 to +14.0) | +9.35 (+4.8 to +14.2) | yes / yes |
+| PLP normalised, model only | instance | -0.98 (-3.2 to +1.5) | +1.10 (-0.9 to +3.2) | no / no |
+| PLP normalised, model only | keyword | -0.08 (-2.3 to +2.4) | +1.76 (-0.2 to +3.7) | no / no |
+| PLP normalised, selection only | instance | +4.48 (+0.5 to +8.4) | +5.71 (+2.0 to +9.4) | yes / yes |
+| PLP normalised, selection only | keyword | +4.18 (+0.3 to +8.1) | +4.73 (+1.5 to +8.3) | yes / yes |
+| PLP normalised, both = VTLN row | instance | +8.97 (+6.1 to +12.2) | +11.20 (+8.4 to +14.3) | yes / yes |
+| PLP normalised, both = VTLN row | keyword | +10.42 (+6.5 to +15.4) | +12.10 (+8.3 to +16.8) | yes / yes |
+
+The cells describe where the gain shows up; no mechanism is claimed, and the
+two halves need not add up to the total.
+
+#### LL per iteration, `ll_decreased` and `selection_step_ok` (fresh LBG, D4)
+
+`ll_decreased` is recorded and did not stop the chain; `selection_step_ok`
+is the check of K1 (a `False` would have been a STOP).
+
+**MFCC normalised**
+
+| Iteration | LL of lambda_init on X^alpha_hat | LL of new model | ll_decreased | selection_step_ok | Share changed | Edge share 0.88 | Edge share 1.12 |
+|---|---|---|---|---|---|---|---|
+| 0 | -116.3300 | -116.2476 | no | n/a | 0.748 | 0.014 | 0.044 |
+| 1 | -116.2050 | -116.2002 | no | True | 0.468 | 0.038 | 0.070 |
+| 2 | -116.1846 | -116.1598 | no | True | 0.314 | 0.048 | 0.088 |
+| 3 | -116.1491 | -116.1524 | **yes** | True | 0.246 | 0.055 | 0.112 |
+| 4 | -116.1461 | -116.1330 | no | True | 0.204 | 0.055 | 0.128 |
+
+**PLP normalised**
+
+| Iteration | LL of lambda_init on X^alpha_hat | LL of new model | ll_decreased | selection_step_ok | Share changed | Edge share 0.88 | Edge share 1.12 |
+|---|---|---|---|---|---|---|---|
+| 0 | 13.4833 | 13.7460 | no | n/a | 0.852 | 0.081 | 0.067 |
+| 1 | 13.8324 | 13.8233 | **yes** | True | 0.554 | 0.115 | 0.113 |
+| 2 | 13.8404 | 13.8838 | no | True | 0.292 | 0.112 | 0.147 |
+| 3 | 13.8904 | 13.8838 | **yes** | True | 0.190 | 0.103 | 0.172 |
+| 4 | 13.8871 | 13.8710 | **yes** | True | 0.146 | 0.095 | 0.197 |
+
+#### Warp statistics and provenance
+
+Mean alpha-hat in the thesis label per iteration over the 3696 train
+utterances, with the share above 1.00 in brackets (iterations 0 to 4):
+
+| Run | 0 | 1 | 2 | 3 | 4 |
+|---|---|---|---|---|---|
+| MFCC normalised | 1.003 (0.388) | 1.006 (0.477) | 1.011 (0.526) | 1.015 (0.565) | 1.018 (0.581) |
+| PLP normalised | 1.010 (0.520) | 1.019 (0.618) | 1.025 (0.649) | 1.028 (0.659) | 1.031 (0.665) |
+
+Final train alpha-hat histogram (thesis label, counts of 3696):
+
+| Run | 1.12 | 1.10 | 1.08 | 1.06 | 1.04 | 1.02 | 1.00 | 0.98 | 0.96 | 0.94 | 0.92 | 0.90 | 0.88 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| MFCC normalised | 473 | 209 | 180 | 553 | 421 | 313 | 412 | 110 | 225 | 252 | 245 | 100 | 203 |
+| PLP normalised | 729 | 567 | 243 | 521 | 265 | 133 | 142 | 47 | 167 | 153 | 238 | 139 | 352 |
+
+| Run | VTLN model hash | ll_decreased at iteration | selection_step_ok all | Train edge shares 0.88 / 1.12 (final) | Share changed (final) | Test-document edge shares | Query edge shares | Queries with alpha-hat different from source | train-vtln time / peak memory | Start commit | Dirty |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| MFCC normalised | `b1f4340f926b...` | 3 | True | 0.055 / 0.128 | 0.204 | 0.056 / 0.154 | 0.041 / 0.228 | 0.71 | 1078 s / 931 MB | `84e26bc` | False |
+| PLP normalised | `c36b1d136023...` | 1, 3, 4 | True | 0.095 / 0.197 | 0.146 | 0.083 / 0.219 | 0.062 / 0.290 | 0.61 | 1823 s / 1256 MB | `84e26bc` | False |
+
+#### What the normalised rows show (facts only)
+
+- Normalised minus un-normalised: every paired interval includes 0, with and
+  without VTLN, for both features (MFCC no VTLN -0.44 / -1.76, VTLN -3.06 /
+  -2.49; PLP no VTLN -1.71 / -1.92, VTLN +0.48 / +0.04, p@N / MAP instance).
+  The normalisation does not establish a difference at this sample size.
+- Gap to the thesis: the no-VTLN rows stay above the thesis's (MFCC +2.13 /
+  +2.04, PLP +1.38 / +0.25), and the paired VTLN gains (MFCC +8.07 / +9.35,
+  PLP +8.97 / +11.20) stay far above the thesis's (+1.35 / +2.91 and
+  +1.98 / +2.37), which lie below our instance intervals. No cause is
+  claimed.
+- MFCC-TMP minus MFCC: without VTLN +2.14 / +2.40 and with VTLN -1.03 /
+  -0.73; every interval includes 0. The thesis's MFCC-TMP advantage is not
+  reproduced under the normalised reference either; nothing is claimed about
+  Teager energy. PLP minus MFCC intervals all include 0.
+- Gain split: for MFCC neither cell's interval excludes 0 (model only
+  +0.92 / +1.98, selection only +2.14 / +2.79); for PLP *selection only*
+  excludes 0 (+4.48 / +5.71) and *model only* does not (-0.98 / +1.10).
+- `ll_decreased` fired at iteration 3 (MFCC) and at 1, 3 and 4 (PLP);
+  `selection_step_ok` held in every iteration of both runs.
