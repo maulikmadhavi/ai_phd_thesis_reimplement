@@ -1,13 +1,14 @@
 # Execution Plan: QbE-STD Thesis Reimplementation
 
-- **Cycle:** 9 (Orchestrator)
-- **Handoff input:** `handoff_response.md` at `5fd6ef0` (Handoff_feedback review of cycle 8,
-  Q1–Q8), plus user decision D6 (2026-11-18)
-- **Stage status:** Stages 0–3, split v2 and Stage 4 GMM-VTLN (GMM-64) are done on the
-  un-normalised `htk_described_4k` profile and on MFCC-TMP. 666 passed, 4 skipped.
-- **This cycle:** review fix-ups and diagnostic code (part A, §8), then score-free VTLN
-  checks, a 2×2 split of the VTLN gain, and the new level-normalised reference
-  `htk_described_4k_pn` for MFCC and PLP (part B, §9)
+- **Cycle:** 10 (Orchestrator)
+- **Handoff input:** `handoff_response.md` at `fa101e0` (Handoff_feedback review of cycle 9,
+  Q1–Q7), plus user decision D7 (2026-11-21)
+- **Stage status:** Stages 0–3, split v2 and Stage 4 GMM-VTLN (GMM-64) are done, on the
+  un-normalised `htk_described_4k`, on the normalised `htk_described_4k_pn` (per-clip
+  query level) and on MFCC-TMP.
+- **This cycle:** the level-matched query path `clip_lm` (D7), post hoc tables and doc
+  fixes (part A, §8), then the c0 null control, the level-matched reference evaluations,
+  and plain GMM-128 under the reference (part B, §9)
 - **Review agent:** from the cycle 6 review on, `handoff_response.md` comes from the
   Claude Code session Handoff_feedback, not Codex (protocol in `requirements.md`)
 - **Source of truth:** thesis `D:\Storage\career_phd_daiict_work\Thesis` (`Chapters/*.tex`,
@@ -140,6 +141,7 @@ comparable, until the split matches (§8 C5, split v2).
 | D3 | **User decision:** reference band, HTK facts and VTLN facts | **Resolved 2026-11-16 (author):** run Stage 4 on both bands (0–3400 and 0–4000 Hz). α > 1 is the male side and the warped features came from HTK `WARPFREQ`, so our label is mirrored (α_thesis = 2 − α_ours). `USEPOWER`, `LOFREQ`, the warp cutoffs, fresh vs warm start and the iteration count are not known; the defaults are kept (§7, §9). |
 | D5 | **User decision:** which band carries forward? | **Resolved 2026-11-17 (author):** 0–4000 Hz only. `htk_described_4k` is the MFCC/PLP reference, and the 0–3400 Hz rows are an earlier reference (§9 W3). |
 | D6 | **User decision:** did the thesis HTK pipeline normalise level? | **Resolved 2026-11-18 (author):** mean subtraction, then scaling to ±1. `htk_described_4k_pn` (DC removal and peak normalisation on) becomes the MFCC/PLP reference; the band stays 0–4000 Hz; `htk_described_4k` rows are the un-normalised earlier reference. Diagnostic compute approved (§9). |
+| D7 | **User decision:** were queries normalised per cut file or cut from the normalised utterance? | **Resolved 2026-11-21 (author):** the whole utterance was normalised (mean subtraction, max set to 1), then the query was cut from it. The level-matched clip path `clip_lm` under `htk_described_4k_pn` becomes the reference; the per-clip `pn` rows are an earlier reference. All diagnostic compute and plain GMM-128 approved (§9). |
 | 26 | Carry the HF baseline forward? | **No** (Codex Q3): v2 is the primary Q-20 comparison; HF v2 and text-disjoint v1 are one-off references. |
 
 Codex decisions adopted:
@@ -389,203 +391,240 @@ Codex decisions adopted:
   correlations on the final α̂. Q7: "not reproduced" wording and a heading rename.
   Q8: small fixes.
 
+**Cycle 9 (done, `a1d582b..9785a28`; reviewed in `handoff_response.md` at `fa101e0`):**
+- K1–K5: `selection_step_ok`, the small fixes, the `--vtln-cell` options with entropy,
+  the profile `htk_described_4k_pn`, and docs.
+- S1, score-free checks:
+  - the S1 (c) order gate passed;
+  - dropping static c0 changes α̂ for 12–14 % of utterances (MFCC) and 6.4 % (PLP). The
+    mean and the histogram are unchanged, and no null has been measured yet;
+  - α̂ correlates negatively with F0, overall and within each F0 group.
+- S2, gain split of the un-normalised rows (instance, paired against no VTLN):
+  - MFCC: model only +1.98 / +1.42 (includes 0); selection only +3.77 / +4.07; both
+    +10.69 / +10.08;
+  - PLP: selection only cannot be told apart from the full row (VTLN − selection only is
+    +1.26, interval includes 0);
+  - `query_inherit` − VTLN: PLP +1.98 / +1.87 (excludes 0); MFCC includes 0.
+- S3, normalised reference `htk_described_4k_pn` (GMM-64, instance p@N / MAP):
+
+  | Feature | No VTLN | VTLN | Paired gain | Thesis gain |
+  |---|---|---|---|---|
+  | MFCC | 37.04 / 38.75 | 45.10 / 48.10 | +8.07 / +9.35 | +1.35 / +2.91 |
+  | PLP | 36.88 / 37.83 | 45.85 / 49.03 | +8.97 / +11.20 | +1.98 / +2.37 |
+
+  - α̂ is now gain-invariant, but the VTLN gain is still above the thesis's on every
+    metric.
+  - The 1.12 edge share is unchanged.
+  - Every thesis row lies inside our marginal intervals; only the paired gain separates
+    us from the thesis.
+  - MFCC-TMP − MFCC with level handling matched:
+    - with VTLN: −1.03 / −0.73;
+    - without VTLN: +2.14 / +2.40 (both intervals include 0).
+- **Found in review:**
+  - under `pn`, each query clip is normalised on its own, which makes clips louder than
+    their source utterance (median ratio 1.44, p90 2.70);
+  - the HF TIMIT copy has no speaker field, and its rows are shuffled.
+
+**Decisions adopted from `fa101e0` and the user (2026-11-21, D7):**
+- **D7 (a), author fact, query level:** the thesis's pipeline normalised the **whole
+  utterance** (mean subtraction, max set to 1) and then cut the query from it. So under
+  `pn` our per-clip normalisation does not match the thesis.
+- **D7 (b), new reference query path:** the **level-matched clip** (`clip_lm`) becomes
+  the reference query path under `htk_described_4k_pn`:
+  1. take the utterance waveform after the utterance-level normalisation, exactly as the
+     documents get it;
+  2. cut the clip from it at the usual word boundaries;
+  3. extract its features with `remove_dc=False` and `normalize_peak=False`.
+
+  It keeps clip-mode edges and deltas, and query α̂ under VTLN is estimated as usual. The
+  per-clip `pn` rows from S3 become the **per-clip earlier reference**. Documents and
+  models are unchanged.
+- **D7 (c), compute approved, all:**
+  - the c0 null control (score-free);
+  - the level-matched evaluations;
+  - then plain GMM-128 for MFCC and PLP under the reference.
+- **Speaker IDs (Q2):** not pursued. The user has no LDC copy (D1), and the HF copy has
+  no speaker field.
+- Q1: post hoc paired table, with no "mostly" and no ratios or sum column; `query_inherit`
+  given as a paired difference. Q2: churn null and drop-c_k control; F0 wording without
+  "speaker" or "gender"; partial ρ is not evidence of the level mechanism.
+- Q3: "does not bring our gain to the thesis's", plus the two-changes caveat. Q5:
+  qualified "not reproduced". Q6: the edge LL-margin check (zero compute), no grid change.
+  Q7: relabel the thesis rows, add the K1 note, and add the process note below.
+- **Process rule (Q7):** a report commit (`exec: evaluate ...`, `exec: run ...`) touches
+  docs only. Code and test changes go in their own commits.
+
 ---
 
-## 8. Cycle 9, part A: review fix-ups and diagnostic code (Handoff_feedback `5fd6ef0`)
+## 8. Cycle 10, part A: level-matched query path, post hoc tables, doc fixes (`fa101e0`)
 
-None of these changes a reported number. **No task in cycle 9 edits a file in
-`FEATURE_SOURCE_FILES`** (`data/feature_cache.py`). The new profile lives in
-`features/profiles.py`, which is outside the digest. `audio/pitch.py` and
-`eval/vtln_eval.py` are outside it too. If a task needs a digest edit, STOP and report:
-it would invalidate every model.
+**No task in cycle 10 edits a file in `FEATURE_SOURCE_FILES`.** The level-matched path
+lives in `eval/` and calls the existing `scale_waveform` and `remove_dc_offset`
+read-only. If a digest edit turns out to be needed, STOP and report.
 
-### K1: `selection_step_ok` (Q5)
-- In `ml/vtln_train.py`, record the selection-step check per iteration:
-  `ll_init[k] >= ll_new[k−1]` (the previous model, scored on the new α̂ against the
-  previous α̂), with a small tolerance of 1e-9 per frame.
-- Store it next to `ll_decreased` in the trace and the saved model. Warn if it fails
-  (that would be a bug). Add a test.
-- **Commit:** `exec: record vtln selection step check`
+**Process rule (Q7):** report commits touch docs only. Code and test changes go in their
+own commits.
 
-### K2: Small fixes (Q8)
-- `clip_warp_features` (`eval/vtln_eval.py`): check `len(clip)` against one frame
-  length before `extract_warped_bank`, and keep the empty-bank check as a second guard.
-  The test asserts that no `RuntimeWarning` is raised.
-- `pitch.frame_f0`: when `top` is `-inf`, set `first = 0` and mark the frame unvoiced
-  explicitly. Drop the unused aliases `peak = top` and `best = first`. Add a test with a
-  no-peak frame, such as a linear ramp.
-- Edge shares as 3-decimal columns, and histograms as a table (thesis label
-  0.88 → 1.12), wherever raw dicts are printed in the docs or the report helpers.
-- Import order: isort-style placement of `qbestd.provenance` in `run_timit.py` and
-  `vtln_train.py` (cosmetic).
-- **Commit:** `exec: fix clip length check and pitch no peak`
-
-### K3: Gain-split cells (Q2)
-- In `eval/run_timit.py` and `eval/vtln_eval.py`, add `--vtln-cell` with these values:
-  - `model_only`: loads a VTLN model (λ_r) and scores plain (α = 1) documents and plain
-    clips;
-  - `selection_only`: loads a plain model (λ_init) and runs `vtln_inputs` (α̂ per
-    document and query) under it;
-  - `query_inherit` (optional fifth cell): documents as in the VTLN row, and each query
-    uses its source utterance's final α̂ from `iter4_alphas.tsv`.
-- Each cell checks its own expected `model_type`, so the guard stays strict on the
-  normal paths. The cell name goes into `summary.json`.
-- Also record the mean posteriorgram entropy of documents and of queries per run
-  (descriptive), for every cell and for the two existing rows.
-- Tests cover each cell's guard, plus one tiny end-to-end run per cell.
-- **Commit:** `exec: add vtln gain split cells`
-
-### K4: Profile `htk_described_4k_pn` (D6)
-- In `features/profiles.py`, add `htk_described_4k_pn` = `htk_described_4k` with
-  `remove_dc=True` and `normalize_peak=True`. Nothing else changes.
-- **Docstring sources:**
-  - author-stated (2026-11-18): mean subtraction, then scaling to ±1;
-  - **known approximation:** our code peak-normalises first (`scale_waveform`) and
-    removes the mean afterwards (`prepare_frames`). The waveform is therefore
-    `(x − m) / max|x|` instead of the author's `(x − m) / max|x − m|`, a per-utterance
-    gain of `max|x − m| / max|x|`. The order is not changed, because that would be a
-    digest edit; S1 (c) measures the size of the gap;
-  - the extra ×32768 PCM scale is a constant gain on every utterance. It shifts every
-    c0 by the same amount, which the GMM absorbs.
+### M1: Query mode `clip_lm` (D7 b)
+- In `eval/query_features.py`, add `clip_lm` to `MODES`. In `eval/run_timit.py`, add
+  `--query-features clip_lm`. The VTLN path is `clip_warp_features` in
+  `eval/vtln_eval.py`.
+- **For each query:**
+  1. Normalise the **source utterance** as the document path does under the active
+     profile: `scale_waveform(x, normalize_peak=True, pcm_scale=1.0)`, then
+     `remove_dc_offset` on the whole utterance. This is the same order as the document
+     path; the ×32768 is applied once, later.
+  2. Cut the clip with `cut_clip` at the usual boundaries.
+  3. Extract features, plain or warped, with the profile config changed to
+     `remove_dc=False` and `normalize_peak=False`.
+- `clip_lm` is defined only for profiles that normalise (`remove_dc` and
+  `normalize_peak` both true): `htk_described_4k_pn` and `timit_matlab` MFCC / MFCC-TMP.
+  It raises on any other profile.
+- The query mode goes into `summary.json`.
 - **Tests:**
-  - the profile resolves for `mfcc` and `plp` and raises for `mfcc_tmp`;
-  - the features are invariant to a waveform gain (×0.5 and ×2 against ×1, MFCC and
-    PLP, to float tolerance);
-  - the cache fingerprint differs from `htk_described_4k`.
-- **Commit:** `exec: add peak normalised htk profile`
+  - **identity:** a `clip_lm` "clip" spanning the whole utterance gives the document
+    features of that utterance to float tolerance, plain and warped;
+  - **gain invariance:** a `clip_lm` clip is invariant to a waveform gain on the source
+    utterance (×0.5, ×2);
+  - **level matching:** `clip_lm` and `clip` differ by exactly the per-query ratio
+    `max|clip − m_clip| / max|x|`, up to the DC term;
+  - **guard:** a profile without normalisation raises.
+- **Commit:** `exec: add level matched clip query mode`
 
-### K5: Docs (Q1, Q3, Q4, Q5, Q6, Q7)
-In `docs/results_timit_q20_features.md`, Stage 4:
-- **Q1:** in "Paired VTLN minus no-VTLN", add a column "thesis gain inside our paired
-  interval" per run and metric. It is descriptive, not a test, and uses the instance
-  interval. Add one sentence: our no-VTLN MFCC 0–4000 Hz row (37.48 / 40.50) already
-  reaches the thesis's VTLN MFCC row (36.26 / 39.62). Keep "no cause claimed".
-- **Q3:** add an MFCC level observation with the Reviewer's gain-test table. Say it is
-  scratch-derived, MFCC-only, and not a cause. Give the arithmetic:
-  `c0 += √40 · 2 ln g` (8.77 for g = 2); for PLP, about `0.66 ln g` (0.46). Add the D6 (a)
-  author fact: the thesis normalised level, so the un-normalised rows differ from the
-  thesis on this point.
-- **Q4:**
-  - mean α̂_thesis per iteration, from the traces, for each run;
-  - one caveat line per VTLN row: final train edge shares, query edge shares, and the
-    share still changing at iteration 4;
-  - the 0–3400 Hz histogram alternation, as earlier-reference only;
-  - convergence differs from the thesis's "converges" (fresh-LBG noise is a likely
-    reason, not a proven one).
-- **Q5 wording:** "after iteration 2 the new model's LL plateaus, and its changes (up to
-  0.05 per frame) are of the same size as the fresh-LBG initialisation noise".
-- **Q6 notes:** the F0 check ran at iteration 0 under λ_init on 0–3400 Hz; a large ρ can
-  come from the gender clusters alone.
-- **Q7:** rename "MFCC-TMP minus MFCC under VTLN (Q5)" to "MFCC-TMP minus MFCC under
-  VTLN". State that the thesis's MFCC-TMP advantage is **not reproduced** against the
-  D5 reference; list the four differences (lineage, filters, level, VTLN response), and
-  say that nothing is claimed about Teager energy.
-- **Relabel:** every `htk_described_4k` row becomes "un-normalised, earlier reference
-  (D6)". The numbers do not change.
-- **Commit:** `exec: document cycle 8 review findings`
+### M2: Post hoc paired tables (Q1)
+- Write a small script (`scripts/` or `eval/`) that runs `paired_keyword_bootstrap`
+  (10000 resamples, seed 0) on the existing `per_query.tsv` files. For the un-normalised
+  and `pn` rows, MFCC and PLP, it computes:
+  - VTLN row − selection only;
+  - VTLN row − model only;
+  - `query_inherit` − VTLN row (un-normalised only).
+- Also give the per-query ratio table for `clip` against `clip_lm` levels (Reviewer:
+  median 1.44, p90 2.70), recomputed by the script.
+- **Commit:** `exec: add post hoc paired comparison script`
+
+### M3: Docs (Q1, Q2, Q3, Q5, Q6, Q7)
+- **Q1:**
+  - add the M2 table, labelled **"post hoc, computed after the run, not declared"**,
+    with the commit and script cited;
+  - for each feature, state which comparisons exclude 0, with no "mostly" and no
+    mechanism;
+  - drop the ratios and the "Model + selection" sum column;
+  - `query_inherit` becomes a paired difference ("for PLP, using each clip's own α̂
+    instead of its source utterance's α̂ gives a lower score by about 2 points (post
+    hoc)"), with a note that it is an analysis cell, not a deployable condition.
+- **Q2:**
+  - wording for now: "dropping static c0 changes α̂ for 12–14 % (MFCC) and 6.4 % (PLP) of
+    utterances; the mean and histogram are unchanged; no null has been measured". N1
+    replaces this;
+  - F0 wording: "α̂ correlates negatively with utterance F0 overall and within each F0
+    group (< 165 Hz, ≥ 165 Hz)", with no "speaker" or "gender";
+  - the partial-ρ sentence from the review;
+  - one line saying the HF copy carries no speaker field.
+- **Q3:**
+  - "Level normalisation therefore does not bring our VTLN gain to the thesis's", with
+    the paired gains, the unchanged edge share, and the Reviewer's real-utterance
+    gain-invariance check (100 utterances, seed 1, ×0.5 and ×2, 0 % changed) labelled
+    post hoc;
+  - the two-changes caveat on every `pn` − un-normalised comparison;
+  - the marginal-interval sentence.
+- **Q5:** the qualified "not reproduced" wording from the review. The Teager claim stays
+  nothing.
+- **Q6:** the convergence caveat, linking the query edge shares to "mostly a clip
+  property".
+- **Q7:**
+  - relabel the D6 thesis rows as "thesis (`Tab:TIMITPerformance` /
+    `Tab:TIMITVTLNPerformance1`)";
+  - add the K1 sentence: "`selection_step_ok` holds by construction; it is a bug guard,
+    not an empirical finding";
+  - relabel the S3 per-clip `pn` rows "per-clip, earlier reference (D7)".
+- **Commit:** `exec: document cycle 9 review findings`
 
 ---
 
-## 9. Cycle 9, part B: score-free checks, gain split, normalised reference (D6)
+## 9. Cycle 10, part B: c0 null, level-matched reference, GMM-128 (D7)
 
 Runs go one at a time, from a clean tree, with no commits while they run. Every summary
 records `git_commit_start` and `git_dirty: false`.
 
-### S1: Score-free checks. Declared first; no retrieval score
-- **Declare**, commit `exec: declare score free vtln checks`. Each part is reported in
-  full and nothing is chosen from it.
-- **(a) c0-marginalised α̂:** under each final λ_r (MFCC 4k, MFCC 3400, PLP 4k,
-  MFCC-TMP), re-estimate the train α̂ with static c0 dropped from the diagonal GMM
-  (the means, variances and that dimension of the log-likelihood). Report the share of
-  utterances whose α̂ changes, and the new histogram and mean α̂_thesis.
-- **(b) F0 against final α̂:** recompute per-utterance F0 with `audio/pitch.py` and save
-  it, keyed by `(hf_split, row)`, under `outputs/` (not committed). For the three D5 runs
-  (MFCC 4k, PLP 4k, MFCC-TMP), report:
-  - ρ(F0, final α̂_thesis), overall and within the F0 < 165 Hz and ≥ 165 Hz groups,
-    with bootstrap intervals;
-  - the partial correlation of α̂ with utterance mean c0, controlling for F0.
+### N1: c0 null and edge margins. Declared first; score-free
+- **Declare**, commit `exec: declare c0 null control`:
+  - **churn null:** the share of train utterances whose all-dimensions α̂ under λ_r
+    differs from the iteration-4 trace α̂. Do this for the 4 un-normalised runs and the 2
+    `pn` runs;
+  - **dimension control:** MFCC 4k un-normalised; drop each static c_k, k = 1…12, in
+    turn, as S1 (a) dropped c0. Report each changed share and where c0's share ranks
+    among the 13;
+  - **edge margins:** from `iter4_ll_matrix.npy`, for train utterances at α̂ = 1.12
+    (thesis label), the distribution of LL(1.12) − LL(1.10) (median, p10, p90). Do the
+    same at the 0.88 edge with LL(0.88) − LL(0.90). Cover all VTLN runs;
+  - **reading rule, fixed now:** c0 is "distinct from refit churn" only if its share is
+    above both the churn null and the largest c_k share. Otherwise the doc says "of the
+    same size as churn / other dimensions". For the edges, the doc reports the margins
+    and does not label them.
+- **Run** (about 20 min). **Commit:** `exec: run c0 null control`, with docs only.
 
-  This is descriptive; the D3 (c) gate already passed.
-- **(c) Order-approximation size (K4):** over all 5040 train and test utterances,
-  compute `r = max|x − m| / max|x|` and the implied MFCC c0 offset
-  `√40 · 2 · |ln r|`. **Gate:** if the 99th percentile offset is ≤ 0.1, the approximation
-  is negligible and S3 goes ahead. Otherwise **STOP** and report: matching the author's
-  order needs a digest edit, which is a user decision.
-- **Commit:** `exec: run score free vtln checks`, with a report section "Score-free VTLN
-  checks".
+### N2: Level-matched reference evaluations. Declared first; eval only
+- **Declare**, commit `exec: declare level matched reference runs`:
+  - **rows**, all `--query-features clip_lm` with the existing models:
+    1. `pn` MFCC: no VTLN, VTLN, model only, selection only;
+    2. `pn` PLP: the same four;
+    3. MFCC-TMP `timit_matlab`: no VTLN and VTLN. This is applied for consistency; the
+       author fact was stated for the HTK pipeline.
+  - **the reference:** `pn` + `clip_lm` is the MFCC/PLP reference whatever it scores
+    (D7 b);
+  - **comparisons**, all paired on the same 145 queries with keyword-cluster bootstrap,
+    10000 resamples, seed 0:
+    - `clip_lm` − `clip`, per row. This is a single change: only the query level differs;
+    - VTLN − no VTLN under `clip_lm`, against the thesis gain, with the "thesis gain
+      inside our interval" column;
+    - the 2×2 cells minus no VTLN;
+    - MFCC-TMP − MFCC and PLP − MFCC, under `clip_lm`;
+  - **query edge shares** for every VTLN row. No mechanism is claimed.
+- **Run:** 10 evaluations, about 1 h.
+- **Report:** in `docs/results_timit_q20_features.md`, a new section "Level-matched
+  reference (D7)", kept separate from the D6 tables, with the gap to the thesis.
+- **Commit:** `exec: evaluate level matched reference on v2`, with docs only.
 
-### S2: 2×2 gain split on the un-normalised rows. Declared first
-- **Declare**, commit `exec: declare vtln gain split`:
-  - the cells: model only (λ_r, α = 1) and selection only (λ_init, α̂), for MFCC 4k and
-    PLP 4k, plus the `query_inherit` cell for both;
-  - every cell is reported, and nothing is chosen from them;
-  - the paired differences are cell minus no-VTLN on the same 145 queries, with
-    keyword-cluster bootstrap, 10000 resamples, seed 0;
-  - the reading rule: the cells describe where the gain shows up. No mechanism is
-    claimed, and the two halves need not add up to the total.
-- **Run:** 6 evaluations (about 6 min each), with the existing warp caches and models and
-  no training.
-- **Report** a 2×2 table per feature (instance and keyword averages), the paired
-  differences, and the entropy per cell.
-- **Commit:** `exec: evaluate vtln gain split`
+### N3: Plain GMM-128 under the reference. Declared first
+- **Declare**, commit `exec: declare gmm128 normalised runs`:
+  - **runs:** MFCC and PLP `htk_described_4k_pn`, plain GMM-128 on the v2 train split,
+    with the same recipe as H2/H3;
+  - **evaluation:** with `clip_lm` (reference) and `clip` (continuity);
+  - **target:** `Tab:TIMITPerformance` GMM-128 rows;
+  - **comparisons:** paired GMM-128 − GMM-64 (`clip_lm`), and PLP − MFCC. No VTLN at
+    GMM-128.
+- **Report:** extend the D7 section with the Stage 3 GMM-128 rows.
+- **Commit:** `exec: evaluate gmm128 normalised reference on v2`, with docs only.
 
-### S3: Normalised reference `htk_described_4k_pn`, MFCC and PLP. Declared first
-- **Declare**, commit `exec: declare normalised reference runs`:
-  - **the runs:** for MFCC, then PLP, each with the same recipe as H3 and W3:
-    1. feature caches;
-    2. plain GMM-64 (v2 train split);
-    3. no-VTLN evaluation;
-    4. 26 warp caches;
-    5. `train-vtln` with N_iter = 5 and fresh LBG (D4);
-    6. VTLN evaluation;
-    7. the 2×2 cells (model only, selection only).
-  - **the targets:** `Tab:TIMITPerformance` GMM-64 rows and `Tab:TIMITVTLNPerformance1`
-    (§3);
-  - **the comparisons:**
-    - paired VTLN − no-VTLN;
-    - paired `pn` − un-normalised (same queries, both with and without VTLN);
-    - MFCC-TMP − MFCC under the `pn` reference, both with and without VTLN;
-    - PLP − MFCC;
-  - **the rule:** `htk_described_4k_pn` is the reference whatever it scores (D6 b). An
-    interval that includes 0 gets the usual wording; nothing is tuned.
-- **Record** everything W3 recorded (α̂ histograms in the thesis label, edge shares, LL,
-  `ll_decreased`, `selection_step_ok`, mean α̂ per iteration, hashes, runtime, peak memory,
-  provenance), plus the K3 entropy.
-- **Disk:** about 6 GB more in `outputs/features`.
-- **Report:** a new section "Normalised HTK reference (D6)" in
-  `docs/results_timit_q20_features.md`, with the Stage 3 GMM-64 and Stage 4 rows, the
-  gap to the thesis, the comparisons above and the 2×2 table. Do not merge it into the
-  un-normalised tables.
-- **Commit:** `exec: evaluate normalised htk reference on v2`
-
-**Cycle 9 definition of done:**
-- K1–K5, S1, S2 and S3 are on `main` in that order. Each declaration comes before its
+**Cycle 10 definition of done:**
+- M1–M3, N1, N2 and N3 are on `main` in that order. Each declaration comes before its
   run.
-- STOP gates: the S1 (c) order gate, a failing `selection_step_ok`, or any needed edit to
-  a digest file. `ll_decreased` is recorded and does not stop the chain (D4).
+- STOP gates:
+  - a failing M1 identity test (it would mean `clip_lm` does not reproduce the document
+    path);
+  - a failing `selection_step_ok`;
+  - any needed digest edit.
 - `pixi run test` is green. Modules stay under 400 lines and lines under 80 characters.
-  No derived data is committed.
+  No derived data is committed. Report commits touch docs only.
 - No commit was made while a run was going.
-- The Reviewer writes `handoff_request.md` for cycle 9 with the questions below.
+- The Reviewer writes `handoff_request.md` for cycle 10 with the questions below.
 
-**Open questions for the cycle 9 review:**
-- 39: Where does the un-normalised VTLN gain show up in the 2×2 split (model, selection,
-  or only together)? Does `query_inherit` change it?
-- 40: How much of the final α̂ does static c0 drive (S1 a)? Does α̂ track F0 within
-  gender (S1 b)?
-- 41: Under the normalised reference, is the VTLN gain closer to the thesis's? Are the
-  no-VTLN rows still above the thesis?
-- 42: With level handling matched, does MFCC-TMP − MFCC move towards the thesis's
-  +5.12 / +4.79?
+**Open questions for the cycle 10 review:**
+- 43: Is c0's share of α̂ changes distinct from refit churn and from the other cepstral
+  dimensions? What do the edge LL margins say about the 1.12 pile-up?
+- 44: Does the level-matched query path change the scores (`clip_lm` − `clip`)? Is the
+  reference VTLN gain still above the thesis's?
+- 45: Under the reference, how do the GMM-128 rows compare with the thesis's
+  `Tab:TIMITPerformance`?
+- 46: Should MFCC-TMP keep `clip_lm` as its reference query path, given that the author
+  fact was stated for the HTK pipeline?
 
 ---
 
 ## 10. Next cycles (preview)
 
-1. Plain GMM-128 for MFCC and PLP under `htk_described_4k_pn` (Stage 3 table complete
-   under the reference), if the user approves the compute.
-2. LC1 and LC3 (§3 has their TIMIT targets), Q-84, and the optional SAD ablation.
-3. Mixture of GMMs (§3 targets), then DTW and fastDTW, then indexing (STM, BoAW).
-4. SWS 2013 and QUESST 2014: path selection with 7 paths, z-norm, MTWV and Cnxe. The
+1. LC1 and LC3 (§3 has their TIMIT targets), Q-84, and the optional SAD ablation.
+2. Mixture of GMMs (§3 targets), then DTW and fastDTW, then indexing (STM, BoAW).
+3. SWS 2013 and QUESST 2014: path selection with 7 paths, z-norm, MTWV and Cnxe. The
    QUESST data is extracted under `research_code_qbe_std/hquest/data/quesst14Database`:
    12492 search files, 560 dev and 555 eval queries, and the scoring folder.
