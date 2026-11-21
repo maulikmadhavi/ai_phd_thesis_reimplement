@@ -1458,3 +1458,42 @@ These margins are reported, not labelled. Their 10th percentiles are all
 above 4 nats, so the chosen edges are not near-ties at the level of the
 10th percentile; the medians are 29 to 54 nats. The summed-over-frames scale
 means these numbers are not comparable with per-frame likelihoods.
+
+## Level-matched reference (D7, cycle 10, N2, declared)
+
+**Declared before any N2 number** (cycle 10, plan section 9 N2; user decision
+D7, 2026-11-21, compute approved). Evaluation only; no model is trained.
+
+- **Why.** The thesis normalised the whole utterance and then cut the query
+  from it (D7). `clip_lm` does that: the source utterance is peak-normalised
+  and mean-removed as the document path does, the clip is cut from it, and its
+  features are extracted with normalisation off. The identity test (a
+  full-span `clip_lm` clip reproduces the document features, plain and warped)
+  passed before this declaration (commit `08ee5cb`).
+- **Reference.** `pn` with `clip_lm` is the MFCC and PLP reference whatever it
+  scores (D7). The `pn` `clip` rows of section "Normalised HTK reference (D6)"
+  are the earlier reference.
+- **Rows, all `--query-features clip_lm`, existing models:**
+  1. `pn` MFCC: no VTLN (`textdisjoint_q20_v2/mfcc_htk_described_4k_pn_gmm64`),
+     VTLN (`vtln5`), model only, selection only.
+  2. `pn` PLP: the same four.
+  3. MFCC-TMP (`timit_matlab`): no VTLN and VTLN. Applied for consistency; the
+     author fact was stated for the HTK pipeline (open question 46).
+- **Comparisons,** all paired on the same 145 queries, keyword-cluster
+  bootstrap, 10000 resamples, seed 0:
+  - `clip_lm` minus `clip`, per row. Only the query level differs. The `clip`
+    rows are the existing ones: `td2_pn_mfcc_gmm64`, `td2_pn_plp_gmm64`,
+    `vtln_mfcc_htk_described_4k_pn_gmm64`, `vtln_plp_htk_described_4k_pn_gmm64`,
+    `cell_model_only_pn_*`, `cell_selection_only_pn_*`,
+    `td2_mfcc_tmp_gmm64`, `vtln_mfcc_tmp_timit_matlab_gmm64`;
+  - VTLN minus no VTLN under `clip_lm`, against the thesis gain, with the
+    "thesis gain inside our interval" column;
+  - the 2x2 cells minus no VTLN;
+  - MFCC-TMP minus MFCC and PLP minus MFCC, under `clip_lm`.
+- **Also reported:** the query edge shares for every VTLN row. No mechanism is
+  claimed.
+- **Recorded:** the usual summary fields, plus `query_features: clip_lm` and
+  the `vtln.query_features` field. `selection_step_ok` is checked from the
+  trace as before; a failure is a STOP.
+- **Run:** 10 evaluations, about 1 h. Outputs in git-ignored `outputs/eval/n2_*`.
+  One at a time, clean tree, no commit while a run goes.
