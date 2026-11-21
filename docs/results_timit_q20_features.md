@@ -917,9 +917,9 @@ Histograms (thesis label, counts):
 Dropping static c0 changes alpha-hat for 12 to 14 % of the MFCC utterances
 (12.4 to 13.8 % across the runs) and 6.4 % of the PLP utterances. The mean
 alpha_thesis moves by less than 0.001 in every run, and the histograms keep
-their shape. No null has been measured: it is not known whether dropping any
-other static dimension would change a similar share, and that control is
-declared in section N1. This is a description; it does not say what a level
+their shape. The null control in section N1 finds the same size for the other static
+columns (0.112 to 0.211) and for refit churn (0.175 for MFCC 0-4000 Hz).
+This is a description; it does not say what a level
 normalisation would do to retrieval.
 
 #### (b) F0 and c0 against the final alpha-hat
@@ -1390,3 +1390,71 @@ say about the 1.12 pile-up?
 - **Compute:** about 20 min. Outputs go to git-ignored `outputs/c0_null/`.
 - **Run from a clean tree**, with no commit while it runs. Each summary
   records `git_commit_start` and `git_dirty: false`.
+
+### Result (N1)
+
+Run as declared, from clean tree `b13bdb2` (`git_dirty: false`), 1173 s, score-free.
+Outputs in git-ignored `outputs/c0_null/c0_null.json`. Each run's trace
+alpha-hat is the argmax of its saved iteration-4 matrix in every utterance
+(agreement 1.000 in all six runs). The c0 share for MFCC 0-4000 Hz equals the
+S1 (a) value (0.136) exactly.
+
+**Churn null** (share of the 3696 train utterances whose all-dimensions
+alpha-hat under lambda_r differs from the iteration-4 trace):
+
+| Run | Churn | Trace argmax agreement |
+|---|---|---|
+| MFCC 0-3400 Hz (run 1, earlier reference) | 0.149 | 1.000 |
+| MFCC 0-4000 Hz (un-normalised, earlier reference) | 0.175 | 1.000 |
+| PLP 0-4000 Hz (un-normalised, earlier reference) | 0.127 | 1.000 |
+| MFCC-TMP (`timit_matlab`) | 0.122 | 1.000 |
+| MFCC 0-4000 Hz, `pn` | 0.131 | 1.000 |
+| PLP 0-4000 Hz, `pn` | 0.119 | 1.000 |
+
+**Dimension control** (MFCC 0-4000 Hz, un-normalised; share changed by
+dropping each static column, against the all-dimensions alpha-hat under
+lambda_r):
+
+| Column dropped | Share changed |
+|---|---|
+| c0 | 0.136 |
+| c1 | 0.112 |
+| c2 | 0.119 |
+| c3 | 0.188 |
+| c4 | 0.189 |
+| c5 | 0.130 |
+| c6 | 0.140 |
+| c7 | 0.162 |
+| c8 | 0.154 |
+| c9 | 0.174 |
+| c10 | 0.207 |
+| c11 | 0.211 |
+| c12 | 0.207 |
+
+c0 ranks 10 of 13 (1 = largest). The largest other share is
+0.211. The other shares run from 0.112 (c1) to 0.211 (c11).
+
+**Reading rule (fixed in the declaration), applied:** c0's share (0.136) is
+below the MFCC 0-4000 Hz churn share (0.175) and below the largest
+other share (0.211). It is therefore **of the same size as churn and as the
+other dimensions**. The earlier wording "c0 drives part of the individual
+choices" is withdrawn: the 12 to 14 % change is what dropping any static
+column of this size produces, and it is also similar to refit churn.
+
+**Edge margins** (log-likelihood summed over an utterance's frames, nats:
+the chosen edge against its inward neighbour; n, then median / p10 / p90).
+Thesis label 1.12 is our 0.88 column, so the 1.12 row uses LL(0.88) - LL(0.90):
+
+| Run | n at thesis 1.12 | Margin, thesis 1.12 | n at thesis 0.88 | Margin, thesis 0.88 |
+|---|---|---|---|---|
+| MFCC 0-3400 Hz (run 1, earlier reference) | 501 | 37.3 / 9.1 / 99.6 | 266 | 34.3 / 6.8 / 99.7 |
+| MFCC 0-4000 Hz (un-normalised, earlier reference) | 478 | 31.3 / 6.1 / 83.1 | 198 | 48.1 / 9.7 / 134.9 |
+| PLP 0-4000 Hz (un-normalised, earlier reference) | 738 | 34.0 / 6.7 / 93.0 | 334 | 49.5 / 8.1 / 143.3 |
+| MFCC-TMP (`timit_matlab`) | 539 | 30.7 / 4.6 / 95.4 | 316 | 53.8 / 13.4 / 142.2 |
+| MFCC 0-4000 Hz, `pn` | 473 | 29.1 / 4.7 / 85.3 | 203 | 52.1 / 11.5 / 145.4 |
+| PLP 0-4000 Hz, `pn` | 729 | 33.6 / 6.0 / 95.7 | 352 | 51.9 / 8.5 / 143.8 |
+
+These margins are reported, not labelled. Their 10th percentiles are all
+above 4 nats, so the chosen edges are not near-ties at the level of the
+10th percentile; the medians are 29 to 54 nats. The summed-over-frames scale
+means these numbers are not comparable with per-frame likelihoods.
