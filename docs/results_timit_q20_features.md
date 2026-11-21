@@ -498,11 +498,11 @@ iteration 0 under lambda_init. Median F0 (50 to 400 Hz autocorrelation,
 signs agree, so there is no sign mismatch from the label map. The interval
 is anti-conservative (no speaker IDs); the operative gate is the magnitude.
 The result agrees with D3 (c) (alpha_thesis > 1 on the male, low-F0 side) and
-says alpha-hat tracks the speaker in this respect. It says nothing about
-retrieval. Two notes: the check ran at iteration 0 under lambda_init on the
+says alpha-hat is negatively related to utterance F0 in this respect. It says
+nothing about retrieval. Two notes: the check ran at iteration 0 under lambda_init on the
 0-3400 Hz profile, not on the D5 reference; and a large rho can come from
-the two gender clusters alone, so it shows alpha-hat separates men from
-women, not that it tracks vocal-tract length within a gender.
+the two F0 groups alone, so it does not show that alpha-hat tracks anything
+within a group.
 
 | alpha_thesis | Mean median-F0 (Hz) | Utterances |
 |---|---|---|
@@ -703,10 +703,11 @@ like-for-like comparison with the 0-3400 Hz run.
 | MFCC-TMP minus MFCC 0-4000 Hz (un-normalised), both no VTLN | instance | +1.70 (-0.6 to +3.9) | +0.64 (-1.8 to +3.0) | no / no |
 | MFCC-TMP minus MFCC 0-4000 Hz (un-normalised), both no VTLN | keyword | +0.37 (-1.9 to +2.6) | -0.19 (-2.5 to +2.1) | no / no |
 
-**The thesis's MFCC-TMP advantage (+5.12 / +4.79 without VTLN, +6.62 /
-+5.90 with) is not reproduced** against the D5 reference: without VTLN the
-interval includes 0, and with VTLN p@N is below 0 with an interval that
-excludes 0 (MAP includes 0). The 0-3400 Hz comparison is an earlier
+**The thesis's MFCC-TMP advantage is not reproduced under VTLN** against the D5
+reference: the thesis's +6.62 / +5.90 lie above our intervals, and p@N is below
+0 with an interval that excludes 0 (MAP includes 0). Without VTLN both thesis
+advantages (+5.12 / +4.79) lie above our un-normalised intervals (+1.70 / +0.64,
+both include 0). The 0-3400 Hz comparison is an earlier
 reference only and is not the band question, which D5 settled. The two
 features differ in four ways at once, so no front-end claim is possible:
 tool lineage (MATLAB-described against HTK-described), filter count (26
@@ -913,12 +914,13 @@ Histograms (thesis label, counts):
 | MFCC-TMP (`timit_matlab`), all 39 dimensions | 563 | 535 | 541 | 394 | 213 | 227 | 128 | 111 | 137 | 202 | 202 | 140 | 303 |
 | MFCC-TMP (`timit_matlab`), c0 dropped | 597 | 547 | 516 | 374 | 208 | 225 | 130 | 92 | 134 | 195 | 201 | 142 | 335 |
 
-Dropping c0 changes alpha-hat for 0.064
-to 0.138 of the utterances; the mean
-alpha_thesis moves by less than 0.001 in every run and the histograms keep their
-shape. In this measure c0 drives part of the individual choices (the MFCC
-runs 0.124 to 0.138, PLP 0.064), not the distribution. This is a description;
-it does not say what a level normalisation would do to retrieval.
+Dropping static c0 changes alpha-hat for 12 to 14 % of the MFCC utterances
+(12.4 to 13.8 % across the runs) and 6.4 % of the PLP utterances. The mean
+alpha_thesis moves by less than 0.001 in every run, and the histograms keep
+their shape. No null has been measured: it is not known whether dropping any
+other static dimension would change a similar share, and that control is
+declared in section N1. This is a description; it does not say what a level
+normalisation would do to retrieval.
 
 #### (b) F0 and c0 against the final alpha-hat
 
@@ -934,13 +936,15 @@ is of alpha-hat with the utterance mean c0 at alpha = 1, controlling for F0.
 | PLP 0-4000 Hz (un-normalised, earlier reference) | -0.688 (-0.707 to -0.667) | -0.181 (-0.220 to -0.143) | -0.422 (-0.472 to -0.369) | +0.160 (+0.129 to +0.191) | +0.206 (+0.174 to +0.237) |
 | MFCC-TMP (`timit_matlab`) | -0.745 (-0.762 to -0.727) | -0.339 (-0.374 to -0.303) | -0.435 (-0.485 to -0.382) | +0.035 (+0.003 to +0.067) | +0.076 (+0.044 to +0.107) |
 
-The negative correlation with F0 is present in every run and is smaller
-within each F0 group than overall, as expected when the two gender clusters
-carry part of it; it stays clearly non-zero within both groups. The partial
-correlation of alpha-hat with mean c0 given F0 is small and positive in the
-three runs (largest for MFCC, 0.235; MFCC-TMP, whose features are
-peak-normalised, 0.076). All of this is descriptive; the D3 (c) gate already
-passed.
+alpha-hat correlates negatively with utterance F0 overall and within each F0
+group (< 165 Hz, >= 165 Hz) in every run; the within-group values are smaller
+than the overall one. The partial correlation of alpha-hat with mean c0 given
+F0 is small and positive in the three runs (MFCC 0.235, PLP 0.206, MFCC-TMP
+0.076). PLP's value is close to MFCC's, although only MFCC's alpha-hat
+responds to gain (cycle 8), so the partial correlation does not indicate the
+level mechanism. The HF TIMIT copy has no speaker field and its rows are
+shuffled, so the intervals are over utterances. All of this is descriptive;
+the D3 (c) gate already passed.
 
 ### Gain split of the un-normalised rows (declared)
 
@@ -1040,9 +1044,54 @@ MAP, instance average). *Selection only* excludes 0 on the instance average
 for both features and on the keyword average for PLP only (MFCC keyword
 intervals include 0). The `query_inherit` cell is within about 0.5 to 2
 points of the VTLN row (MFCC +0.49 / +0.77 above it, PLP +1.98 / +1.87),
-with overlapping intervals. Mean entropy of the documents is lower under
-VTLN (0.4235 against 0.4402 for MFCC, 0.4160 against 0.4361 for PLP). No
-mechanism is claimed.
+Mean entropy of the documents is lower under VTLN (0.4235 against 0.4402
+for MFCC, 0.4160 against 0.4361 for PLP). No mechanism is claimed.
+
+**Post hoc paired comparisons (not declared; computed after the runs).**
+`qbestd.eval.post_hoc` (commit `b4aeebb`) reads the finished `per_query.tsv`
+files and applies `paired_keyword_bootstrap` (10000 resamples, seed 0). The
+output is `outputs/posthoc/post_hoc.md` (git-ignored). Differences are B minus
+A as labelled; "excludes 0" means the 95 % interval lies wholly on one side.
+
+| Comparison | Average | p@N diff (95% CI) | MAP diff (95% CI) | Excludes 0 (p@N / MAP) |
+|---|---|---|---|---|
+| MFCC un-normalised: VTLN minus selection only | instance | +6.92 (+3.76 to +10.19) | +6.01 (+3.20 to +8.86) | yes / yes |
+| MFCC un-normalised: VTLN minus selection only | keyword | +6.11 (+2.49 to +9.62) | +5.22 (+2.03 to +8.41) | yes / yes |
+| MFCC un-normalised: VTLN minus model only | instance | +8.71 (+5.34 to +12.32) | +8.66 (+5.66 to +11.64) | yes / yes |
+| MFCC un-normalised: VTLN minus model only | keyword | +9.08 (+4.79 to +14.06) | +8.14 (+3.64 to +13.09) | yes / yes |
+| MFCC un-normalised: query_inherit minus VTLN | instance | +0.49 (-1.07 to +2.28) | +0.77 (-0.26 to +1.91) | no / no |
+| MFCC un-normalised: query_inherit minus VTLN | keyword | +0.04 (-1.18 to +1.36) | +0.82 (-0.19 to +2.07) | no / no |
+| MFCC pn: VTLN minus selection only | instance | +5.92 (+3.06 to +9.04) | +6.56 (+4.16 to +9.13) | yes / yes |
+| MFCC pn: VTLN minus selection only | keyword | +5.45 (+2.24 to +8.77) | +6.22 (+3.70 to +8.92) | yes / yes |
+| MFCC pn: VTLN minus model only | instance | +7.14 (+4.33 to +9.91) | +7.37 (+5.20 to +9.56) | yes / yes |
+| MFCC pn: VTLN minus model only | keyword | +6.75 (+1.73 to +11.78) | +7.06 (+3.16 to +11.35) | yes / yes |
+| PLP un-normalised: VTLN minus selection only | instance | +1.26 (-1.99 to +4.95) | +2.34 (-0.11 to +5.19) | no / no |
+| PLP un-normalised: VTLN minus selection only | keyword | +1.97 (-1.86 to +6.15) | +3.16 (-0.44 to +7.42) | no / no |
+| PLP un-normalised: VTLN minus model only | instance | +8.31 (+5.08 to +11.49) | +9.36 (+6.52 to +12.21) | yes / yes |
+| PLP un-normalised: VTLN minus model only | keyword | +7.85 (+4.18 to +11.74) | +9.12 (+5.13 to +13.23) | yes / yes |
+| PLP un-normalised: query_inherit minus VTLN | instance | +1.98 (+0.54 to +3.48) | +1.87 (+0.54 to +3.18) | yes / yes |
+| PLP un-normalised: query_inherit minus VTLN | keyword | +1.66 (+0.39 to +3.00) | +1.38 (+0.40 to +2.54) | yes / yes |
+| PLP pn: VTLN minus selection only | instance | +4.48 (+1.16 to +8.42) | +5.49 (+1.81 to +9.56) | yes / yes |
+| PLP pn: VTLN minus selection only | keyword | +6.24 (+2.29 to +10.48) | +7.37 (+2.88 to +12.28) | yes / yes |
+| PLP pn: VTLN minus model only | instance | +9.94 (+7.63 to +12.42) | +10.10 (+7.46 to +12.84) | yes / yes |
+| PLP pn: VTLN minus model only | keyword | +10.50 (+7.51 to +13.88) | +10.34 (+6.64 to +14.41) | yes / yes |
+
+Which comparisons exclude 0, per feature (all four p@N / MAP, instance and
+keyword, unless stated):
+
+- **MFCC un-normalised:** VTLN minus selection only excludes 0; VTLN minus model
+  only excludes 0; `query_inherit` minus VTLN includes 0.
+- **PLP un-normalised:** VTLN minus selection only includes 0; VTLN minus model
+  only excludes 0; `query_inherit` minus VTLN excludes 0.
+- **MFCC `pn`:** VTLN minus selection only and VTLN minus model only both
+  exclude 0.
+- **PLP `pn`:** VTLN minus selection only and VTLN minus model only both
+  exclude 0.
+
+`query_inherit` is an analysis cell, not a deployable condition: it uses each
+query's source-utterance alpha-hat from the training trace. For PLP, using the
+clip's own alpha-hat instead of the source utterance's gives a lower score by
+about 2 points (post hoc). It was not run under `pn`.
 
 ### Normalised reference runs (declared)
 
@@ -1095,16 +1144,16 @@ comparison. Nothing was tuned.
 
 | Row | p@N, instance avg (95% CI) | MAP, instance avg (95% CI) | p@N, keyword avg (95% CI) | MAP, keyword avg (95% CI) | Queries | Non-matches |
 |---|---|---|---|---|---|---|
-| MFCC 0-4000 Hz, normalised (`htk_described_4k_pn`), thesis, no VTLN | 34.91 | 36.71 | n/s | n/s | 145 | n/a |
-| MFCC 0-4000 Hz, normalised (`htk_described_4k_pn`), thesis, VTLN | 36.26 | 39.62 | n/s | n/s | 145 | n/a |
-| MFCC 0-4000 Hz, normalised (`htk_described_4k_pn`), GMM-64, no VTLN | 37.04 (27.7-47.0) | 38.75 (28.5-50.0) | 34.23 (25.7-43.1) | 36.44 (27.0-46.2) | 145 | 1 |
-| MFCC 0-4000 Hz, normalised (`htk_described_4k_pn`), GMM-64, GMM-VTLN | 45.10 (35.1-55.5) | 48.10 (37.0-59.8) | 43.06 (32.7-53.6) | 45.80 (35.0-56.9) | 145 | 2 |
+| MFCC thesis (`Tab:TIMITPerformance`), no VTLN | 34.91 | 36.71 | n/s | n/s | 145 | n/a |
+| MFCC thesis (`Tab:TIMITVTLNPerformance1`), VTLN | 36.26 | 39.62 | n/s | n/s | 145 | n/a |
+| MFCC 0-4000 Hz, normalised (`htk_described_4k_pn`), per-clip, earlier reference (D7), GMM-64, no VTLN | 37.04 (27.7-47.0) | 38.75 (28.5-50.0) | 34.23 (25.7-43.1) | 36.44 (27.0-46.2) | 145 | 1 |
+| MFCC 0-4000 Hz, normalised (`htk_described_4k_pn`), per-clip, earlier reference (D7), GMM-64, GMM-VTLN | 45.10 (35.1-55.5) | 48.10 (37.0-59.8) | 43.06 (32.7-53.6) | 45.80 (35.0-56.9) | 145 | 2 |
 | MFCC 0-4000 Hz, un-normalised (earlier reference), GMM-64, no VTLN | 37.48 (28.0-47.6) | 40.50 (30.1-52.1) | 35.07 (26.6-43.9) | 37.84 (28.4-47.6) | 145 | 3 |
 | MFCC 0-4000 Hz, un-normalised (earlier reference), GMM-64, GMM-VTLN | 48.17 (37.3-59.9) | 50.58 (39.0-62.9) | 44.95 (34.5-55.9) | 46.88 (35.7-58.5) | 145 | 1 |
-| PLP 0-4000 Hz, normalised (`htk_described_4k_pn`), thesis, no VTLN | 35.50 | 37.58 | n/s | n/s | 145 | n/a |
-| PLP 0-4000 Hz, normalised (`htk_described_4k_pn`), thesis, VTLN | 37.48 | 39.95 | n/s | n/s | 145 | n/a |
-| PLP 0-4000 Hz, normalised (`htk_described_4k_pn`), GMM-64, no VTLN | 36.88 (28.0-46.4) | 37.83 (28.2-48.3) | 34.20 (26.0-42.7) | 35.25 (26.6-44.1) | 145 | 0 |
-| PLP 0-4000 Hz, normalised (`htk_described_4k_pn`), GMM-64, GMM-VTLN | 45.85 (36.3-56.5) | 49.03 (38.4-60.6) | 44.61 (34.9-54.6) | 47.34 (36.7-58.3) | 145 | 0 |
+| PLP thesis (`Tab:TIMITPerformance`), no VTLN | 35.50 | 37.58 | n/s | n/s | 145 | n/a |
+| PLP thesis (`Tab:TIMITVTLNPerformance1`), VTLN | 37.48 | 39.95 | n/s | n/s | 145 | n/a |
+| PLP 0-4000 Hz, normalised (`htk_described_4k_pn`), per-clip, earlier reference (D7), GMM-64, no VTLN | 36.88 (28.0-46.4) | 37.83 (28.2-48.3) | 34.20 (26.0-42.7) | 35.25 (26.6-44.1) | 145 | 0 |
+| PLP 0-4000 Hz, normalised (`htk_described_4k_pn`), per-clip, earlier reference (D7), GMM-64, GMM-VTLN | 45.85 (36.3-56.5) | 49.03 (38.4-60.6) | 44.61 (34.9-54.6) | 47.34 (36.7-58.3) | 145 | 0 |
 | PLP 0-4000 Hz, un-normalised (earlier reference), GMM-64, no VTLN | 38.59 (29.1-48.5) | 39.75 (29.3-50.9) | 35.82 (27.1-44.8) | 36.81 (27.5-46.5) | 145 | 0 |
 | PLP 0-4000 Hz, un-normalised (earlier reference), GMM-64, GMM-VTLN | 45.37 (35.5-56.2) | 48.99 (38.2-60.9) | 43.29 (33.6-53.5) | 46.55 (36.0-57.7) | 145 | 0 |
 
@@ -1161,9 +1210,12 @@ The last column puts the thesis's gain against our instance interval
 
 MFCC-TMP (`timit_matlab`) is the same row as in the earlier tables. The
 thesis's MFCC-TMP advantage is +5.12 / +4.79 without VTLN and +6.62 / +5.90
-with VTLN. As before, the features differ in lineage, filter count, level
-handling and VTLN response at once, so nothing is claimed about Teager
-energy.
+with VTLN. Under VTLN it is not reproduced (-1.03 / -0.73; the thesis's values
+lie above our intervals). Without VTLN the direction matches (+2.14 / +2.40,
+both intervals include 0); the thesis's p@N advantage lies above our interval
+and its MAP advantage lies inside it. As before, the features differ in
+lineage, filter count, level handling and VTLN response at once, so nothing is
+claimed about Teager energy.
 
 #### Gain split of the normalised rows (model only, selection only)
 
@@ -1255,11 +1307,50 @@ Final train alpha-hat histogram (thesis label, counts of 3696):
   +1.98 / +2.37), which lie below our instance intervals. No cause is
   claimed.
 - MFCC-TMP minus MFCC: without VTLN +2.14 / +2.40 and with VTLN -1.03 /
-  -0.73; every interval includes 0. The thesis's MFCC-TMP advantage is not
-  reproduced under the normalised reference either; nothing is claimed about
-  Teager energy. PLP minus MFCC intervals all include 0.
+  -0.73; every interval includes 0. Under VTLN the thesis's MFCC-TMP advantage
+  is not reproduced; without VTLN the direction matches, and the thesis's p@N
+  advantage lies above our interval while its MAP advantage lies inside it.
+  Nothing is claimed about Teager energy. PLP minus MFCC intervals all include 0.
 - Gain split: for MFCC neither cell's interval excludes 0 (model only
   +0.92 / +1.98, selection only +2.14 / +2.79); for PLP *selection only*
   excludes 0 (+4.48 / +5.71) and *model only* does not (-0.98 / +1.10).
 - `ll_decreased` fired at iteration 3 (MFCC) and at 1, 3 and 4 (PLP);
   `selection_step_ok` held in every iteration of both runs.
+  `selection_step_ok` holds by construction (alpha-hat_k maximises each
+  utterance's LL under lambda_{k-1}); it is a bug guard, not an empirical
+  finding.
+
+**Level handling (Reviewer checks, post hoc, not declared).**
+
+- Under `pn`, alpha-hat is invariant to waveform gain on real utterances: 100
+  train utterances (seed 1), waveform x0.5 and x2, under lambda_r, changed for
+  0 % of utterances in both MFCC and PLP. K4 tests the same invariance on
+  synthetic signals.
+- The paired VTLN gain stays at +8.07 / +9.35 (MFCC) and +8.97 / +11.20 (PLP).
+  Level normalisation therefore does not bring our VTLN gain to the thesis's.
+  The 1.12 edge share is unchanged: MFCC 0.128 against 0.129 un-normalised,
+  PLP 0.197 against 0.200.
+- Every thesis row lies inside our marginal keyword-cluster intervals. The
+  paired gain is the comparison that separates us from the thesis.
+- Two things change in every `pn` minus un-normalised comparison. The
+  normalisation changes, and a query/document level mismatch appears: query
+  clips are peak-normalised on their own, while documents and training
+  utterances are normalised per utterance. Over the 145 queries (post hoc, from
+  `qbestd.eval.post_hoc`, commit `b4aeebb`), the ratio of utterance peak to clip
+  peak has median 1.44, p90 2.70 and max 4.96. The VTLN minus no-VTLN
+  comparisons within `pn` carry the same mismatch on both sides.
+
+**Convergence and query edges (caveat only).** The share of train utterances
+whose warp changed at iteration 4 is 0.204 (MFCC) and 0.146 (PLP). The final
+train 1.12 shares are still growing (0.128 and 0.197). The grid stays 0.88 to
+1.12, the thesis grid, and N_iter = 5 is the thesis value. The query 1.12
+shares are 0.228 (MFCC) and 0.290 (PLP) under `pn`, against 0.186 and 0.283
+without normalisation, so `pn` adds about 0.04 and 0.01. The query excess is
+therefore mostly a clip property, with no level effect shown. The cause (for
+example short clips giving noisy alpha-hat) is not measured here.
+
+**Status (D7, user decision 2026-11-21, author fact).** The thesis normalised
+the whole utterance and then cut the query from it. The per-clip `pn` rows
+above are now the earlier reference. The reference query path is the
+level-matched clip, `clip_lm`, which section "Level-matched reference (D7)"
+reports once N2 has run.
