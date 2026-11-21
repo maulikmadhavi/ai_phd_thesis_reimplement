@@ -25,6 +25,10 @@ import numpy as np
 
 from qbestd.data.timit_hf import download_timit_parquet, iter_timit_rows
 from qbestd.data.warped_cache import build_warped_caches
+from qbestd.eval.query_features import (
+    level_matched_clip,
+    level_matched_config,
+)
 from qbestd.eval.timit_queries import cut_clip
 from qbestd.features.extract import extract_features, extract_warped_bank
 from qbestd.ml.vtln import (
@@ -115,7 +119,7 @@ def inherited_clip_features(clip, sample_rate, kind, config, alpha):
 
 def vtln_inputs(gmm, doc_keys, examples, audio, paths, kind, profile,
                 config, source_alphas=None, warps=WARP_FACTORS,
-                inherit=False):
+                inherit=False, query_mode="clip"):
     """Warped document posteriorgrams, query features and a summary dict.
 
     Args:
@@ -127,17 +131,28 @@ def vtln_inputs(gmm, doc_keys, examples, audio, paths, kind, profile,
             the share of queries whose alpha-hat differs from it.
         inherit: ``query_inherit``: each query clip takes ``source_alphas``
             instead of its own estimate; a missing source is an error.
+        query_mode: ``clip`` (cut from the audio) or ``clip_lm`` (cut from the
+            normalised utterance, extracted without normalisation, cycle 10).
 
     Returns:
         ``(posteriorgrams, query_features, info)``; a query whose clip is too
         short gets an empty feature array (and no alpha-hat).
     """
+    if query_mode not in ("clip", "clip_lm"):
+        raise ValueError(f"VTLN queries take clip or clip_lm, not "
+                         f"{query_mode!r}")
     doc_alphas, grams = estimate_test_warps(paths, gmm, doc_keys, kind,
                                             profile, warps)
     queries, alphas, differs = [], [], []
     for example in examples:
         row = audio[(example.hf_split, example.row_index)]
-        clip = cut_clip(row.audio, row.sample_rate, example)
+        if query_mode == "clip_lm":
+            clip = level_matched_clip(row.audio, row.sample_rate, example,
+                                      config)
+            query_config = level_matched_config(config)
+        else:
+            clip = cut_clip(row.audio, row.sample_rate, example)
+            query_config = config
         source = (source_alphas or {}).get((example.hf_split,
                                             example.row_index))
         if inherit and source is None:
@@ -145,13 +160,13 @@ def vtln_inputs(gmm, doc_keys, examples, audio, paths, kind, profile,
         try:
             if inherit:
                 features = inherited_clip_features(
-                    clip, row.sample_rate, kind, config, source)
+                    clip, row.sample_rate, kind, query_config, source)
                 if features is None:
                     raise ValueError("clip too short for a frame")
                 alpha = source
             else:
                 features, alpha = clip_warp_features(
-                    clip, row.sample_rate, kind, config, gmm, warps)
+                    clip, row.sample_rate, kind, query_config, gmm, warps)
         except ValueError:
             queries.append(np.zeros((0, gmm.dim)))
             continue
@@ -159,7 +174,7 @@ def vtln_inputs(gmm, doc_keys, examples, audio, paths, kind, profile,
         alphas.append(alpha)
         if source is not None:
             differs.append(alpha != source)
-    info = {"query_features": "clip",
+    info = {"query_features": query_mode,
             "query_alpha": "inherited" if inherit else "own",
             "test_warp_histogram": warp_histogram(doc_alphas, warps),
             "test_edge_shares": edge_shares(doc_alphas, warps),

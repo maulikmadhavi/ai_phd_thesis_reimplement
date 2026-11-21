@@ -96,7 +96,9 @@ def parse_args(argv=None):
     parser.add_argument("--query-features", default="clip", choices=MODES,
                         help="clip (primary): features of the cut clip; "
                         "slice (sensitivity): frames of the whole "
-                        "utterance inside the interval")
+                        "utterance inside the interval; clip_lm (D7): "
+                        "clip of the peak- and mean-normalised utterance, "
+                        "extracted without normalisation")
     parser.add_argument("--split-manifest", type=Path, default=None,
                         help="text-disjoint manifest (default: HF split)")
     parser.add_argument("--limit-queries", type=int, default=None,
@@ -226,7 +228,8 @@ def vtln_run_inputs(args, gmm, info, doc_rows, examples):
     return vtln_inputs(
         gmm, doc_rows, examples, load_example_audio(examples), paths,
         args.kind, args.profile, get_profile(args.profile, args.kind),
-        sources, inherit=args.vtln_cell == "query_inherit")
+        sources, inherit=args.vtln_cell == "query_inherit",
+        query_mode=args.query_features)
 
 
 def load_inputs(args, selection):
@@ -303,7 +306,8 @@ def main(argv=None):
         "model_content_sha256": gmm_content_sha256(gmm),
         "model_info": info, "split_id": split_id,
         "feature_fingerprint": fingerprint,
-        "query_features": "clip" if warped else args.query_features,
+        "query_features": (vtln_info["query_features"] if warped
+                           else args.query_features),
         "model_type": model_type, "vtln_cell": args.vtln_cell,
         "mean_entropy_documents": mean_posteriorgram_entropy(document_posts),
         "mean_entropy_queries": mean_posteriorgram_entropy(query_posts),
