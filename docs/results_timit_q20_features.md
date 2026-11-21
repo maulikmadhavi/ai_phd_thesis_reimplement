@@ -1354,3 +1354,39 @@ the whole utterance and then cut the query from it. The per-clip `pn` rows
 above are now the earlier reference. The reference query path is the
 level-matched clip, `clip_lm`, which section "Level-matched reference (D7)"
 reports once N2 has run.
+
+## Stage 4: c0 null and edge margins (cycle 10, N1, declared)
+
+**Declared before any N1 number** (cycle 10, plan section 9 N1; user decision
+D7, 2026-11-21, compute approved). Score-free: no retrieval score, no model is
+trained. Question: is the c0 share of alpha-hat changes distinct from refit
+churn and from the other cepstral dimensions, and what do the edge margins
+say about the 1.12 pile-up?
+
+- **Runs (six VTLN train runs, final lambda_r = `*_vtln5.npz`):** the four
+  un-normalised runs (MFCC 0-3400 Hz run 1, MFCC 0-4000 Hz, PLP 0-4000 Hz,
+  MFCC-TMP `timit_matlab`) and the two `pn` runs (MFCC, PLP).
+- **Churn null:** for each run, the share of the 3696 train utterances whose
+  all-dimensions alpha-hat under lambda_r differs from the iteration-4 trace
+  alpha-hat. The trace alpha-hat was chosen under the previous model, so this
+  is the same kind of change as the refit between iterations.
+- **Dimension control:** MFCC 0-4000 Hz, un-normalised. Drop each static
+  column c_k, k = 0 (c0, the reference) to 12, in turn, with the rest of the
+  S1 (a) code. Report the share of utterances whose alpha-hat differs from the
+  all-dimensions alpha-hat under lambda_r, and the rank of c0's share among the
+  13 static columns.
+- **Reading rule, fixed now:** c0 is "distinct from refit churn" only if its
+  share is above both the MFCC 0-4000 Hz churn share and the largest c_k
+  share. Otherwise the doc says "of the same size as churn" or "of the same
+  size as the other dimensions", whichever holds.
+- **Edge margins:** from each run's `iter4_ll_matrix.npy`. Thesis label: for
+  utterances whose trace alpha-hat is 1.12, the margin is LL(1.12) - LL(1.10);
+  for 0.88, LL(0.88) - LL(0.90). In our label these are the columns 0.88 minus
+  0.90 and 1.12 minus 1.10. Report the median, p10 and p90 per run. The
+  margins are reported and not labelled: a large margin would point to an
+  optimum beyond the grid, a margin near 0 to a flat likelihood.
+- **Checks before reading:** the trace alpha-hat must equal the argmax of the
+  saved matrix (it is the same selection); a mismatch is a STOP.
+- **Compute:** about 20 min. Outputs go to git-ignored `outputs/c0_null/`.
+- **Run from a clean tree**, with no commit while it runs. Each summary
+  records `git_commit_start` and `git_dirty: false`.
